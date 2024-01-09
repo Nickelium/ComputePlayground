@@ -7,11 +7,11 @@ struct UAV
 {
 	UAV();
 
-	D3D12_RESOURCE_DESC m_Desc = {};
-	D3D12_HEAP_PROPERTIES m_HeapProperties = {};
-	ComPtr<ID3D12Resource> m_GPUResource;
+	D3D12_RESOURCE_DESC m_desc = {};
+	D3D12_HEAP_PROPERTIES m_heap_properties = {};
+	ComPtr<ID3D12Resource> m_gpu_resource;
 
-	D3D12_RESOURCE_DESC m_ReadbackDesc = {};
-	D3D12_HEAP_PROPERTIES m_ReadbackHeapProperties = {};
-	ComPtr<ID3D12Resource> m_ReadbackResource;
+	D3D12_RESOURCE_DESC m_readback_desc = {};
+	D3D12_HEAP_PROPERTIES m_readback_heap_properties = {};
+	ComPtr<ID3D12Resource> m_read_back_resource;
 };

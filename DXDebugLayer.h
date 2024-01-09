@@ -2,29 +2,21 @@
 #include "Common.h"
 #include "IDXDebugLayer.h"
 
-#if defined(_DEBUG)
-
 struct IDXGIDebug1;
 struct ID3D12Debug5;
 void PIXCaptureAndOpen();
-enum class GRAPHICS_DEBUGGER_TYPE
-{
-	PIX,
-	RENDERDOC,
-};
 class DXDebugLayer : public IDXDebugLayer
 {
 public:
-	DXDebugLayer(GRAPHICS_DEBUGGER_TYPE type);
+	DXDebugLayer(GRAPHICS_DEBUGGER_TYPE gd_type);
 	virtual ~DXDebugLayer();
 	virtual void Init() override;
 	virtual void Close() override;
 private:
-	ComPtr<IDXGIDebug1> m_dxgiDebug;
-	ComPtr<ID3D12Debug5> m_d3d12Debug;
-	HMODULE m_pixModule;
-	HMODULE m_renderdocModule;
+	ComPtr<IDXGIDebug1> m_dxgi_debug;
+	ComPtr<ID3D12Debug5> m_d3d12_debug;
+	HMODULE m_pix_module;
+	HMODULE m_renderdoc_module;
 
-	GRAPHICS_DEBUGGER_TYPE m_graphicsDebuggerType;
+	GRAPHICS_DEBUGGER_TYPE m_graphics_debugger_type;
 };
-#endif

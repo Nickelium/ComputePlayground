@@ -109,6 +109,7 @@ xcopy /y /d $(ProjectDir)DXC\bin\x64\dxil.dll $(OutDir)</Command>
     <ClCompile Include="DXCommon.cpp" />
     <ClCompile Include="DXCompiler.cpp" />
     <ClCompile Include="DXContext.cpp" />
+    <ClCompile Include="DXDebugContext.cpp" />
     <ClCompile Include="DXDebugLayer.cpp" />
     <ClCompile Include="DXResource.cpp" />
     <ClCompile Include="DXWindow.cpp" />
@@ -127,6 +128,7 @@ xcopy /y /d $(ProjectDir)DXC\bin\x64\dxil.dll $(OutDir)</Command>
     <ClInclude Include="DXCommon.h" />
     <ClInclude Include="DXCompiler.h" />
     <ClInclude Include="DXContext.h" />
+    <ClInclude Include="DXDebugContext.h" />
     <ClInclude Include="DXDebugLayer.h" />
     <ClInclude Include="DXNullDebugLayer.h" />
     <ClInclude Include="DXResource.h" />

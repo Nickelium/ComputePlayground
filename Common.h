@@ -1,7 +1,6 @@
 #pragma once
 
 #include <vector>
-#include <cassert>
 #include <string>
 #include <iterator>
 #include <vector>
@@ -41,13 +40,24 @@ namespace std
 	}
 }
 
-#if defined(_DEBUG)
 void operator>>(HRSourceLocation hrSourceLocation, CheckToken);
-#else
-void operator>>(HRSourceLocation, CheckToken) {}
-#endif
 
 int __cdecl CrtDbgHook(int nReportType, char* szMsg, int* pnRet);
 
 #define DISABLE_OPTIMISATIONS() __pragma( optimize( "", off ) )
 #define ENABLE_OPTIMISATIONS() __pragma( optimize( "", on ) )
+#define DEBUG_BREAK() __debugbreak()
+// https://web.archive.org/web/20201129200055/http://cnicholson.net/2009/02/stupid-c-tricks-adventures-in-assert/
+#define UNUSED(x) do { (void)sizeof(x); } while(false)
+#if defined(_DEBUG)
+#include <cassert>
+#define ASSERT(x) assert(x)
+#else
+#define ASSERT(x) UNUSED(x)
+#endif
+// TODO remove this from non debug
+enum class GRAPHICS_DEBUGGER_TYPE
+{
+	PIX,
+	RENDERDOC,
+};

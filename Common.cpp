@@ -4,6 +4,7 @@ CheckToken CHK = CheckToken{};
 
 void operator>>(HRSourceLocation hrSourceLocation, CheckToken)
 {
+#if defined(_DEBUG)
 	if (hrSourceLocation.m_hr != S_OK)
 	{
 		// TODO HResult into string
@@ -14,11 +15,15 @@ void operator>>(HRSourceLocation hrSourceLocation, CheckToken)
 			std::to_wstring(hrSourceLocation.m_sourceLocation.line()) + L"\n";
 		OutputDebugStringW(stringOuput.c_str());
 		printf("%ls", stringOuput.c_str());
-		assert(false);
+		ASSERT(false);
 	}
+
+#else
+	UNUSED(hrSourceLocation);
+#endif
 }
 
-int __cdecl CrtDbgHook(int nReportType, char* szMsg, int* pnRet)
+int __cdecl CrtDbgHook(int /*nReportType*/, char* /*szMsg*/, int* /*pnRet*/)
 {
 	__debugbreak();
 	return TRUE;//Return true - Abort,Retry,Ignore dialog will *not* be displayed

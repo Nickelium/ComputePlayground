@@ -14,7 +14,7 @@ namespace LA
 
 	Vector2& Vector2::operator/=(float32 f)
 	{
-		assert(f != 0.0f);
+		ASSERT(f != 0.0f);
 		return *this *= (1.0f / f);
 	}
 
@@ -61,7 +61,7 @@ namespace LA
 
 	float32& Vector2::operator[](int32 i)
 	{
-		assert(i >= 0 && i < NUMBER_ELEMENTS);
+		ASSERT(i >= 0 && i < NUMBER_ELEMENTS);
 		if (i == 0)
 			return x;
 		else
@@ -70,7 +70,7 @@ namespace LA
 
 	float32 Vector2::operator[](int32 i) const
 	{
-		assert(i >= 0 && i < NUMBER_ELEMENTS);
+		ASSERT(i >= 0 && i < NUMBER_ELEMENTS);
 		if (i == 0)
 			return x;
 		else
@@ -89,7 +89,7 @@ namespace LA
 
 	Vector3& Vector3::operator/=(float32 f)
 	{
-		assert(f != 0.0f);
+		ASSERT(f != 0.0f);
 		return *this *= (1.0f / f);
 	}
 
@@ -139,7 +139,7 @@ namespace LA
 
 	float32& Vector3::operator[](int32 i)
 	{
-		assert(i >= 0 && i < NUMBER_ELEMENTS);
+		ASSERT(i >= 0 && i < NUMBER_ELEMENTS);
 		if (i == 0)
 			return x;
 		else if (i == 1)
@@ -150,7 +150,7 @@ namespace LA
 
 	float32 Vector3::operator[](int32 i) const
 	{
-		assert(i >= 0 && i < NUMBER_ELEMENTS);
+		ASSERT(i >= 0 && i < NUMBER_ELEMENTS);
 		if (i == 0)
 			return x;
 		else if (i == 1)
@@ -171,7 +171,7 @@ namespace LA
 
 	Vector2 operator/(const Vector2& v, float32 f)
 	{
-		assert(f != 0.0f);
+		ASSERT(f != 0.0f);
 		return v * (1.0f / f);
 	}
 
@@ -192,7 +192,7 @@ namespace LA
 
 	Vector3 operator/(const Vector3& v, float32 f)
 	{
-		assert(f != 0.0f);
+		ASSERT(f != 0.0f);
 		return v * (1.0f / f);
 	}
 
@@ -224,7 +224,7 @@ namespace LA
 
 	Vector2 Normalize(const Vector2& v)
 	{
-		assert(Length(v) != 0.0f);
+		ASSERT(Length(v) != 0.0f);
 		return v / Length(v);
 	}
 
@@ -240,7 +240,7 @@ namespace LA
 
 	Vector3 Normalize(const Vector3& v)
 	{
-		assert(Length(v) != 0.0f);
+		ASSERT(Length(v) != 0.0f);
 		return v / Length(v);
 	}
 

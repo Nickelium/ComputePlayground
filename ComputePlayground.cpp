@@ -1,14 +1,23 @@
 #include "Common.h"
 #include "DXCompiler.h"
 #include "DXContext.h"
+//#include "DX.h"
 #include "dxcapi.h" // DXC compiler
 #include "DXCommon.h"
+
+#include "DXContext.h"
+#if defined(_DEBUG)
+#include "DXDebugContext.h"
 #include "DXDebugLayer.h"
+#else
+#include "DXNullDebugLayer.h"
+#endif
 #include "DXWindow.h"
 #include "DXCommon.h"
 #include "DXResource.h"
 
 #include "maths/LinearAlgebra.h"
+
 DISABLE_OPTIMISATIONS()
 
 using namespace Microsoft::WRL; // ComPtr
@@ -16,74 +25,76 @@ using namespace Microsoft::WRL; // ComPtr
 struct Resources
 {
 	UAV m_uav;
-	ComPtr<IDxcBlob> m_computeShader;
-	ComPtr<ID3D12PipelineState> m_computePSO;
-	ComPtr<ID3D12RootSignature> m_computeRootSignature;
-	uint32_t m_kGroupSize;
-	uint32_t m_kDispatchCount;
+	ComPtr<IDxcBlob> m_compute_shader;
+	ComPtr<ID3D12PipelineState> m_compute_pso;
+	ComPtr<ID3D12RootSignature> m_compute_root_signature;
+	uint32_t m_group_size;
+	uint32_t m_dispatch_count;
 
 	// TODO add inputlayout
-	ComPtr<IDxcBlob> m_vertexShader;
-	ComPtr<IDxcBlob> m_pixelShader;
-	ComPtr<ID3D12PipelineState> m_gfxPSO;
-	ComPtr<ID3D12RootSignature> m_gfxRootSignature;
+	ComPtr<IDxcBlob> m_vertex_shader;
+	ComPtr<IDxcBlob> m_pixel_shader;
+	ComPtr<ID3D12PipelineState> m_gfx_pso;
+	ComPtr<ID3D12RootSignature> m_gfx_root_signature;
 };
 
-Resources CreateResources(const DXContext& dxContext)
+Resources CreateResources(const DXContext& dx_context)
 {
 	Resources resources{};
-	resources.m_kGroupSize = 1024;
-	resources.m_kDispatchCount = 1;
+	resources.m_group_size = 1024;
+	resources.m_dispatch_count = 1;
 
 	{
-		DXCompiler dxCompiler;
-		bool compileDebug{};
+		DXCompiler dx_compiler;
+		bool compile_debug{};
 #if defined(_DEBUG)
-		compileDebug = true;
+		compile_debug = true;
 #else
-		compileDebug = false;
+		compile_debug = false;
 #endif
-		dxCompiler.Init(compileDebug);
-		dxCompiler.Compile(&resources.m_computeShader, L"shaders/ComputeShader.hlsl", ShaderType::COMPUTE_SHADER);
-		dxCompiler.Compile(&resources.m_vertexShader, L"shaders/VertexShader.hlsl", ShaderType::VERTEX_SHADER);
-		dxCompiler.Compile(&resources.m_pixelShader, L"shaders/PixelShader.hlsl", ShaderType::PIXEL_SHADER);
+		dx_compiler.Init(compile_debug);
+		dx_compiler.Compile(&resources.m_compute_shader, L"shaders/ComputeShader.hlsl", ShaderType::COMPUTE_SHADER);
+		dx_compiler.Compile(&resources.m_vertex_shader, L"shaders/VertexShader.hlsl", ShaderType::VERTEX_SHADER);
+		dx_compiler.Compile(&resources.m_pixel_shader, L"shaders/PixelShader.hlsl", ShaderType::PIXEL_SHADER);
 	}
 
-	resources.m_uav.m_Desc.Width = resources.m_kGroupSize * resources.m_kDispatchCount * sizeof(float32) * 4;
-	resources.m_uav.m_ReadbackDesc.Width = resources.m_uav.m_Desc.Width;
-	dxContext.GetDevice()->CreateCommittedResource(&resources.m_uav.m_HeapProperties, D3D12_HEAP_FLAG_NONE, &resources.m_uav.m_Desc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&resources.m_uav.m_GPUResource)) >> CHK;
-	dxContext.GetDevice()->CreateCommittedResource(&resources.m_uav.m_ReadbackHeapProperties, D3D12_HEAP_FLAG_NONE, &resources.m_uav.m_ReadbackDesc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&resources.m_uav.m_ReadbackResource)) >> CHK;
+	resources.m_uav.m_desc.Width = resources.m_group_size * resources.m_dispatch_count * sizeof(float32) * 4;
+	resources.m_uav.m_readback_desc.Width = resources.m_uav.m_desc.Width;
+	dx_context.GetDevice()->CreateCommittedResource(&resources.m_uav.m_heap_properties, D3D12_HEAP_FLAG_NONE, &resources.m_uav.m_desc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&resources.m_uav.m_gpu_resource)) >> CHK;
+	dx_context.GetDevice()->CreateCommittedResource(&resources.m_uav.m_readback_heap_properties, D3D12_HEAP_FLAG_NONE, &resources.m_uav.m_readback_desc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&resources.m_uav.m_read_back_resource)) >> CHK;
 
 	// Root signature embed in the shader already
-	dxContext.GetDevice()->CreateRootSignature(0, resources.m_computeShader->GetBufferPointer(), resources.m_computeShader->GetBufferSize(), IID_PPV_ARGS(&resources.m_computeRootSignature)) >> CHK;
+	dx_context.GetDevice()->CreateRootSignature(0, resources.m_compute_shader->GetBufferPointer(), resources.m_compute_shader->GetBufferSize(), IID_PPV_ARGS(&resources.m_compute_root_signature)) >> CHK;
 
 	D3D12_COMPUTE_PIPELINE_STATE_DESC pso_desc =
 	{
-		.pRootSignature = resources.m_computeRootSignature.Get(),
+		.pRootSignature = resources.m_compute_root_signature.Get(),
 		.CS = 
 		{
-			.pShaderBytecode = resources.m_computeShader->GetBufferPointer(),
-			.BytecodeLength = resources.m_computeShader->GetBufferSize(),
+			.pShaderBytecode = resources.m_compute_shader->GetBufferPointer(),
+			.BytecodeLength = resources.m_compute_shader->GetBufferSize(),
 		},
 	};
-	dxContext.GetDevice()->CreateComputePipelineState(&pso_desc, IID_PPV_ARGS(&resources.m_computePSO)) >> CHK;
+	dx_context.GetDevice()->CreateComputePipelineState(&pso_desc, IID_PPV_ARGS(&resources.m_compute_pso)) >> CHK;
 	return resources;
 }
 
-IDXDebugLayer* CreateDebugLayer(GRAPHICS_DEBUGGER_TYPE gdType)
+IDXDebugLayer* CreateDebugLayer(GRAPHICS_DEBUGGER_TYPE gd_type)
 {
 #if defined(_DEBUG)
-	return new DXDebugLayer(gdType);
+	return new DXDebugLayer(gd_type);
 #else
+	UNUSED(gd_type);
 	return new DXNullDebugLayer();
 #endif
 }
 
-DXContext* CreateDXContext(GRAPHICS_DEBUGGER_TYPE gdType)
+DXContext* CreateDXContext(GRAPHICS_DEBUGGER_TYPE gd_type)
 {
 #if defined(_DEBUG)
-	return new DXDebugContext(gdType == GRAPHICS_DEBUGGER_TYPE::RENDERDOC);
+	return new DXDebugContext(gd_type == GRAPHICS_DEBUGGER_TYPE::RENDERDOC);
 #else
+	UNUSED(gd_type);
 	return new DXContext();
 #endif
 }
@@ -91,24 +102,24 @@ DXContext* CreateDXContext(GRAPHICS_DEBUGGER_TYPE gdType)
 int main()
 {
 	_CrtSetReportHook2(_CRT_RPTHOOK_INSTALL, CrtDbgHook);
-	GRAPHICS_DEBUGGER_TYPE gdType = GRAPHICS_DEBUGGER_TYPE::PIX;
-	IDXDebugLayer* pDxDebugLayer = CreateDebugLayer(gdType);
-	pDxDebugLayer->Init();
+	GRAPHICS_DEBUGGER_TYPE gd_type = GRAPHICS_DEBUGGER_TYPE::PIX;
+	IDXDebugLayer* dx_debug_layer = CreateDebugLayer(gd_type);
+	dx_debug_layer->Init();
 	{
 		// load
-		DXContext* pDxContext = CreateDXContext(gdType);
-		pDxContext->Init();
+		DXContext* dx_context = CreateDXContext(gd_type);
+		dx_context->Init();
 		D3D12_FEATURE_DATA_D3D12_OPTIONS feature;
-		pDxContext->GetDevice()->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS, &feature, sizeof(feature)) >> CHK;
+		dx_context->GetDevice()->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS, &feature, sizeof(feature)) >> CHK;
 
-		D3D12_DESCRIPTOR_HEAP_DESC descHeapDesc = {};
-		descHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-		descHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-		descHeapDesc.NumDescriptors = 1;
-		Resources resource = CreateResources(*pDxContext);
-		ComPtr<ID3D12Resource2> vertexBuffer;
-		D3D12_VERTEX_BUFFER_VIEW vertexBufferView;
-		uint32_t vertexCount;
+		D3D12_DESCRIPTOR_HEAP_DESC desc_heap_desc = {};
+		desc_heap_desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+		desc_heap_desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+		desc_heap_desc.NumDescriptors = 1;
+		Resources resource = CreateResources(*dx_context);
+		ComPtr<ID3D12Resource2> vertex_buffer;
+		D3D12_VERTEX_BUFFER_VIEW vertex_buffer_view;
+		uint32_t vertex_count;
 		{
 
 			struct Vertex
@@ -117,21 +128,20 @@ int main()
 				float3 color;
 			};
 
-			Vertex vertexData[] =
+			Vertex vertex_data[] =
 			{
 				{ {+0.0f, +0.25f}, {1.0f, 0.0f, 0.0f} },
 				{ {+0.25f, -0.25f}, {0.0f, 1.0f, 0.0f} },
 				{ {-0.25f, -0.25f}, {0.0f, 0.0f, 1.0f} },
 			};
 
-			vertexCount = _countof(vertexData);
+			vertex_count = _countof(vertex_data);
 
-			uint32_t numberVertices = _countof(vertexData);
-			D3D12_RESOURCE_DESC vertexDesc =
+			D3D12_RESOURCE_DESC vertex_desc =
 			{
 				.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER,
 				.Alignment = D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT, // 64 * 1024 bytes = 64kB
-				.Width = sizeof(vertexData),
+				.Width = sizeof(vertex_data),
 				.Height = 1,
 				.DepthOrArraySize = 1,
 				.MipLevels = 1,
@@ -144,7 +154,7 @@ int main()
 				.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR, // In order, no swizzle
 				.Flags = D3D12_RESOURCE_FLAG_NONE,
 			};
-			D3D12_HEAP_PROPERTIES heapProperties =
+			D3D12_HEAP_PROPERTIES heap_properties =
 			{
 				.Type = D3D12_HEAP_TYPE_DEFAULT,
 				.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN,
@@ -152,15 +162,15 @@ int main()
 				.CreationNodeMask = 1,
 				.VisibleNodeMask = 1,
 			};
-			pDxContext->GetDevice()->CreateCommittedResource
+			dx_context->GetDevice()->CreateCommittedResource
 			(
-				&heapProperties, D3D12_HEAP_FLAG_NONE, &vertexDesc,
+				&heap_properties, D3D12_HEAP_FLAG_NONE, &vertex_desc,
 				D3D12_RESOURCE_STATE_COPY_DEST, nullptr,
-				IID_PPV_ARGS(&vertexBuffer)
+				IID_PPV_ARGS(&vertex_buffer)
 			) >> CHK;
-			vertexBuffer->SetName(L"VertexBuffer");
+			vertex_buffer->SetName(L"VertexBuffer");
 
-			D3D12_HEAP_PROPERTIES heapPropertiesUpload =
+			D3D12_HEAP_PROPERTIES heap_properties_upload =
 			{
 				.Type = D3D12_HEAP_TYPE_UPLOAD,
 				.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN,
@@ -168,43 +178,43 @@ int main()
 				.CreationNodeMask = 1,
 				.VisibleNodeMask = 1,
 			};
-			ComPtr<ID3D12Resource2> vertexUploadBuffer;
-			pDxContext->GetDevice()->CreateCommittedResource
+			ComPtr<ID3D12Resource2> vertex_upload_buffer;
+			dx_context->GetDevice()->CreateCommittedResource
 			(
-				&heapPropertiesUpload, D3D12_HEAP_FLAG_NONE, &vertexDesc,
+				&heap_properties_upload, D3D12_HEAP_FLAG_NONE, &vertex_desc,
 				D3D12_RESOURCE_STATE_GENERIC_READ, nullptr,
-				IID_PPV_ARGS(&vertexUploadBuffer)
+				IID_PPV_ARGS(&vertex_upload_buffer)
 			) >> CHK;
-			vertexUploadBuffer->SetName(L"VertexUploadBuffer");
+			vertex_upload_buffer->SetName(L"VertexUploadBuffer");
 			Vertex* data = nullptr;
-			vertexUploadBuffer->Map(0, nullptr, reinterpret_cast<void**>(&data)) >> CHK;
-			memcpy(data, vertexData, sizeof(vertexData));
-			vertexUploadBuffer->Unmap(0, nullptr);
-			pDxContext->InitCommandList();
-			pDxContext->GetCommandList()->CopyResource(vertexBuffer.Get(), vertexUploadBuffer.Get());
+			vertex_upload_buffer->Map(0, nullptr, reinterpret_cast<void**>(&data)) >> CHK;
+			memcpy(data, vertex_data, sizeof(vertex_data));
+			vertex_upload_buffer->Unmap(0, nullptr);
+			dx_context->InitCommandList();
+			dx_context->GetCommandList()->CopyResource(vertex_buffer.Get(), vertex_upload_buffer.Get());
 			D3D12_RESOURCE_BARRIER barriers[1]{};
 			barriers[0] =
 			{
 				.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION,
 				.Transition =
 				{
-					.pResource = vertexBuffer.Get(),
+					.pResource = vertex_buffer.Get(),
 					.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
 					.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST,
 					.StateAfter = D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER,
 				},
 			};
-			pDxContext->GetCommandList()->ResourceBarrier(_countof(barriers), &barriers[0]);
-			pDxContext->ExecuteCommandList();
+			dx_context->GetCommandList()->ResourceBarrier(_countof(barriers), &barriers[0]);
+			dx_context->ExecuteCommandList();
 
-			vertexBufferView =
+			vertex_buffer_view =
 			{
-				.BufferLocation = vertexBuffer->GetGPUVirtualAddress(),
-				.SizeInBytes = sizeof(vertexData),
-				.StrideInBytes = sizeof(vertexData[0]),
+				.BufferLocation = vertex_buffer->GetGPUVirtualAddress(),
+				.SizeInBytes = sizeof(vertex_data),
+				.StrideInBytes = sizeof(vertex_data[0]),
 			};
 
-			D3D12_INPUT_ELEMENT_DESC elementsDesc[] =
+			D3D12_INPUT_ELEMENT_DESC element_descs[] =
 			{
 				{ 
 					.SemanticName = "Position",
@@ -225,26 +235,26 @@ int main()
 					.InstanceDataStepRate = 0,
 				},
 			};
-			D3D12_INPUT_LAYOUT_DESC layoutDesc =
+			D3D12_INPUT_LAYOUT_DESC layout_desc =
 			{
-				.pInputElementDescs = elementsDesc,
-				.NumElements = _countof(elementsDesc),
+				.pInputElementDescs = element_descs,
+				.NumElements = _countof(element_descs),
 			};
 
-			pDxContext->GetDevice()->CreateRootSignature(0, resource.m_vertexShader->GetBufferPointer(), resource.m_vertexShader->GetBufferSize(), IID_PPV_ARGS(&resource.m_gfxRootSignature)) >> CHK;
+			dx_context->GetDevice()->CreateRootSignature(0, resource.m_vertex_shader->GetBufferPointer(), resource.m_vertex_shader->GetBufferSize(), IID_PPV_ARGS(&resource.m_gfx_root_signature)) >> CHK;
 		
-			D3D12_GRAPHICS_PIPELINE_STATE_DESC gfxPSODesc =
+			D3D12_GRAPHICS_PIPELINE_STATE_DESC gfx_pso_desc =
 			{
-				.pRootSignature = resource.m_gfxRootSignature.Get(),
+				.pRootSignature = resource.m_gfx_root_signature.Get(),
 				.VS = 
 				{
-					.pShaderBytecode = resource.m_vertexShader->GetBufferPointer(),
-					.BytecodeLength = resource.m_vertexShader->GetBufferSize(),
+					.pShaderBytecode = resource.m_vertex_shader->GetBufferPointer(),
+					.BytecodeLength = resource.m_vertex_shader->GetBufferSize(),
 				},
 				.PS =
 				{
-					.pShaderBytecode = resource.m_pixelShader->GetBufferPointer(),
-					.BytecodeLength = resource.m_pixelShader->GetBufferSize(),
+					.pShaderBytecode = resource.m_pixel_shader->GetBufferPointer(),
+					.BytecodeLength = resource.m_pixel_shader->GetBufferSize(),
 				},
 				.DS = nullptr,
 				.HS = nullptr,
@@ -314,7 +324,7 @@ int main()
 						.StencilFunc = D3D12_COMPARISON_FUNC_ALWAYS,
 					},
 				},
-				.InputLayout = layoutDesc,
+				.InputLayout = layout_desc,
 				//.IBStripCutValue = nullptr,
 				.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE,
 				.NumRenderTargets = 1,
@@ -336,97 +346,97 @@ int main()
 				},
 				.Flags = D3D12_PIPELINE_STATE_FLAG_NONE,
 			};
-			pDxContext->GetDevice()->CreateGraphicsPipelineState(&gfxPSODesc, IID_PPV_ARGS(&resource.m_gfxPSO)) >> CHK;
+			dx_context->GetDevice()->CreateGraphicsPipelineState(&gfx_pso_desc, IID_PPV_ARGS(&resource.m_gfx_pso)) >> CHK;
 	}
 
-		DXWindow dxWindow;
-		dxWindow.Init(*pDxContext);
+		DXWindow dx_window;
+		dx_window.Init(*dx_context);
 		//dxWindow.SetFullScreen(false);
-		while (!dxWindow.ShouldClose())
+		while (!dx_window.ShouldClose())
 		{
 			// Process window message
-			dxWindow.Update();
+			dx_window.Update();
 			// Handle resizing
-			if (dxWindow.ShouldResize())
+			if (dx_window.ShouldResize())
 			{
-				pDxContext->Flush(dxWindow.GetBackBufferCount());
-				dxWindow.Resize(*pDxContext);
+				dx_context->Flush(dx_window.GetBackBufferCount());
+				dx_window.Resize(*dx_context);
 			}
 
-			pDxContext->InitCommandList();
+			dx_context->InitCommandList();
 			{
 				// Fill CommandList
-				dxWindow.BeginFrame(*pDxContext);
+				dx_window.BeginFrame(*dx_context);
 				// Compute Work
 				{
-					pDxContext->GetCommandList()->SetComputeRootSignature(resource.m_computeRootSignature.Get());
-					pDxContext->GetCommandList()->SetPipelineState(resource.m_computePSO.Get());
-					pDxContext->GetCommandList()->SetComputeRootUnorderedAccessView(0, resource.m_uav.m_GPUResource->GetGPUVirtualAddress());
-					pDxContext->GetCommandList()->Dispatch(resource.m_kDispatchCount, 1, 1);
+					dx_context->GetCommandList()->SetComputeRootSignature(resource.m_compute_root_signature.Get());
+					dx_context->GetCommandList()->SetPipelineState(resource.m_compute_pso.Get());
+					dx_context->GetCommandList()->SetComputeRootUnorderedAccessView(0, resource.m_uav.m_gpu_resource->GetGPUVirtualAddress());
+					dx_context->GetCommandList()->Dispatch(resource.m_dispatch_count, 1, 1);
 					D3D12_RESOURCE_BARRIER barriers[1]{};
 					barriers[0] =
 					{
 						.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION,
 						.Transition =
 						{
-							.pResource = resource.m_uav.m_GPUResource.Get(),
+							.pResource = resource.m_uav.m_gpu_resource.Get(),
 							.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
 							.StateBefore = D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
 							.StateAfter = D3D12_RESOURCE_STATE_COPY_SOURCE,
 						},
 					};
-					pDxContext->GetCommandList()->ResourceBarrier(_countof(barriers), &barriers[0]);
-					pDxContext->GetCommandList()->CopyResource(resource.m_uav.m_ReadbackResource.Get(), resource.m_uav.m_GPUResource.Get());
+					dx_context->GetCommandList()->ResourceBarrier(_countof(barriers), &barriers[0]);
+					dx_context->GetCommandList()->CopyResource(resource.m_uav.m_read_back_resource.Get(), resource.m_uav.m_gpu_resource.Get());
 				}
 				// Draw Work
 				{
-					D3D12_VIEWPORT viewPorts[] =
+					D3D12_VIEWPORT view_ports[] =
 					{
 						{
 							.TopLeftX = 0,
 							.TopLeftY = 0,
-							.Width = (float)dxWindow.GetWidth(),
-							.Height = (float)dxWindow.GetHeight(),
+							.Width = (float)dx_window.GetWidth(),
+							.Height = (float)dx_window.GetHeight(),
 							.MinDepth = 0,
 							.MaxDepth = 1,
 						}
 					};
-					D3D12_RECT scissorRects[] = 
+					D3D12_RECT scissor_rects[] = 
 					{
 						{
 							.left = 0,
 							.top = 0,
-							.right = (long)dxWindow.GetWidth(),
-							.bottom = (long)dxWindow.GetHeight(),
+							.right = (long)dx_window.GetWidth(),
+							.bottom = (long)dx_window.GetHeight(),
 						}
 					};
-					pDxContext->GetCommandList()->RSSetViewports(1, viewPorts);
-					pDxContext->GetCommandList()->RSSetScissorRects(1, scissorRects);
-					pDxContext->GetCommandList()->SetPipelineState(resource.m_gfxPSO.Get());
-					pDxContext->GetCommandList()->SetGraphicsRootSignature(resource.m_gfxRootSignature.Get());
-					pDxContext->GetCommandList()->IASetVertexBuffers(0, 1, &vertexBufferView);
-					pDxContext->GetCommandList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-					pDxContext->GetCommandList()->DrawInstanced(vertexCount, 1, 0, 0);
+					dx_context->GetCommandList()->RSSetViewports(1, view_ports);
+					dx_context->GetCommandList()->RSSetScissorRects(1, scissor_rects);
+					dx_context->GetCommandList()->SetPipelineState(resource.m_gfx_pso.Get());
+					dx_context->GetCommandList()->SetGraphicsRootSignature(resource.m_gfx_root_signature.Get());
+					dx_context->GetCommandList()->IASetVertexBuffers(0, 1, &vertex_buffer_view);
+					dx_context->GetCommandList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+					dx_context->GetCommandList()->DrawInstanced(vertex_count, 1, 0, 0);
 				}
-				dxWindow.EndFrame(*pDxContext);
+				dx_window.EndFrame(*dx_context);
 
 			}
-			pDxContext->ExecuteCommandList();
-			dxWindow.Present();
+			dx_context->ExecuteCommandList();
+			dx_window.Present();
 
 			float32* data = nullptr;
-			D3D12_RANGE range = { 0, resource.m_uav.m_ReadbackDesc.Width };
-			resource.m_uav.m_ReadbackResource->Map(0, &range, (void**)&data);
-			for (int i = 0; i < resource.m_uav.m_ReadbackDesc.Width / sizeof(float32) / 4; i++)
+			D3D12_RANGE range = { 0, resource.m_uav.m_readback_desc.Width };
+			resource.m_uav.m_read_back_resource->Map(0, &range, (void**)&data);
+			for (int i = 0; i < resource.m_uav.m_readback_desc.Width / sizeof(float32) / 4; i++)
 				printf("uav[%d] = %.3f, %.3f, %.3f, %.3f\n", i, data[i * 4 + 0], data[i * 4 + 1], data[i * 4 + 2], data[i * 4 + 3]);
-			resource.m_uav.m_ReadbackResource->Unmap(0, nullptr);
+			resource.m_uav.m_read_back_resource->Unmap(0, nullptr);
 		}
-		pDxContext->Flush(dxWindow.GetBackBufferCount());
-		dxWindow.Close();
-		delete pDxContext;
+		dx_context->Flush(dx_window.GetBackBufferCount());
+		dx_window.Close();
+		delete dx_context;
 
 	}
-	pDxDebugLayer->Close();
-	delete pDxDebugLayer;
+	dx_debug_layer->Close();
+	delete dx_debug_layer;
 	return 0;
 }

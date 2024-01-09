@@ -11,13 +11,13 @@ struct D3D12_CPU_DESCRIPTOR_HANDLE;
 class DXWindow
 {
 public:
-	static LRESULT CALLBACK OnWindowMessage(HWND handle, UINT msg, WPARAM wParam, LPARAM lParam);
+	static LRESULT CALLBACK OnWindowMessage(HWND handle, UINT msg, WPARAM w_param, LPARAM l_param);
 
-	void Init(const DXContext& dxContext);
+	void Init(const DXContext& dx_context);
 
-	void BeginFrame(const DXContext& dxContext);
+	void BeginFrame(const DXContext& dx_context);
 
-	void EndFrame(const DXContext& dxContext);
+	void EndFrame(const DXContext& dx_context);
 
 	void Present();
 
@@ -25,7 +25,7 @@ public:
 
 	void Update();
 
-	void Resize(const DXContext& dxContext);
+	void Resize(const DXContext& dx_context);
 
 	uint32_t GetBackBufferCount() const;
 
@@ -43,28 +43,28 @@ public:
 private:
 	void SetResolutionToMonitor();
 	void CreateWindowHandle();
-	void CreateSwapChain(const DXContext& dxContext);
+	void CreateSwapChain(const DXContext& dx_context);
 
-	void GetBuffers(const DXContext& dxContext);
+	void GetBuffers(const DXContext& dx_context);
 
 	void ReleaseBuffers();
 
-	ATOM m_wndClassAtom;
+	ATOM m_wnd_class_atom;
 	HWND m_handle;
 
-	bool m_shouldClose = false;
-	bool m_shouldResize = false;
-	bool m_fullScreen = false;
+	bool m_should_close = false;
+	bool m_should_resize = false;
+	bool m_full_screen = false;
 
-	ComPtr<IDXGISwapChain4> m_swapChain;
+	ComPtr<IDXGISwapChain4> m_swap_chain;
 	std::vector<ComPtr<ID3D12Resource2>> m_buffers;
 
-	ComPtr<ID3D12DescriptorHeap> m_rtvDescHeap;
-	std::vector<D3D12_CPU_DESCRIPTOR_HANDLE> m_rtvHandles;
+	ComPtr<ID3D12DescriptorHeap> m_rtv_desc_heap;
+	std::vector<D3D12_CPU_DESCRIPTOR_HANDLE> m_rtv_handles;
 
 	uint32_t m_width;
 	uint32_t m_height;
 
-	uint32_t m_backbufferCount = 3u;
-	uint32_t m_currentBufferIndex = 0u;
+	uint32_t m_backbuffer_count = 3u;
+	uint32_t m_current_buffer_index = 0u;
 };

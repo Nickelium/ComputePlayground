@@ -2,7 +2,7 @@
 
 UAV::UAV()
 {
-	m_HeapProperties =
+	m_heap_properties =
 	{
 		.Type = D3D12_HEAP_TYPE_DEFAULT,
 		.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN,
@@ -11,7 +11,7 @@ UAV::UAV()
 		.VisibleNodeMask = 0,
 	};
 
-	m_Desc =
+	m_desc =
 	{
 		.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER,
 		.Alignment = D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT,
@@ -29,9 +29,9 @@ UAV::UAV()
 		.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS,
 	};
 
-	m_ReadbackHeapProperties = m_HeapProperties;
-	m_ReadbackHeapProperties.Type = D3D12_HEAP_TYPE_READBACK;
+	m_readback_heap_properties = m_heap_properties;
+	m_readback_heap_properties.Type = D3D12_HEAP_TYPE_READBACK;
 
-	m_ReadbackDesc = m_Desc;
-	m_ReadbackDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+	m_readback_desc = m_desc;
+	m_readback_desc.Flags = D3D12_RESOURCE_FLAG_NONE;
 }

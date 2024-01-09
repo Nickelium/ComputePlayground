@@ -16,7 +16,7 @@ class DXCompiler
 {
 public:
 	void Init(bool debug);
-	void Compile(ComPtr<IDxcBlob>* outShaderBlob, std::wstring shaderPath, ShaderType shaderType);
+	void Compile(ComPtr<IDxcBlob>* out_shader_blob, std::wstring shader_path, ShaderType shader_type);
 private:
 	bool m_debug;
 

@@ -42,6 +42,9 @@
     <ClCompile Include="maths\LinearAlgebra.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="DXDebugContext.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="shaders\ComputeShader.hlsl" />
@@ -81,6 +84,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Types.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="DXDebugContext.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

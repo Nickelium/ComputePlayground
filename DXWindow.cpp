@@ -35,14 +35,14 @@ LRESULT CALLBACK DXWindow::OnWindowMessage(HWND handle, UINT msg, WPARAM wParam,
 				(reqWidth != pWindow->m_width || reqHeight != pWindow->m_height)
 				)
 		{
-			pWindow->m_shouldResize = true;
+			pWindow->m_should_resize = true;
 		}
 	}
 	break;
 	case WM_KEYDOWN:
 		if (wParam == VK_ESCAPE)
 		{
-			pWindow->m_shouldClose = true;
+			pWindow->m_should_close = true;
 		}
 		else if (wParam == VK_F11)
 		{
@@ -54,7 +54,7 @@ LRESULT CALLBACK DXWindow::OnWindowMessage(HWND handle, UINT msg, WPARAM wParam,
 		}
 		return 0;
 	case WM_CLOSE:
-		pWindow->m_shouldClose = true;
+		pWindow->m_should_close = true;
 		return 0;
 	default:
 		break;
@@ -69,7 +69,7 @@ void DXWindow::Init(const DXContext& dxContext)
 	CreateSwapChain(dxContext);
 
 	ComPtr<IDXGIFactory1> factory;
-	m_swapChain->GetParent(IID_PPV_ARGS(&factory)) >> CHK;
+	m_swap_chain->GetParent(IID_PPV_ARGS(&factory)) >> CHK;
 	// Requires to GetParent factory to work
 	factory->MakeWindowAssociation(m_handle, DXGI_MWA_NO_ALT_ENTER) >> CHK;
 
@@ -80,16 +80,16 @@ void DXWindow::Init(const DXContext& dxContext)
 		.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE,
 		.NodeMask = 0,
 	};
-	dxContext.GetDevice()->CreateDescriptorHeap(&rtvDescHeapDesc, IID_PPV_ARGS(&m_rtvDescHeap)) >> CHK;
+	dxContext.GetDevice()->CreateDescriptorHeap(&rtvDescHeapDesc, IID_PPV_ARGS(&m_rtv_desc_heap)) >> CHK;
 
-	m_rtvHandles.resize(GetBackBufferCount());
-	D3D12_CPU_DESCRIPTOR_HANDLE firstHandle = m_rtvDescHeap->GetCPUDescriptorHandleForHeapStart();
+	m_rtv_handles.resize(GetBackBufferCount());
+	D3D12_CPU_DESCRIPTOR_HANDLE firstHandle = m_rtv_desc_heap->GetCPUDescriptorHandleForHeapStart();
 	uint32_t incrementSize = dxContext.GetDevice()->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 	for (uint32_t i = 0; i < GetBackBufferCount(); ++i)
 	{
 		D3D12_CPU_DESCRIPTOR_HANDLE currentHandle{};
 		currentHandle.ptr = firstHandle.ptr + i * incrementSize;
-		m_rtvHandles[i] = currentHandle;
+		m_rtv_handles[i] = currentHandle;
 	}
 
 	GetBuffers(dxContext);
@@ -97,7 +97,7 @@ void DXWindow::Init(const DXContext& dxContext)
 
 void DXWindow::BeginFrame(const DXContext& dxContext)
 {
-	m_currentBufferIndex = m_swapChain->GetCurrentBackBufferIndex();
+	m_current_buffer_index = m_swap_chain->GetCurrentBackBufferIndex();
 
 	D3D12_RESOURCE_BARRIER barrier[1]{};
 	barrier[0] =
@@ -106,7 +106,7 @@ void DXWindow::BeginFrame(const DXContext& dxContext)
 		.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE,
 		.Transition =
 		{
-			.pResource = m_buffers[m_currentBufferIndex].Get(),
+			.pResource = m_buffers[m_current_buffer_index].Get(),
 			.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
 			.StateBefore = D3D12_RESOURCE_STATE_PRESENT,
 			.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET,
@@ -115,8 +115,8 @@ void DXWindow::BeginFrame(const DXContext& dxContext)
 	dxContext.GetCommandList()->ResourceBarrier(_countof(barrier), barrier);
 
 	float color[4]{ 85.0f / 255.0f, 230.0f / 255.0f, 23.0f / 255.0f, 1.0f };
-	dxContext.GetCommandList()->ClearRenderTargetView(m_rtvHandles[m_currentBufferIndex], color, 0, nullptr);
-	dxContext.GetCommandList()->OMSetRenderTargets(1, &m_rtvHandles[m_currentBufferIndex], false, nullptr);
+	dxContext.GetCommandList()->ClearRenderTargetView(m_rtv_handles[m_current_buffer_index], color, 0, nullptr);
+	dxContext.GetCommandList()->OMSetRenderTargets(1, &m_rtv_handles[m_current_buffer_index], false, nullptr);
 }
 
 void DXWindow::EndFrame(const DXContext& dxContext)
@@ -128,7 +128,7 @@ void DXWindow::EndFrame(const DXContext& dxContext)
 		.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE,
 		.Transition =
 		{
-			.pResource = m_buffers[m_currentBufferIndex].Get(),
+			.pResource = m_buffers[m_current_buffer_index].Get(),
 			.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
 			.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET,
 			.StateAfter = D3D12_RESOURCE_STATE_PRESENT,
@@ -139,19 +139,19 @@ void DXWindow::EndFrame(const DXContext& dxContext)
 
 void DXWindow::Present()
 {
-	m_swapChain->Present(1, 0) >> CHK;
+	m_swap_chain->Present(1, 0) >> CHK;
 }
 
 void DXWindow::Close()
 {
 	if (m_handle)
 	{
-		assert(DestroyWindow(m_handle));
+		ASSERT(DestroyWindow(m_handle));
 	}
 
-	if (m_wndClassAtom)
+	if (m_wnd_class_atom)
 	{
-		assert(UnregisterClassW((LPCWSTR)m_wndClassAtom, GetModuleHandleW(nullptr)));
+		ASSERT(UnregisterClassW((LPCWSTR)m_wnd_class_atom, GetModuleHandleW(nullptr)));
 	}
 }
 
@@ -175,9 +175,9 @@ void DXWindow::Resize(const DXContext& dxContext)
 		m_width = rt.right - rt.left;
 		m_height = rt.bottom - rt.top;
 		DXGI_SWAP_CHAIN_DESC1 desc{};
-		m_swapChain->GetDesc1(&desc);
-		m_swapChain->ResizeBuffers(GetBackBufferCount(), m_width, m_height, desc.Format, desc.Flags) >> CHK;
-		m_shouldResize = false;
+		m_swap_chain->GetDesc1(&desc);
+		m_swap_chain->ResizeBuffers(GetBackBufferCount(), m_width, m_height, desc.Format, desc.Flags) >> CHK;
+		m_should_resize = false;
 
 		GetBuffers(dxContext);
 	}
@@ -185,7 +185,7 @@ void DXWindow::Resize(const DXContext& dxContext)
 
 uint32_t DXWindow::GetBackBufferCount() const
 {
-	return m_backbufferCount;
+	return m_backbuffer_count;
 }
 
 void DXWindow::SetFullScreen(bool enable)
@@ -219,22 +219,22 @@ void DXWindow::SetFullScreen(bool enable)
 		ShowWindow(m_handle, SW_MAXIMIZE);
 	}
 
-	m_fullScreen = enable;
+	m_full_screen = enable;
 }
 
 bool DXWindow::ShouldClose()
 {
-	return m_shouldClose;
+	return m_should_close;
 }
 
 bool DXWindow::ShouldResize()
 {
-	return m_shouldResize;
+	return m_should_resize;
 }
 
 bool DXWindow::IsFullScreen() const
 {
-	return m_fullScreen;
+	return m_full_screen;
 }
 
 void DXWindow::SetResolutionToMonitor()
@@ -267,18 +267,18 @@ void DXWindow::CreateWindowHandle()
 		.lpszClassName = L"WndClass",
 		.hIconSm = LoadIconW(nullptr, IDI_APPLICATION),
 	};
-	m_wndClassAtom = RegisterClassExW(&wndClassExW);
-	assert(m_wndClassAtom);
+	m_wnd_class_atom = RegisterClassExW(&wndClassExW);
+	ASSERT(m_wnd_class_atom);
 
 	m_handle = CreateWindowExW
 	(
-		WS_EX_OVERLAPPEDWINDOW | WS_EX_APPWINDOW, (LPCWSTR)m_wndClassAtom,
+		WS_EX_OVERLAPPEDWINDOW | WS_EX_APPWINDOW, (LPCWSTR)m_wnd_class_atom,
 		L"Application", WS_OVERLAPPEDWINDOW | WS_VISIBLE, 0, 0, m_width, m_height,
 		nullptr, nullptr,
 		GetModuleHandleW(nullptr), this
 	);
-	assert(m_handle);
-	assert(IsWindow(m_handle));
+	ASSERT(m_handle);
+	ASSERT(IsWindow(m_handle));
 }
 
 void DXWindow::CreateSwapChain(const DXContext& dxContext)
@@ -295,7 +295,7 @@ void DXWindow::CreateSwapChain(const DXContext& dxContext)
 			.Quality = 0,
 		},
 		.BufferUsage = DXGI_USAGE_BACK_BUFFER | DXGI_USAGE_RENDER_TARGET_OUTPUT,
-		.BufferCount = m_backbufferCount,
+		.BufferCount = m_backbuffer_count,
 		.Scaling = DXGI_SCALING_NONE,
 		// FLIP_DISCARD (can discard backbuffer after present) or FLIP_SEQ (keeps backbuffer alive after present) in DX12
 		.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD,
@@ -309,18 +309,18 @@ void DXWindow::CreateSwapChain(const DXContext& dxContext)
 		&swapChainDesc, nullptr, nullptr,
 		&swapChain
 	) >> CHK;
-	swapChain->QueryInterface(IID_PPV_ARGS(&m_swapChain)) >> CHK;
-	m_swapChain->SetPrivateData(WKPDID_D3DDebugObjectNameW, sizeof(wchar_t) * _countof(L"SwapChain"), L"SwapChain") >> CHK;
+	swapChain->QueryInterface(IID_PPV_ARGS(&m_swap_chain)) >> CHK;
+	m_swap_chain->SetPrivateData(WKPDID_D3DDebugObjectNameW, sizeof(wchar_t) * _countof(L"SwapChain"), L"SwapChain") >> CHK;
 }
 
 void DXWindow::GetBuffers(const DXContext& dxContext)
 {
 	m_buffers.resize(GetBackBufferCount());
 
-	D3D12_CPU_DESCRIPTOR_HANDLE rtvDescStart = m_rtvDescHeap->GetCPUDescriptorHandleForHeapStart();
+	D3D12_CPU_DESCRIPTOR_HANDLE rtvDescStart = m_rtv_desc_heap->GetCPUDescriptorHandleForHeapStart();
 	for (uint32_t i = 0; i < GetBackBufferCount(); ++i)
 	{
-		m_swapChain->GetBuffer(i, IID_PPV_ARGS(&m_buffers[i])) >> CHK;
+		m_swap_chain->GetBuffer(i, IID_PPV_ARGS(&m_buffers[i])) >> CHK;
 		std::wstring str = L"Backbuffer " + std::to_wstring(i);
 		m_buffers[i]->SetName(str.c_str());
 
@@ -335,7 +335,7 @@ void DXWindow::GetBuffers(const DXContext& dxContext)
 				.PlaneSlice = 0,
 			},
 		};
-		dxContext.GetDevice()->CreateRenderTargetView(m_buffers[i].Get(), &rtvDesc, m_rtvHandles[i]);
+		dxContext.GetDevice()->CreateRenderTargetView(m_buffers[i].Get(), &rtvDesc, m_rtv_handles[i]);
 	}
 }
 
