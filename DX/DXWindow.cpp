@@ -62,6 +62,16 @@ LRESULT CALLBACK DXWindow::OnWindowMessage(HWND handle, UINT msg, WPARAM wParam,
 	return DefWindowProcW(handle, msg, wParam, lParam);
 }
 
+DXWindow::DXWindow(const DXContext& dx_context)
+{
+	Init(dx_context);
+}
+
+DXWindow::~DXWindow()
+{
+	Close();
+}
+
 void DXWindow::Init(const DXContext& dxContext)
 {
 	SetResolutionToMonitor();

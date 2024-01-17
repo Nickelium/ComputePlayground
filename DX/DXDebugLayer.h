@@ -1,5 +1,5 @@
 #pragma once
-#include "Common.h"
+#include "../Common.h"
 #include "IDXDebugLayer.h"
 
 struct IDXGIDebug1;
@@ -11,7 +11,7 @@ public:
 	DXDebugLayer(GRAPHICS_DEBUGGER_TYPE gd_type);
 	virtual ~DXDebugLayer();
 	virtual void Init() override;
-	virtual void Close() override;
+	void Close();
 private:
 	ComPtr<IDXGIDebug1> m_dxgi_debug;
 	ComPtr<ID3D12Debug5> m_d3d12_debug;

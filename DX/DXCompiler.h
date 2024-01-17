@@ -1,5 +1,5 @@
 #pragma once
-#include "Common.h"
+#include "../Common.h"
 
 struct IDxcUtils;
 struct IDxcBlob;
@@ -16,7 +16,7 @@ class DXCompiler
 {
 public:
 	void Init(bool debug);
-	void Compile(ComPtr<IDxcBlob>* out_shader_blob, std::wstring shader_path, ShaderType shader_type);
+	void Compile(ComPtr<IDxcBlob>* out_shader_blob, std::wstring shader_path, ShaderType shader_type) const;
 private:
 	bool m_debug;
 

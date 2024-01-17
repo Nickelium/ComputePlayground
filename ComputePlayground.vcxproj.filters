@@ -18,31 +18,34 @@
     <ClCompile Include="ComputePlayground.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="DXCompiler.cpp">
+    <ClCompile Include="DX\DXCompiler.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Common.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="DXContext.cpp">
+    <ClCompile Include="DX\DXContext.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="DXCommon.cpp">
+    <ClCompile Include="DX\DXCommon.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="DXDebugLayer.cpp">
+    <ClCompile Include="DX\DXDebugLayer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="DXWindow.cpp">
+    <ClCompile Include="DX\DXWindow.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="DXResource.cpp">
+    <ClCompile Include="DX\DXResource.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="maths\LinearAlgebra.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="DXDebugContext.cpp">
+    <ClCompile Include="DX\DXDebugContext.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Factory.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -53,31 +56,31 @@
     <None Include="shaders\VertexShader.hlsl" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="DXCompiler.h">
+    <ClInclude Include="DX\DXCompiler.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Common.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="DXContext.h">
+    <ClInclude Include="DX\DXContext.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="DXCommon.h">
+    <ClInclude Include="DX\DXCommon.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="IDXDebugLayer.h">
+    <ClInclude Include="DX\IDXDebugLayer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="DXNullDebugLayer.h">
+    <ClInclude Include="DX\DXNullDebugLayer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="DXDebugLayer.h">
+    <ClInclude Include="DX\DXDebugLayer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="DXWindow.h">
+    <ClInclude Include="DX\DXWindow.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="DXResource.h">
+    <ClInclude Include="DX\DXResource.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="maths\LinearAlgebra.h">
@@ -86,7 +89,10 @@
     <ClInclude Include="Types.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="DXDebugContext.h">
+    <ClInclude Include="DX\DXDebugContext.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Factory.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

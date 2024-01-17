@@ -106,13 +106,14 @@ xcopy /y /d $(ProjectDir)DXC\bin\x64\dxil.dll $(OutDir)</Command>
   <ItemGroup>
     <ClCompile Include="Common.cpp" />
     <ClCompile Include="ComputePlayground.cpp" />
-    <ClCompile Include="DXCommon.cpp" />
-    <ClCompile Include="DXCompiler.cpp" />
-    <ClCompile Include="DXContext.cpp" />
-    <ClCompile Include="DXDebugContext.cpp" />
-    <ClCompile Include="DXDebugLayer.cpp" />
-    <ClCompile Include="DXResource.cpp" />
-    <ClCompile Include="DXWindow.cpp" />
+    <ClCompile Include="DX\DXCommon.cpp" />
+    <ClCompile Include="DX\DXCompiler.cpp" />
+    <ClCompile Include="DX\DXContext.cpp" />
+    <ClCompile Include="DX\DXDebugContext.cpp" />
+    <ClCompile Include="DX\DXDebugLayer.cpp" />
+    <ClCompile Include="DX\DXResource.cpp" />
+    <ClCompile Include="DX\DXWindow.cpp" />
+    <ClCompile Include="Factory.cpp" />
     <ClCompile Include="maths\LinearAlgebra.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -125,15 +126,16 @@ xcopy /y /d $(ProjectDir)DXC\bin\x64\dxil.dll $(OutDir)</Command>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Common.h" />
-    <ClInclude Include="DXCommon.h" />
-    <ClInclude Include="DXCompiler.h" />
-    <ClInclude Include="DXContext.h" />
-    <ClInclude Include="DXDebugContext.h" />
-    <ClInclude Include="DXDebugLayer.h" />
-    <ClInclude Include="DXNullDebugLayer.h" />
-    <ClInclude Include="DXResource.h" />
-    <ClInclude Include="DXWindow.h" />
-    <ClInclude Include="IDXDebugLayer.h" />
+    <ClInclude Include="DX\DXCommon.h" />
+    <ClInclude Include="DX\DXCompiler.h" />
+    <ClInclude Include="DX\DXContext.h" />
+    <ClInclude Include="DX\DXDebugContext.h" />
+    <ClInclude Include="DX\DXDebugLayer.h" />
+    <ClInclude Include="DX\DXNullDebugLayer.h" />
+    <ClInclude Include="DX\DXResource.h" />
+    <ClInclude Include="DX\DXWindow.h" />
+    <ClInclude Include="DX\IDXDebugLayer.h" />
+    <ClInclude Include="Factory.h" />
     <ClInclude Include="maths\LinearAlgebra.h" />
     <ClInclude Include="Types.h" />
   </ItemGroup>

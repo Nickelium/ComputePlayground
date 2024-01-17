@@ -8,7 +8,7 @@ void DXCompiler::Init(bool debug)
 	DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(&compiler)) >> CHK;
 }
 
-void DXCompiler::Compile(ComPtr<IDxcBlob>* outShaderBlob, std::wstring shaderPath, ShaderType shaderType)
+void DXCompiler::Compile(ComPtr<IDxcBlob>* outShaderBlob, std::wstring shaderPath, ShaderType shaderType) const
 {
 	ComPtr<IDxcBlobEncoding> shaderSource{};
 	utils->LoadFile(shaderPath.c_str(), nullptr, &shaderSource) >> CHK;

@@ -1,5 +1,5 @@
 #pragma once
-#include "Common.h"
+#include "../Common.h"
 
 class DXContext;
 
@@ -13,6 +13,8 @@ class DXWindow
 public:
 	static LRESULT CALLBACK OnWindowMessage(HWND handle, UINT msg, WPARAM w_param, LPARAM l_param);
 
+	DXWindow(const DXContext& dx_context);
+	~DXWindow();
 	void Init(const DXContext& dx_context);
 
 	void BeginFrame(const DXContext& dx_context);

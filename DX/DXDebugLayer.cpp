@@ -1,5 +1,5 @@
 #include "DXDebugLayer.h"
-#include "Common.h"
+#include "../Common.h"
 #include "DXCommon.h"
 #include <dxgidebug.h>
 
@@ -56,7 +56,7 @@ DXDebugLayer::DXDebugLayer(GRAPHICS_DEBUGGER_TYPE type) :
 
 DXDebugLayer::~DXDebugLayer()
 {
-
+	Close();
 }
 
 void DXDebugLayer::Init()

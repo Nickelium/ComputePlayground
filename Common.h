@@ -1,5 +1,13 @@
 #pragma once
 
+#ifdef _DEBUG
+#define _CRTDBG_MAP_ALLOC
+#include <crtdbg.h>
+// Display file and line number on memory leak
+#define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
+#define new DEBUG_NEW
+#endif
+
 #include <vector>
 #include <string>
 #include <iterator>
@@ -55,6 +63,11 @@ int __cdecl CrtDbgHook(int nReportType, char* szMsg, int* pnRet);
 #else
 #define ASSERT(x) UNUSED(x)
 #endif
+
+void MemoryTrack();
+void MemoryDump();
+void AssertHook();
+
 // TODO remove this from non debug
 enum class GRAPHICS_DEBUGGER_TYPE
 {
