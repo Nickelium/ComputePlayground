@@ -280,10 +280,11 @@ void DXWindow::CreateWindowHandle()
 	m_wnd_class_atom = RegisterClassExW(&wndClassExW);
 	ASSERT(m_wnd_class_atom);
 
+	// TODO provide user name window
 	m_handle = CreateWindowExW
 	(
 		WS_EX_OVERLAPPEDWINDOW | WS_EX_APPWINDOW, (LPCWSTR)m_wnd_class_atom,
-		L"Application", WS_OVERLAPPEDWINDOW | WS_VISIBLE, 0, 0, m_width, m_height,
+		L"Playground", WS_OVERLAPPEDWINDOW | WS_VISIBLE, 0, 0, m_width, m_height,
 		nullptr, nullptr,
 		GetModuleHandleW(nullptr), this
 	);
