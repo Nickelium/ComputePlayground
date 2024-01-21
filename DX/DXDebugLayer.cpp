@@ -6,8 +6,9 @@
 #define USE_PIX
 #include <pix3.h>
 
+// TODO setup path
 #include "C:\Program Files\RenderDoc\renderdoc_app.h"
-// TODO crash on capture in NV driver?
+
 bool LoadRenderdoc(HMODULE* renderdoc_module_out, RENDERDOC_API_1_6_0** renderdoc_api_out)
 {
 	RENDERDOC_API_1_6_0* renderdoc_api = nullptr;

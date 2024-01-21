@@ -16,7 +16,7 @@ void DXCompiler::Compile(ComPtr<IDxcBlob>* outShaderBlob, std::wstring shaderPat
 	sourceBuffer.Ptr = shaderSource->GetBufferPointer();
 	sourceBuffer.Size = shaderSource->GetBufferSize();
 
-	std::vector<LPCWSTR> compileArguments;
+	std::vector<LPCWSTR> compileArguments{};
 	compileArguments.push_back(L"-E "); // Entry point 
 	compileArguments.push_back(L"main");
 	compileArguments.push_back(L"-T"); // Target profile 
@@ -50,16 +50,16 @@ void DXCompiler::Compile(ComPtr<IDxcBlob>* outShaderBlob, std::wstring shaderPat
 	compileArguments.push_back(L"-HV 2021"); // HLSL 2021
 	compileArguments.push_back(L"-WX"); // Warnings are errors
 
-	ComPtr<IDxcResult> compileResult;
+	ComPtr<IDxcResult> compileResult{};
 	compiler->Compile(&sourceBuffer, compileArguments.data(), (UINT32)compileArguments.size(), nullptr, IID_PPV_ARGS(&compileResult)) >> CHK;
 
-	ComPtr<IDxcBlobUtf8> pErrors;
+	ComPtr<IDxcBlobUtf8> pErrors{};
 	compileResult->GetOutput(DXC_OUT_ERRORS, IID_PPV_ARGS(&pErrors), nullptr) >> CHK;
 	if (pErrors && pErrors->GetStringLength() > 0)
 	{
 		printf("%s", (char*)pErrors->GetBufferPointer());
 	}
-	HRESULT HR;
+	HRESULT HR{};
 	compileResult->GetStatus(&HR);
 	HR >> CHK;
 

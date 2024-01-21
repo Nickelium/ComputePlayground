@@ -6,7 +6,7 @@
 LRESULT CALLBACK DXWindow::OnWindowMessage(HWND handle, UINT msg, WPARAM wParam, LPARAM lParam)
 {
 	// Get DXWindow Object
-	DXWindow* pWindow = nullptr;
+	DXWindow* pWindow{};
 	// First message send
 	if (msg == WM_CREATE)
 	{
@@ -79,7 +79,7 @@ void DXWindow::Init(const DXContext& dx_context, const std::string& window_name)
 	CreateWindowHandle(window_name);
 	CreateSwapChain(dx_context);
 
-	ComPtr<IDXGIFactory1> factory;
+	ComPtr<IDXGIFactory1> factory{};
 	m_swap_chain->GetParent(IID_PPV_ARGS(&factory)) >> CHK;
 	// Requires to GetParent factory to work
 	factory->MakeWindowAssociation(m_handle, DXGI_MWA_NO_ALT_ENTER) >> CHK;
@@ -132,7 +132,7 @@ void DXWindow::BeginFrame(const DXContext& dxContext)
 
 void DXWindow::EndFrame(const DXContext& dxContext)
 {
-	D3D12_RESOURCE_BARRIER barrier[1];
+	D3D12_RESOURCE_BARRIER barrier[1]{};
 	barrier[0] =
 	{
 		.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION,
@@ -314,7 +314,7 @@ void DXWindow::CreateSwapChain(const DXContext& dxContext)
 		.AlphaMode = DXGI_ALPHA_MODE_IGNORE,
 		.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH | DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING,
 	};
-	ComPtr<IDXGISwapChain1> swapChain;
+	ComPtr<IDXGISwapChain1> swapChain{};
 	dxContext.GetFactory()->CreateSwapChainForHwnd
 	(
 		dxContext.GetCommandQueue().Get(), m_handle,

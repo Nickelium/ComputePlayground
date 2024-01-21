@@ -2,7 +2,7 @@
 
 CheckToken CHK = CheckToken{};
 
-void operator>>(HRSourceLocation hrSourceLocation, CheckToken)
+void operator>>(HRSourceLocation hrSourceLocation, CheckToken chk_token)
 {
 #if defined(_DEBUG)
 	if (hrSourceLocation.m_hr != S_OK)
@@ -17,10 +17,10 @@ void operator>>(HRSourceLocation hrSourceLocation, CheckToken)
 		printf("%ls", stringOuput.c_str());
 		ASSERT(false);
 	}
-
 #else
 	UNUSED(hrSourceLocation);
 #endif
+	UNUSED(chk_token);
 }
 
 int __cdecl CrtDbgHook(int nReportType, char* szMsg, int* pnRet)

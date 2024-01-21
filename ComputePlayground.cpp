@@ -73,10 +73,9 @@ int main()
 		std::shared_ptr<IDXDebugLayer> dx_debug_layer = CreateDebugLayer(gd_type);
 		std::shared_ptr <DXContext> dx_context = CreateDXContext(gd_type);
 		std::shared_ptr <DXCompiler> dx_compiler = CreateDXCompiler();
-		std::shared_ptr<DXWindow> dx_window = CreateDXWindow(*dx_context, &state, "CPlayground");
-
+		std::shared_ptr<DXWindow> dx_window = CreateDXWindow(*dx_context, &state, "Playground");
 		{
-			D3D12_FEATURE_DATA_D3D12_OPTIONS feature;
+			D3D12_FEATURE_DATA_D3D12_OPTIONS feature{};
 			dx_context->GetDevice()->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS, &feature, sizeof(feature)) >> CHK;
 
 			D3D12_DESCRIPTOR_HEAP_DESC desc_heap_desc = {};
@@ -84,9 +83,9 @@ int main()
 			desc_heap_desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 			desc_heap_desc.NumDescriptors = 1;
 			Resources resource = CreateResources(*dx_context, *dx_compiler);
-			ComPtr<ID3D12Resource2> vertex_buffer;
-			D3D12_VERTEX_BUFFER_VIEW vertex_buffer_view;
-			uint32_t vertex_count;
+			ComPtr<ID3D12Resource2> vertex_buffer{};
+			D3D12_VERTEX_BUFFER_VIEW vertex_buffer_view{};
+			uint32_t vertex_count{};
 			{
 				struct Vertex
 				{
@@ -144,7 +143,7 @@ int main()
 					.CreationNodeMask = 1,
 					.VisibleNodeMask = 1,
 				};
-				ComPtr<ID3D12Resource2> vertex_upload_buffer;
+				ComPtr<ID3D12Resource2> vertex_upload_buffer{};
 				dx_context->GetDevice()->CreateCommittedResource
 				(
 					&heap_properties_upload, D3D12_HEAP_FLAG_NONE, &vertex_desc,

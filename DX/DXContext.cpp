@@ -15,13 +15,13 @@ void DXContext::Init()
 {
 	CreateDXGIFactory2(DXGI_CREATE_FACTORY_DEBUG, IID_PPV_ARGS(&m_factory)) >> CHK;
 	m_factory->EnumAdapterByGpuPreference(0, DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE, IID_PPV_ARGS(&m_adapter)) >> CHK;
-	DXGI_ADAPTER_DESC1 adapter_desc;
+	DXGI_ADAPTER_DESC1 adapter_desc{};
 	m_adapter->GetDesc1(&adapter_desc) >> CHK;
 
-	ComPtr<IDXGIOutput> output;
+	ComPtr<IDXGIOutput> output{};
 	m_adapter->EnumOutputs(0, output.GetAddressOf()) >> CHK;
 	output->QueryInterface(IID_PPV_ARGS(&m_output)) >> CHK;
-	DXGI_OUTPUT_DESC1 output_desc;
+	DXGI_OUTPUT_DESC1 output_desc{};
 	m_output->GetDesc1(&output_desc);
 	D3D12CreateDevice(m_adapter.Get(), D3D_FEATURE_LEVEL_12_1, IID_PPV_ARGS(&m_device)) >> CHK;
 
@@ -80,7 +80,7 @@ void DXContext::Flush(uint32_t flush_count)
 	}
 }
 
-Microsoft::WRL::ComPtr<ID3D12Device9> DXContext::GetDevice() const
+ComPtr<ID3D12Device9> DXContext::GetDevice() const
 {
 	return m_device;
 }
