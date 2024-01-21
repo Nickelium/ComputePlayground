@@ -8,14 +8,16 @@ struct ID3D12Resource2;
 struct ID3D12DescriptorHeap;
 struct D3D12_CPU_DESCRIPTOR_HANDLE;
 
+struct State;
+
 class DXWindow
 {
 public:
 	static LRESULT CALLBACK OnWindowMessage(HWND handle, UINT msg, WPARAM w_param, LPARAM l_param);
 
-	DXWindow(const DXContext& dx_context);
+	DXWindow(const DXContext& dx_context, State* state, const std::string& window_name);
 	~DXWindow();
-	void Init(const DXContext& dx_context);
+	void Init(const DXContext& dx_context, const std::string& window_name);
 
 	void BeginFrame(const DXContext& dx_context);
 
@@ -44,7 +46,7 @@ public:
 
 private:
 	void SetResolutionToMonitor();
-	void CreateWindowHandle();
+	void CreateWindowHandle(const std::string& window_name);
 	void CreateSwapChain(const DXContext& dx_context);
 
 	void GetBuffers(const DXContext& dx_context);
@@ -69,4 +71,6 @@ private:
 
 	uint32_t m_backbuffer_count = 3u;
 	uint32_t m_current_buffer_index = 0u;
+
+	State* m_state;
 };

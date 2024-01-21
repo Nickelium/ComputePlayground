@@ -30,10 +30,10 @@ LRESULT CALLBACK DXWindow::OnWindowMessage(HWND handle, UINT msg, WPARAM wParam,
 		uint32_t reqWidth = HIWORD(lParam);
 		uint32_t reqHeight = LOWORD(lParam);
 		if
-			(
-				lParam &&
-				(reqWidth != pWindow->m_width || reqHeight != pWindow->m_height)
-				)
+		(
+			lParam &&
+			(reqWidth != pWindow->m_width || reqHeight != pWindow->m_height)
+		)
 		{
 			pWindow->m_should_resize = true;
 		}
@@ -50,7 +50,7 @@ LRESULT CALLBACK DXWindow::OnWindowMessage(HWND handle, UINT msg, WPARAM wParam,
 		}
 		else if (wParam == VK_F1)
 		{
-			PIXCaptureAndOpen();
+			pWindow->m_state->m_capture = true;
 		}
 		return 0;
 	case WM_CLOSE:
@@ -62,9 +62,10 @@ LRESULT CALLBACK DXWindow::OnWindowMessage(HWND handle, UINT msg, WPARAM wParam,
 	return DefWindowProcW(handle, msg, wParam, lParam);
 }
 
-DXWindow::DXWindow(const DXContext& dx_context)
+DXWindow::DXWindow(const DXContext& dx_context, State* state, const std::string& window_name)
+	:m_state(state)
 {
-	Init(dx_context);
+	Init(dx_context, window_name);
 }
 
 DXWindow::~DXWindow()
@@ -72,11 +73,11 @@ DXWindow::~DXWindow()
 	Close();
 }
 
-void DXWindow::Init(const DXContext& dxContext)
+void DXWindow::Init(const DXContext& dx_context, const std::string& window_name)
 {
 	SetResolutionToMonitor();
-	CreateWindowHandle();
-	CreateSwapChain(dxContext);
+	CreateWindowHandle(window_name);
+	CreateSwapChain(dx_context);
 
 	ComPtr<IDXGIFactory1> factory;
 	m_swap_chain->GetParent(IID_PPV_ARGS(&factory)) >> CHK;
@@ -90,11 +91,11 @@ void DXWindow::Init(const DXContext& dxContext)
 		.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE,
 		.NodeMask = 0,
 	};
-	dxContext.GetDevice()->CreateDescriptorHeap(&rtvDescHeapDesc, IID_PPV_ARGS(&m_rtv_desc_heap)) >> CHK;
+	dx_context.GetDevice()->CreateDescriptorHeap(&rtvDescHeapDesc, IID_PPV_ARGS(&m_rtv_desc_heap)) >> CHK;
 
 	m_rtv_handles.resize(GetBackBufferCount());
 	D3D12_CPU_DESCRIPTOR_HANDLE firstHandle = m_rtv_desc_heap->GetCPUDescriptorHandleForHeapStart();
-	uint32_t incrementSize = dxContext.GetDevice()->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+	uint32_t incrementSize = dx_context.GetDevice()->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 	for (uint32_t i = 0; i < GetBackBufferCount(); ++i)
 	{
 		D3D12_CPU_DESCRIPTOR_HANDLE currentHandle{};
@@ -102,7 +103,7 @@ void DXWindow::Init(const DXContext& dxContext)
 		m_rtv_handles[i] = currentHandle;
 	}
 
-	GetBuffers(dxContext);
+	GetBuffers(dx_context);
 }
 
 void DXWindow::BeginFrame(const DXContext& dxContext)
@@ -259,7 +260,7 @@ void DXWindow::SetResolutionToMonitor()
 		m_height = monitorInfo.rcMonitor.bottom - monitorInfo.rcMonitor.top;
 }
 
-void DXWindow::CreateWindowHandle()
+void DXWindow::CreateWindowHandle(const std::string& window_name)
 {
 	WNDCLASSEXW wndClassExW =
 	{
@@ -284,7 +285,7 @@ void DXWindow::CreateWindowHandle()
 	m_handle = CreateWindowExW
 	(
 		WS_EX_OVERLAPPEDWINDOW | WS_EX_APPWINDOW, (LPCWSTR)m_wnd_class_atom,
-		L"Playground", WS_OVERLAPPEDWINDOW | WS_VISIBLE, 0, 0, m_width, m_height,
+		std::to_wstring(window_name).c_str(), WS_OVERLAPPEDWINDOW | WS_VISIBLE, 0, 0, m_width, m_height,
 		nullptr, nullptr,
 		GetModuleHandleW(nullptr), this
 	);

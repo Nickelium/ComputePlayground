@@ -48,7 +48,7 @@ std::shared_ptr<DXCompiler> CreateDXCompiler()
 	return dx_compiler;
 }
 
-std::shared_ptr<DXWindow> CreateDXWindow(const DXContext& dx_context)
+std::shared_ptr<DXWindow> CreateDXWindow(const DXContext& dx_context, State* state, const std::string& window_name)
 {
-	return std::make_shared<DXWindow>(dx_context);
+	return std::make_shared<DXWindow>(dx_context, state, window_name);
 }

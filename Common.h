@@ -73,4 +73,11 @@ enum class GRAPHICS_DEBUGGER_TYPE
 {
 	PIX,
 	RENDERDOC,
+	NONE,
+};
+
+// TODO split out this application logic
+struct State
+{
+	bool m_capture;
 };

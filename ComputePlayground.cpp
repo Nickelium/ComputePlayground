@@ -67,10 +67,14 @@ int main()
 	AssertHook();
 	MemoryTrack();
 	{
+		State state{};
+
 		GRAPHICS_DEBUGGER_TYPE gd_type = GRAPHICS_DEBUGGER_TYPE::PIX;
 		std::shared_ptr<IDXDebugLayer> dx_debug_layer = CreateDebugLayer(gd_type);
 		std::shared_ptr <DXContext> dx_context = CreateDXContext(gd_type);
 		std::shared_ptr <DXCompiler> dx_compiler = CreateDXCompiler();
+		std::shared_ptr<DXWindow> dx_window = CreateDXWindow(*dx_context, &state, "CPlayground");
+
 		{
 			D3D12_FEATURE_DATA_D3D12_OPTIONS feature;
 			dx_context->GetDevice()->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS, &feature, sizeof(feature)) >> CHK;
@@ -311,86 +315,100 @@ int main()
 				dx_context->GetDevice()->CreateGraphicsPipelineState(&gfx_pso_desc, IID_PPV_ARGS(&resource.m_gfx_pso)) >> CHK;
 		}
 
-			std::shared_ptr<DXWindow> dx_window = CreateDXWindow(*dx_context);
-			//dxWindow.SetFullScreen(false);
+			//dxWindow->SetFullScreen(false);
 			while (!dx_window->ShouldClose())
 			{
 				// Process window message
 				dx_window->Update();
-				// Handle resizing
-				if (dx_window->ShouldResize())
+
+				if (state.m_capture)
 				{
-					dx_context->Flush(dx_window->GetBackBufferCount());
-					dx_window->Resize(*dx_context);
+					dx_debug_layer->PIXCaptureAndOpen();
+					dx_debug_layer->RenderdocCaptureStart();
+				}
+				// rendering
+				{
+					// Handle resizing
+					if (dx_window->ShouldResize())
+					{
+						dx_context->Flush(dx_window->GetBackBufferCount());
+						dx_window->Resize(*dx_context);
+					}
+
+					dx_context->InitCommandList();
+					{
+						// Fill CommandList
+						dx_window->BeginFrame(*dx_context);
+						// Compute Work
+						{
+							dx_context->GetCommandList()->SetComputeRootSignature(resource.m_compute_root_signature.Get());
+							dx_context->GetCommandList()->SetPipelineState(resource.m_compute_pso.Get());
+							dx_context->GetCommandList()->SetComputeRootUnorderedAccessView(0, resource.m_uav.m_gpu_resource->GetGPUVirtualAddress());
+							dx_context->GetCommandList()->Dispatch(resource.m_dispatch_count, 1, 1);
+							D3D12_RESOURCE_BARRIER barriers[1]{};
+							barriers[0] =
+							{
+								.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION,
+								.Transition =
+								{
+									.pResource = resource.m_uav.m_gpu_resource.Get(),
+									.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
+									.StateBefore = D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
+									.StateAfter = D3D12_RESOURCE_STATE_COPY_SOURCE,
+								},
+							};
+							dx_context->GetCommandList()->ResourceBarrier(_countof(barriers), &barriers[0]);
+							dx_context->GetCommandList()->CopyResource(resource.m_uav.m_read_back_resource.Get(), resource.m_uav.m_gpu_resource.Get());
+						}
+						// Draw Work
+						{
+							D3D12_VIEWPORT view_ports[] =
+							{
+								{
+									.TopLeftX = 0,
+									.TopLeftY = 0,
+									.Width = (float)dx_window->GetWidth(),
+									.Height = (float)dx_window->GetHeight(),
+									.MinDepth = 0,
+									.MaxDepth = 1,
+								}
+							};
+							D3D12_RECT scissor_rects[] =
+							{
+								{
+									.left = 0,
+									.top = 0,
+									.right = (long)dx_window->GetWidth(),
+									.bottom = (long)dx_window->GetHeight(),
+								}
+							};
+							dx_context->GetCommandList()->RSSetViewports(1, view_ports);
+							dx_context->GetCommandList()->RSSetScissorRects(1, scissor_rects);
+							dx_context->GetCommandList()->SetPipelineState(resource.m_gfx_pso.Get());
+							dx_context->GetCommandList()->SetGraphicsRootSignature(resource.m_gfx_root_signature.Get());
+							dx_context->GetCommandList()->IASetVertexBuffers(0, 1, &vertex_buffer_view);
+							dx_context->GetCommandList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+							dx_context->GetCommandList()->DrawInstanced(vertex_count, 1, 0, 0);
+						}
+						dx_window->EndFrame(*dx_context);
+
+					}
+					dx_context->ExecuteCommandList();
+					dx_window->Present();
+
+					float32* data = nullptr;
+					D3D12_RANGE range = { 0, resource.m_uav.m_readback_desc.Width };
+					resource.m_uav.m_read_back_resource->Map(0, &range, (void**)&data);
+					for (int i = 0; i < resource.m_uav.m_readback_desc.Width / sizeof(float32) / 4; i++)
+						printf("uav[%d] = %.3f, %.3f, %.3f, %.3f\n", i, data[i * 4 + 0], data[i * 4 + 1], data[i * 4 + 2], data[i * 4 + 3]);
+					resource.m_uav.m_read_back_resource->Unmap(0, nullptr);
+				}
+				if (state.m_capture)
+				{
+					dx_debug_layer->RenderdocCaptureEnd();
+					state.m_capture = !state.m_capture;
 				}
 
-				dx_context->InitCommandList();
-				{
-					// Fill CommandList
-					dx_window->BeginFrame(*dx_context);
-					// Compute Work
-					{
-						dx_context->GetCommandList()->SetComputeRootSignature(resource.m_compute_root_signature.Get());
-						dx_context->GetCommandList()->SetPipelineState(resource.m_compute_pso.Get());
-						dx_context->GetCommandList()->SetComputeRootUnorderedAccessView(0, resource.m_uav.m_gpu_resource->GetGPUVirtualAddress());
-						dx_context->GetCommandList()->Dispatch(resource.m_dispatch_count, 1, 1);
-						D3D12_RESOURCE_BARRIER barriers[1]{};
-						barriers[0] =
-						{
-							.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION,
-							.Transition =
-							{
-								.pResource = resource.m_uav.m_gpu_resource.Get(),
-								.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
-								.StateBefore = D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
-								.StateAfter = D3D12_RESOURCE_STATE_COPY_SOURCE,
-							},
-						};
-						dx_context->GetCommandList()->ResourceBarrier(_countof(barriers), &barriers[0]);
-						dx_context->GetCommandList()->CopyResource(resource.m_uav.m_read_back_resource.Get(), resource.m_uav.m_gpu_resource.Get());
-					}
-					// Draw Work
-					{
-						D3D12_VIEWPORT view_ports[] =
-						{
-							{
-								.TopLeftX = 0,
-								.TopLeftY = 0,
-								.Width = (float)dx_window->GetWidth(),
-								.Height = (float)dx_window->GetHeight(),
-								.MinDepth = 0,
-								.MaxDepth = 1,
-							}
-						};
-						D3D12_RECT scissor_rects[] = 
-						{
-							{
-								.left = 0,
-								.top = 0,
-								.right = (long)dx_window->GetWidth(),
-								.bottom = (long)dx_window->GetHeight(),
-							}
-						};
-						dx_context->GetCommandList()->RSSetViewports(1, view_ports);
-						dx_context->GetCommandList()->RSSetScissorRects(1, scissor_rects);
-						dx_context->GetCommandList()->SetPipelineState(resource.m_gfx_pso.Get());
-						dx_context->GetCommandList()->SetGraphicsRootSignature(resource.m_gfx_root_signature.Get());
-						dx_context->GetCommandList()->IASetVertexBuffers(0, 1, &vertex_buffer_view);
-						dx_context->GetCommandList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-						dx_context->GetCommandList()->DrawInstanced(vertex_count, 1, 0, 0);
-					}
-					dx_window->EndFrame(*dx_context);
-
-				}
-				dx_context->ExecuteCommandList();
-				dx_window->Present();
-
-				float32* data = nullptr;
-				D3D12_RANGE range = { 0, resource.m_uav.m_readback_desc.Width };
-				resource.m_uav.m_read_back_resource->Map(0, &range, (void**)&data);
-				for (int i = 0; i < resource.m_uav.m_readback_desc.Width / sizeof(float32) / 4; i++)
-					printf("uav[%d] = %.3f, %.3f, %.3f, %.3f\n", i, data[i * 4 + 0], data[i * 4 + 1], data[i * 4 + 2], data[i * 4 + 3]);
-				resource.m_uav.m_read_back_resource->Unmap(0, nullptr);
 			}
 			dx_context->Flush(dx_window->GetBackBufferCount());
 		}
