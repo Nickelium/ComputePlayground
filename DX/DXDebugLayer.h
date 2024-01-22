@@ -5,7 +5,7 @@
 struct IDXGIDebug1;
 struct ID3D12Debug5;
 struct RENDERDOC_API_1_6_0;
-void PIXCaptureAndOpen();
+
 class DXDebugLayer : public IDXDebugLayer
 {
 public:

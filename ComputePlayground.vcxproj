@@ -73,8 +73,8 @@
       </Command>
     </CustomBuildStep>
     <PostBuildEvent>
-      <Command>xcopy /y /d $(ProjectDir)DXC\bin\x64\dxcompiler.dll $(OutDir)
-xcopy /y /d $(ProjectDir)DXC\bin\x64\dxil.dll $(OutDir)</Command>
+      <Command>xcopy /y /d $(ProjectDir)dependencies\DXC\bin\x64\dxcompiler.dll $(OutDir)
+xcopy /y /d $(ProjectDir)dependencies\DXC\bin\x64\dxil.dll $(OutDir)</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
