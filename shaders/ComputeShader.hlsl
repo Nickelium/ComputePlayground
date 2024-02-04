@@ -1,3 +1,5 @@
+#include "Common.hlsl"
+
 RWStructuredBuffer<float4> m_uav : register(u0, space0);
 
 [RootSignature("RootFlags(0), UAV(u0)")]

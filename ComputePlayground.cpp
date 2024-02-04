@@ -37,9 +37,9 @@ Resources CreateResources(const DXContext& dx_context, const DXCompiler& dx_comp
 	resources.m_group_size = 1024;
 	resources.m_dispatch_count = 1;
 
-	dx_compiler.Compile(&resources.m_compute_shader, L"shaders/ComputeShader.hlsl", ShaderType::COMPUTE_SHADER);
-	dx_compiler.Compile(&resources.m_vertex_shader, L"shaders/VertexShader.hlsl", ShaderType::VERTEX_SHADER);
-	dx_compiler.Compile(&resources.m_pixel_shader, L"shaders/PixelShader.hlsl", ShaderType::PIXEL_SHADER);
+	dx_compiler.Compile(&resources.m_compute_shader, L"ComputeShader.hlsl", ShaderType::COMPUTE_SHADER);
+	dx_compiler.Compile(&resources.m_vertex_shader, L"VertexShader.hlsl", ShaderType::VERTEX_SHADER);
+	dx_compiler.Compile(&resources.m_pixel_shader, L"PixelShader.hlsl", ShaderType::PIXEL_SHADER);
 
 	resources.m_uav.m_desc.Width = resources.m_group_size * resources.m_dispatch_count * sizeof(float32) * 4;
 	resources.m_uav.m_readback_desc.Width = resources.m_uav.m_desc.Width;
@@ -76,7 +76,7 @@ int main()
 		const GRAPHICS_DEBUGGER_TYPE gd_type{ GRAPHICS_DEBUGGER_TYPE::PIX };
 		std::shared_ptr<IDXDebugLayer> dx_debug_layer = CreateDebugLayer(gd_type);
 		std::shared_ptr <DXContext> dx_context = CreateDXContext(gd_type);
-		std::shared_ptr <DXCompiler> dx_compiler = CreateDXCompiler();
+		std::shared_ptr <DXCompiler> dx_compiler = CreateDXCompiler(L"shaders");
 		std::shared_ptr<DXWindow> dx_window = CreateDXWindow(*dx_context, &state, "Playground");
 		{
 			D3D12_FEATURE_DATA_D3D12_OPTIONS feature{};

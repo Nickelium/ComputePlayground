@@ -1,17 +1,20 @@
 #include "DXCompiler.h"
 #include "dxcapi.h" // DXC compiler
 
-void DXCompiler::Init(const bool debug)
+void DXCompiler::Init(const bool debug, const std::wstring& directory)
 {
 	m_debug = debug;
-	DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(&utils)) >> CHK;
-	DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(&compiler)) >> CHK;
+	m_directory = directory;
+	DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(&m_utils)) >> CHK;
+	DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(&m_compiler)) >> CHK;
+	m_utils->CreateDefaultIncludeHandler(&m_include_handler);
 }
 
-void DXCompiler::Compile(ComPtr<IDxcBlob>* outShaderBlob, const std::wstring& shaderPath, const ShaderType shaderType) const
+void DXCompiler::Compile(ComPtr<IDxcBlob>* outShaderBlob, const std::wstring& shaderFile, const ShaderType shaderType) const
 {
 	ComPtr<IDxcBlobEncoding> shaderSource{};
-	utils->LoadFile(shaderPath.c_str(), nullptr, &shaderSource) >> CHK;
+	const std::wstring shaderFullPath = m_directory + std::wstring(L"\\") + shaderFile;
+	m_utils->LoadFile(shaderFullPath.c_str(), nullptr, &shaderSource) >> CHK;
 	DxcBuffer sourceBuffer{};
 	sourceBuffer.Ptr = shaderSource->GetBufferPointer();
 	sourceBuffer.Size = shaderSource->GetBufferSize();
@@ -49,9 +52,11 @@ void DXCompiler::Compile(ComPtr<IDxcBlob>* outShaderBlob, const std::wstring& sh
 	//compileArguments.push_back(L"-Fd"); // PDB options followed by pdbpath
 	compileArguments.push_back(L"-HV 2021"); // HLSL 2021
 	compileArguments.push_back(L"-WX"); // Warnings are errors
+	std::wstring include_string_argument = L"-I " + m_directory;
+	compileArguments.push_back(include_string_argument.c_str());
 
 	ComPtr<IDxcResult> compileResult{};
-	compiler->Compile(&sourceBuffer, compileArguments.data(), (UINT32)compileArguments.size(), nullptr, IID_PPV_ARGS(&compileResult)) >> CHK;
+	m_compiler->Compile(&sourceBuffer, compileArguments.data(), (UINT32)compileArguments.size(), m_include_handler.Get(), IID_PPV_ARGS(&compileResult)) >> CHK;
 
 	ComPtr<IDxcBlobUtf8> pErrors{};
 	compileResult->GetOutput(DXC_OUT_ERRORS, IID_PPV_ARGS(&pErrors), nullptr) >> CHK;

@@ -1,3 +1,5 @@
+#include "Common.hlsl"
+
 struct VSInput
 {
 	float2 pos : Position;

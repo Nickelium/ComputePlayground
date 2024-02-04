@@ -35,7 +35,7 @@ std::shared_ptr<DXContext> CreateDXContext(const GRAPHICS_DEBUGGER_TYPE gd_type)
 	return dx_context;
 }
 
-std::shared_ptr<DXCompiler> CreateDXCompiler()
+std::shared_ptr<DXCompiler> CreateDXCompiler(const std::wstring& directory)
 {
 	std::shared_ptr<DXCompiler> dx_compiler = std::make_shared<DXCompiler>();
 	bool compile_debug{};
@@ -44,7 +44,7 @@ std::shared_ptr<DXCompiler> CreateDXCompiler()
 #else
 	compile_debug = false;
 #endif
-	dx_compiler->Init(compile_debug);
+	dx_compiler->Init(compile_debug, directory);
 	return dx_compiler;
 }
 
