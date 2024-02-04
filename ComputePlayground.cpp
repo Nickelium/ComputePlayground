@@ -64,12 +64,16 @@ Resources CreateResources(const DXContext& dx_context, const DXCompiler& dx_comp
 
 int main()
 {
+	//while (true)
+	//{
+
+	//}
 	AssertHook();
 	MemoryTrack();
 	{
 		State state{};
 
-		GRAPHICS_DEBUGGER_TYPE gd_type = GRAPHICS_DEBUGGER_TYPE::RENDERDOC;
+		const GRAPHICS_DEBUGGER_TYPE gd_type{ GRAPHICS_DEBUGGER_TYPE::PIX };
 		std::shared_ptr<IDXDebugLayer> dx_debug_layer = CreateDebugLayer(gd_type);
 		std::shared_ptr <DXContext> dx_context = CreateDXContext(gd_type);
 		std::shared_ptr <DXCompiler> dx_compiler = CreateDXCompiler();
@@ -78,10 +82,12 @@ int main()
 			D3D12_FEATURE_DATA_D3D12_OPTIONS feature{};
 			dx_context->GetDevice()->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS, &feature, sizeof(feature)) >> CHK;
 
-			D3D12_DESCRIPTOR_HEAP_DESC desc_heap_desc = {};
-			desc_heap_desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-			desc_heap_desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-			desc_heap_desc.NumDescriptors = 1;
+			D3D12_DESCRIPTOR_HEAP_DESC desc_heap_desc = 
+			{
+				.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,
+				.NumDescriptors = 1,
+				.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE,
+			};
 			Resources resource = CreateResources(*dx_context, *dx_compiler);
 			ComPtr<ID3D12Resource2> vertex_buffer{};
 			D3D12_VERTEX_BUFFER_VIEW vertex_buffer_view{};
@@ -93,7 +99,7 @@ int main()
 					float3 color;
 				};
 
-				Vertex vertex_data[] =
+				const Vertex vertex_data[] =
 				{
 					{ {+0.0f, +0.25f}, {1.0f, 0.0f, 0.0f} },
 					{ {+0.25f, -0.25f}, {0.0f, 1.0f, 0.0f} },
@@ -102,7 +108,7 @@ int main()
 
 				vertex_count = _countof(vertex_data);
 
-				D3D12_RESOURCE_DESC vertex_desc =
+				const D3D12_RESOURCE_DESC vertex_desc =
 				{
 					.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER,
 					.Alignment = D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT, // 64 * 1024 bytes = 64kB
@@ -119,7 +125,7 @@ int main()
 					.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR, // In order, no swizzle
 					.Flags = D3D12_RESOURCE_FLAG_NONE,
 				};
-				D3D12_HEAP_PROPERTIES heap_properties =
+				const D3D12_HEAP_PROPERTIES heap_properties =
 				{
 					.Type = D3D12_HEAP_TYPE_DEFAULT,
 					.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN,
@@ -135,7 +141,7 @@ int main()
 				) >> CHK;
 				vertex_buffer->SetName(L"VertexBuffer");
 
-				D3D12_HEAP_PROPERTIES heap_properties_upload =
+				const D3D12_HEAP_PROPERTIES heap_properties_upload =
 				{
 					.Type = D3D12_HEAP_TYPE_UPLOAD,
 					.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN,
@@ -179,7 +185,7 @@ int main()
 					.StrideInBytes = sizeof(vertex_data[0]),
 				};
 
-				D3D12_INPUT_ELEMENT_DESC element_descs[] =
+				const D3D12_INPUT_ELEMENT_DESC element_descs[] =
 				{
 					{ 
 						.SemanticName = "Position",
@@ -200,7 +206,7 @@ int main()
 						.InstanceDataStepRate = 0,
 					},
 				};
-				D3D12_INPUT_LAYOUT_DESC layout_desc =
+				const D3D12_INPUT_LAYOUT_DESC layout_desc =
 				{
 					.pInputElementDescs = element_descs,
 					.NumElements = _countof(element_descs),
@@ -208,7 +214,7 @@ int main()
 
 				dx_context->GetDevice()->CreateRootSignature(0, resource.m_vertex_shader->GetBufferPointer(), resource.m_vertex_shader->GetBufferSize(), IID_PPV_ARGS(&resource.m_gfx_root_signature)) >> CHK;
 		
-				D3D12_GRAPHICS_PIPELINE_STATE_DESC gfx_pso_desc =
+				const D3D12_GRAPHICS_PIPELINE_STATE_DESC gfx_pso_desc =
 				{
 					.pRootSignature = resource.m_gfx_root_signature.Get(),
 					.VS = 
@@ -396,7 +402,7 @@ int main()
 					dx_window->Present();
 
 					float32* data = nullptr;
-					D3D12_RANGE range = { 0, resource.m_uav.m_readback_desc.Width };
+					const D3D12_RANGE range = { 0, resource.m_uav.m_readback_desc.Width };
 					resource.m_uav.m_read_back_resource->Map(0, &range, (void**)&data);
 					for (int i = 0; i < resource.m_uav.m_readback_desc.Width / sizeof(float32) / 4; i++)
 						printf("uav[%d] = %.3f, %.3f, %.3f, %.3f\n", i, data[i * 4 + 0], data[i * 4 + 1], data[i * 4 + 2], data[i * 4 + 3]);

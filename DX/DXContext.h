@@ -26,7 +26,7 @@ public:
 	void InitCommandList();
 	void ExecuteCommandList();
 	void SignalAndWait();
-	void Flush(uint32_t flush_count);
+	void Flush(const uint32_t flush_count);
 
 	ComPtr<ID3D12Device9> GetDevice() const;
 	ComPtr<ID3D12GraphicsCommandList6> GetCommandList() const;
@@ -34,7 +34,7 @@ public:
 	ComPtr<ID3D12CommandQueue> GetCommandQueue() const;
 protected:
 	ComPtr<IDXGIFactory6> m_factory;
-	ComPtr<IDXGIAdapter1> m_adapter; // GPU
+	ComPtr<IDXGIAdapter3> m_adapter; // GPU
 	ComPtr<IDXGIOutput6> m_output; // Monitor
 	ComPtr<ID3D12Device9> m_device;
 

@@ -9,7 +9,7 @@
 #endif
 #include "dxcapi.h" // DXC compiler TODO remove include
 
-std::shared_ptr<IDXDebugLayer> CreateDebugLayer(GRAPHICS_DEBUGGER_TYPE gd_type)
+std::shared_ptr<IDXDebugLayer> CreateDebugLayer(const GRAPHICS_DEBUGGER_TYPE gd_type)
 {
 	std::shared_ptr<IDXDebugLayer> dx_debug_layer{};
 #if defined(_DEBUG)
@@ -22,7 +22,7 @@ std::shared_ptr<IDXDebugLayer> CreateDebugLayer(GRAPHICS_DEBUGGER_TYPE gd_type)
 	return dx_debug_layer;
 }
 
-std::shared_ptr<DXContext> CreateDXContext(GRAPHICS_DEBUGGER_TYPE gd_type)
+std::shared_ptr<DXContext> CreateDXContext(const GRAPHICS_DEBUGGER_TYPE gd_type)
 {
 	std::shared_ptr<DXContext> dx_context{};
 #if defined(_DEBUG)

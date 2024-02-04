@@ -1,14 +1,14 @@
 #include "DXCompiler.h"
 #include "dxcapi.h" // DXC compiler
 
-void DXCompiler::Init(bool debug)
+void DXCompiler::Init(const bool debug)
 {
 	m_debug = debug;
 	DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(&utils)) >> CHK;
 	DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(&compiler)) >> CHK;
 }
 
-void DXCompiler::Compile(ComPtr<IDxcBlob>* outShaderBlob, std::wstring shaderPath, ShaderType shaderType) const
+void DXCompiler::Compile(ComPtr<IDxcBlob>* outShaderBlob, const std::wstring& shaderPath, const ShaderType shaderType) const
 {
 	ComPtr<IDxcBlobEncoding> shaderSource{};
 	utils->LoadFile(shaderPath.c_str(), nullptr, &shaderSource) >> CHK;
@@ -60,7 +60,7 @@ void DXCompiler::Compile(ComPtr<IDxcBlob>* outShaderBlob, std::wstring shaderPat
 		printf("%s", (char*)pErrors->GetBufferPointer());
 	}
 	HRESULT HR{};
-	compileResult->GetStatus(&HR);
+	compileResult->GetStatus(&HR) >> CHK;
 	HR >> CHK;
 
 	compileResult->GetOutput(DXC_OUT_OBJECT, __uuidof(IDxcBlob), (void**)outShaderBlob, nullptr) >> CHK;

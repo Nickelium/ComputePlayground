@@ -11,7 +11,7 @@ struct VSOutput
 };
 
 [RootSignature("RootFlags(ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT)")]
-VSOutput main(in VSInput input) 
+VSOutput main(in const VSInput input) 
 {
 	VSOutput output = (VSOutput)0;
 	output.pos = float4(input.pos,0,1);

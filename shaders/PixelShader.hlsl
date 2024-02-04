@@ -10,7 +10,7 @@ struct PSOutput
 };
 
 [RootSignature("RootFlags(ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT)")]
-PSOutput main(in PSInput psInput) 
+PSOutput main(in const PSInput psInput) 
 {
 	PSOutput psOutput = (PSOutput)0;
 	psOutput.color = float4(psInput.color, 1.0f);

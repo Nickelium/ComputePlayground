@@ -13,10 +13,10 @@ bool LoadRenderdoc(HMODULE* renderdoc_module_out, RENDERDOC_API_1_6_0** renderdo
 	HMODULE renderdoc_module = 0;
 
 	TCHAR current_directory[MAX_PATH + 1] = { 0 };
-	DWORD number_characters_written = ::GetCurrentDirectory(MAX_PATH, current_directory);
+	const DWORD number_characters_written = ::GetCurrentDirectory(MAX_PATH, current_directory);
 	ASSERT(number_characters_written != 0 && "Failed current directory, call GetLastError");
-	std::wstring renderdoc_dll_name = L"renderdoc.dll";
-	std::wstring renderdoc_dll_relative_path = L"\\dependencies\\renderdoc\\bin\\";
+	const std::wstring renderdoc_dll_name = L"renderdoc.dll";
+	const std::wstring renderdoc_dll_relative_path = L"\\dependencies\\renderdoc\\bin\\";
 	std::wstring renderdoc_dll_absolute_path = current_directory;
 	renderdoc_dll_absolute_path += renderdoc_dll_relative_path;
 	renderdoc_dll_absolute_path += renderdoc_dll_name;
@@ -24,7 +24,7 @@ bool LoadRenderdoc(HMODULE* renderdoc_module_out, RENDERDOC_API_1_6_0** renderdo
 	ASSERT(renderdoc_module && "Missing renderdoc dependencies");
 	pRENDERDOC_GetAPI renderdoc_get_API =
 		(pRENDERDOC_GetAPI)GetProcAddress(renderdoc_module, "RENDERDOC_GetAPI");
-	int ret = renderdoc_get_API(eRENDERDOC_API_Version_1_6_0, (void**)&renderdoc_api);
+	const int ret = renderdoc_get_API(eRENDERDOC_API_Version_1_6_0, (void**)&renderdoc_api);
 	ASSERT(ret == 1);
 
 	*renderdoc_module_out = renderdoc_module;
@@ -42,10 +42,10 @@ bool LoadPIX(HMODULE* pix_module_out)
 	HMODULE pix_module = 0;
 
 	TCHAR current_directory[MAX_PATH + 1] = { 0 };
-	DWORD number_characters_written = ::GetCurrentDirectory(MAX_PATH, current_directory);
+	const DWORD number_characters_written = ::GetCurrentDirectory(MAX_PATH, current_directory);
 	ASSERT(number_characters_written != 0 && "Failed current directory, call GetLastError");
-	std::wstring pix_dll_name = L"WinPixGpuCapturer.dll";
-	std::wstring pix_dll_relative_path = L"\\dependencies\\pix\\bin\\";
+	const std::wstring pix_dll_name = L"WinPixGpuCapturer.dll";
+	const std::wstring pix_dll_relative_path = L"\\dependencies\\pix\\bin\\";
 	std::wstring pix_dll_absolute_path = current_directory;
 	pix_dll_absolute_path += pix_dll_relative_path;
 	pix_dll_absolute_path += pix_dll_name;
@@ -126,9 +126,9 @@ void DXDebugLayer::RenderdocCaptureEnd()
 	// rdc_1_capture_3
 
 
-	std::string path = ".\\captures\\";
-	std::vector<std::string> file_names = GetAllFileNames(path);
-	std::string regex_string(R"(rdc_(\d+)_capture.*)");
+	const std::string path = ".\\captures\\";
+	const std::vector<std::string> file_names = GetAllFileNames(path);
+	const std::string regex_string(R"(rdc_(\d+)_capture.*)");
 	std::vector<int32> index_matches = GetRegexIndexOfFileNames(file_names, regex_string);
 	std::sort(index_matches.begin(), index_matches.end());
 	int32 max_index = -1;
@@ -137,10 +137,10 @@ void DXDebugLayer::RenderdocCaptureEnd()
 		max_index = index_matches.back();
 	}
 
-	std::string file_path_template = "captures/";
+	const std::string file_path_template = "captures/";
 	std::string name_template = "rdc";
 	name_template += "_" + std::to_string(max_index + 1);
-	std::string full_path_template = file_path_template + name_template;
+	const std::string full_path_template = file_path_template + name_template;
 	m_renderdoc_api->SetCaptureFilePathTemplate(full_path_template.c_str());
 
 	const std::string& renderdoc_relative_path = ".\\captures\\";
@@ -155,7 +155,7 @@ void DXDebugLayer::RenderdocCaptureEnd()
 	ShellExecute(0, 0, renderdoc_absolute_path_wstring.c_str(), 0, 0, SW_SHOW);
 }
 
-DXDebugLayer::DXDebugLayer(GRAPHICS_DEBUGGER_TYPE type) :
+DXDebugLayer::DXDebugLayer(const GRAPHICS_DEBUGGER_TYPE type) :
 	m_pix_module(0u),
 	m_renderdoc_module(0u),
 	m_renderdoc_api(nullptr),
@@ -185,7 +185,7 @@ void DXDebugLayer::Init()
 	}
 	case GRAPHICS_DEBUGGER_TYPE::RENDERDOC:
 	{
-		bool success = LoadRenderdoc(&m_renderdoc_module, &m_renderdoc_api);
+		const bool success = LoadRenderdoc(&m_renderdoc_module, &m_renderdoc_api);
 		if (!success)
 		{
 			printf("RenderDoc not installed %d\n", GetLastError());
@@ -215,12 +215,12 @@ void DXDebugLayer::Close()
 
 	if (m_pix_module)
 	{
-		bool success = FreeLibrary(m_pix_module);
+		const bool success = FreeLibrary(m_pix_module);
 		ASSERT(success);
 	}
 	if (m_renderdoc_module)
 	{
-		bool success = FreeLibrary(m_renderdoc_module);
+		const bool success = FreeLibrary(m_renderdoc_module);
 		ASSERT(success);
 	}
 }

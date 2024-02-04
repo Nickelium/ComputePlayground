@@ -18,7 +18,7 @@ LRESULT CALLBACK DXWindow::OnWindowMessage(HWND handle, UINT msg, WPARAM wParam,
 	else
 	{
 		// Retrieve DXWindow Object
-		LONG_PTR ptr = GetWindowLongPtr(handle, GWLP_USERDATA);
+		const LONG_PTR ptr = GetWindowLongPtr(handle, GWLP_USERDATA);
 		pWindow = reinterpret_cast<DXWindow*>(ptr);
 	}
 
@@ -27,8 +27,8 @@ LRESULT CALLBACK DXWindow::OnWindowMessage(HWND handle, UINT msg, WPARAM wParam,
 	case WM_SIZE:
 	{
 		// Handle minimize & maximize
-		uint32_t reqWidth = HIWORD(lParam);
-		uint32_t reqHeight = LOWORD(lParam);
+		const uint32_t reqWidth = HIWORD(lParam);
+		const uint32_t reqHeight = LOWORD(lParam);
 		if
 		(
 			lParam &&
@@ -84,7 +84,7 @@ void DXWindow::Init(const DXContext& dx_context, const std::string& window_name)
 	// Requires to GetParent factory to work
 	factory->MakeWindowAssociation(m_handle, DXGI_MWA_NO_ALT_ENTER) >> CHK;
 
-	D3D12_DESCRIPTOR_HEAP_DESC rtvDescHeapDesc =
+	const D3D12_DESCRIPTOR_HEAP_DESC rtvDescHeapDesc =
 	{
 		.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV,
 		.NumDescriptors = GetBackBufferCount(),
@@ -94,8 +94,8 @@ void DXWindow::Init(const DXContext& dx_context, const std::string& window_name)
 	dx_context.GetDevice()->CreateDescriptorHeap(&rtvDescHeapDesc, IID_PPV_ARGS(&m_rtv_desc_heap)) >> CHK;
 
 	m_rtv_handles.resize(GetBackBufferCount());
-	D3D12_CPU_DESCRIPTOR_HANDLE firstHandle = m_rtv_desc_heap->GetCPUDescriptorHandleForHeapStart();
-	uint32_t incrementSize = dx_context.GetDevice()->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+	const D3D12_CPU_DESCRIPTOR_HANDLE firstHandle = m_rtv_desc_heap->GetCPUDescriptorHandleForHeapStart();
+	const uint32_t incrementSize = dx_context.GetDevice()->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 	for (uint32_t i = 0; i < GetBackBufferCount(); ++i)
 	{
 		D3D12_CPU_DESCRIPTOR_HANDLE currentHandle{};
@@ -125,7 +125,7 @@ void DXWindow::BeginFrame(const DXContext& dxContext)
 	};
 	dxContext.GetCommandList()->ResourceBarrier(_countof(barrier), barrier);
 
-	float color[4]{ 85.0f / 255.0f, 230.0f / 255.0f, 23.0f / 255.0f, 1.0f };
+	const float4 color{ 85.0f / 255.0f, 230.0f / 255.0f, 23.0f / 255.0f, 1.0f };
 	dxContext.GetCommandList()->ClearRenderTargetView(m_rtv_handles[m_current_buffer_index], color, 0, nullptr);
 	dxContext.GetCommandList()->OMSetRenderTargets(1, &m_rtv_handles[m_current_buffer_index], false, nullptr);
 }
@@ -213,7 +213,7 @@ void DXWindow::SetFullScreen(bool enable)
 
 	if (enable)
 	{
-		HMONITOR monitorHandle = MonitorFromWindow(m_handle, MONITOR_DEFAULTTONEAREST);
+		const HMONITOR monitorHandle = MonitorFromWindow(m_handle, MONITOR_DEFAULTTONEAREST);
 		MONITORINFO monitorInfo{};
 		monitorInfo.cbSize = sizeof(monitorInfo);
 		if (GetMonitorInfoW(monitorHandle, &monitorInfo))
@@ -251,10 +251,10 @@ bool DXWindow::IsFullScreen() const
 void DXWindow::SetResolutionToMonitor()
 {
 	POINT pt{};
-	HMONITOR monitorHandle = MonitorFromPoint(pt, MONITOR_DEFAULTTONEAREST);
+	const HMONITOR monitorHandle = MonitorFromPoint(pt, MONITOR_DEFAULTTONEAREST);
 	MONITORINFO monitorInfo{};
 	monitorInfo.cbSize = sizeof(monitorInfo);
-	bool success = GetMonitorInfoW(monitorHandle, &monitorInfo);
+	const bool success = GetMonitorInfoW(monitorHandle, &monitorInfo);
 	/*assert*/(success);
 	m_width = monitorInfo.rcMonitor.right - monitorInfo.rcMonitor.left,
 		m_height = monitorInfo.rcMonitor.bottom - monitorInfo.rcMonitor.top;
@@ -262,7 +262,7 @@ void DXWindow::SetResolutionToMonitor()
 
 void DXWindow::CreateWindowHandle(const std::string& window_name)
 {
-	WNDCLASSEXW wndClassExW =
+	const WNDCLASSEXW wndClassExW =
 	{
 		.cbSize = sizeof(wndClassExW),
 		.style = CS_OWNDC,
@@ -295,7 +295,7 @@ void DXWindow::CreateWindowHandle(const std::string& window_name)
 
 void DXWindow::CreateSwapChain(const DXContext& dxContext)
 {
-	DXGI_SWAP_CHAIN_DESC1 swapChainDesc =
+	const DXGI_SWAP_CHAIN_DESC1 swapChainDesc =
 	{
 		.Width = m_width,
 		.Height = m_height,
@@ -329,14 +329,14 @@ void DXWindow::GetBuffers(const DXContext& dxContext)
 {
 	m_buffers.resize(GetBackBufferCount());
 
-	D3D12_CPU_DESCRIPTOR_HANDLE rtvDescStart = m_rtv_desc_heap->GetCPUDescriptorHandleForHeapStart();
+	const D3D12_CPU_DESCRIPTOR_HANDLE rtvDescStart = m_rtv_desc_heap->GetCPUDescriptorHandleForHeapStart();
 	for (uint32_t i = 0; i < GetBackBufferCount(); ++i)
 	{
 		m_swap_chain->GetBuffer(i, IID_PPV_ARGS(&m_buffers[i])) >> CHK;
 		std::wstring str = L"Backbuffer " + std::to_wstring(i);
 		m_buffers[i]->SetName(str.c_str());
 
-		D3D12_RENDER_TARGET_VIEW_DESC rtvDesc =
+		const D3D12_RENDER_TARGET_VIEW_DESC rtvDesc =
 		{
 			// SDR Format
 			.Format = DXGI_FORMAT_R8G8B8A8_UNORM,

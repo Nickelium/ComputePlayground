@@ -228,6 +228,26 @@ namespace LA
 		return v / Length(v);
 	}
 
+	float32 MinComponent(const Vector2& v)
+	{
+		return std::min(v.x, v.y);
+	}
+
+	float32 MinComponent(const Vector3& v)
+	{
+		return std::min(std::min(v.x, v.y), v.z);
+	}
+
+	float32 MaxComponent(const Vector2& v)
+	{
+		return std::max(v.x, v.y);
+	}
+
+	float32 MaxComponent(const Vector3& v)
+	{
+		return std::max(std::max(v.x, v.y), v.z);
+	}
+
 	float32 LengthSquared(const Vector3& v)
 	{
 		return v.x * v.x + v.y * v.y + v.z * v.z;

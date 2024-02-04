@@ -15,8 +15,8 @@ enum class ShaderType
 class DXCompiler
 {
 public:
-	void Init(bool debug);
-	void Compile(ComPtr<IDxcBlob>* out_shader_blob, std::wstring shader_path, ShaderType shader_type) const;
+	void Init(const bool debug);
+	void Compile(ComPtr<IDxcBlob>* out_shader_blob, const std::wstring& shader_path, const ShaderType shader_type) const;
 private:
 	bool m_debug;
 

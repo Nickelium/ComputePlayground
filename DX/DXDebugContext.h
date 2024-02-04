@@ -6,7 +6,7 @@
 class DXDebugContext : public DXContext
 {
 public:
-	DXDebugContext(bool load_renderdoc);
+	DXDebugContext(const bool load_renderdoc);
 
 	virtual ~DXDebugContext();
 

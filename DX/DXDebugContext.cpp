@@ -1,6 +1,6 @@
 #include "DXDebugContext.h"
 
-DXDebugContext::DXDebugContext(bool load_renderdoc) : m_load_renderdoc(load_renderdoc), m_callback_handle(0u)
+DXDebugContext::DXDebugContext(const bool load_renderdoc) : m_load_renderdoc(load_renderdoc), m_callback_handle(0u)
 {
 
 }

@@ -18,6 +18,14 @@ void DXContext::Init()
 	DXGI_ADAPTER_DESC1 adapter_desc{};
 	m_adapter->GetDesc1(&adapter_desc) >> CHK;
 
+	// node_index 0 because single GPU
+	const uint32 node_index{0};
+	// Local means non-system main memory, non CPU RAM, aka VRAM
+	const DXGI_MEMORY_SEGMENT_GROUP memory_segment_group{ DXGI_MEMORY_SEGMENT_GROUP_LOCAL};
+	DXGI_QUERY_VIDEO_MEMORY_INFO video_memory_info{};
+	m_adapter->QueryVideoMemoryInfo(node_index, memory_segment_group, &video_memory_info) >> CHK;
+	//video_memory_info.Budget >> 30;
+
 	ComPtr<IDXGIOutput> output{};
 	m_adapter->EnumOutputs(0, output.GetAddressOf()) >> CHK;
 	output->QueryInterface(IID_PPV_ARGS(&m_output)) >> CHK;
@@ -71,7 +79,7 @@ void DXContext::SignalAndWait()
 	WaitForSingleObject(m_fence_event, INFINITE);
 }
 
-void DXContext::Flush(uint32_t flush_count)
+void DXContext::Flush(const uint32_t flush_count)
 {
 	// TODO proper flush
 	for (size_t i = 0; i < flush_count; i++)

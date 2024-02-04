@@ -5,7 +5,7 @@
 #include "DX/DXCompiler.h"
 #include "DX/DXWindow.h"
 
-std::shared_ptr<IDXDebugLayer> CreateDebugLayer(GRAPHICS_DEBUGGER_TYPE gd_type);
-std::shared_ptr<DXContext> CreateDXContext(GRAPHICS_DEBUGGER_TYPE gd_type);
+std::shared_ptr<IDXDebugLayer> CreateDebugLayer(const GRAPHICS_DEBUGGER_TYPE gd_type);
+std::shared_ptr<DXContext> CreateDXContext(const GRAPHICS_DEBUGGER_TYPE gd_type);
 std::shared_ptr<DXCompiler> CreateDXCompiler();
 std::shared_ptr<DXWindow> CreateDXWindow(const DXContext& dx_context, State* state, const std::string& window_name);

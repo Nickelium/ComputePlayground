@@ -2,7 +2,7 @@
 
 CheckToken CHK = CheckToken{};
 
-void operator>>(HRSourceLocation hrSourceLocation, CheckToken chk_token)
+void operator>>(const HRSourceLocation hrSourceLocation, const CheckToken chk_token)
 {
 #if defined(_DEBUG)
 	if (hrSourceLocation.m_hr != S_OK)

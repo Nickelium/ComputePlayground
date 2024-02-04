@@ -29,7 +29,7 @@ struct CheckToken {};
 extern CheckToken CHK;
 struct HRSourceLocation 
 {
-	HRSourceLocation(HRESULT hr, std::source_location loc = std::source_location::current())
+	HRSourceLocation(const HRESULT hr, std::source_location loc = std::source_location::current())
 		: m_hr(hr),
 		m_sourceLocation(loc)
 	{}

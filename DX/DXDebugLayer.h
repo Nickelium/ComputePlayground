@@ -9,7 +9,7 @@ struct RENDERDOC_API_1_6_0;
 class DXDebugLayer : public IDXDebugLayer
 {
 public:
-	DXDebugLayer(GRAPHICS_DEBUGGER_TYPE gd_type);
+	DXDebugLayer(const GRAPHICS_DEBUGGER_TYPE gd_type);
 	virtual ~DXDebugLayer();
 	virtual void Init() override;
 	void Close();
