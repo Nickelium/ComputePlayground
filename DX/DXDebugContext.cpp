@@ -43,8 +43,8 @@ void DXDebugContext::Init()
 		m_device->QueryInterface(IID_PPV_ARGS(&m_debug_device)) >> CHK;
 		m_device->QueryInterface(IID_PPV_ARGS(&m_info_queue)) >> CHK;
 		m_info_queue->RegisterMessageCallback(CallbackD3D12, D3D12_MESSAGE_CALLBACK_FLAG_NONE, nullptr, &m_callback_handle) >> CHK;
-		m_command_list->QueryInterface(IID_PPV_ARGS(&m_debug_command_list)) >> CHK;
-		m_command_queue->QueryInterface(IID_PPV_ARGS(&m_debug_command_queue)) >> CHK;
+		m_command_list_graphics->QueryInterface(IID_PPV_ARGS(&m_debug_command_list)) >> CHK;
+		m_graphics_queue->QueryInterface(IID_PPV_ARGS(&m_debug_command_queue)) >> CHK;
 	}
 }
 

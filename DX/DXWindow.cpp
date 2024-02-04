@@ -123,11 +123,11 @@ void DXWindow::BeginFrame(const DXContext& dxContext)
 			.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET,
 		}
 	};
-	dxContext.GetCommandList()->ResourceBarrier(_countof(barrier), barrier);
+	dxContext.GetCommandListGraphics()->ResourceBarrier(_countof(barrier), barrier);
 
 	const float4 color{ 85.0f / 255.0f, 230.0f / 255.0f, 23.0f / 255.0f, 1.0f };
-	dxContext.GetCommandList()->ClearRenderTargetView(m_rtv_handles[m_current_buffer_index], color, 0, nullptr);
-	dxContext.GetCommandList()->OMSetRenderTargets(1, &m_rtv_handles[m_current_buffer_index], false, nullptr);
+	dxContext.GetCommandListGraphics()->ClearRenderTargetView(m_rtv_handles[m_current_buffer_index], color, 0, nullptr);
+	dxContext.GetCommandListGraphics()->OMSetRenderTargets(1, &m_rtv_handles[m_current_buffer_index], false, nullptr);
 }
 
 void DXWindow::EndFrame(const DXContext& dxContext)
@@ -145,7 +145,7 @@ void DXWindow::EndFrame(const DXContext& dxContext)
 			.StateAfter = D3D12_RESOURCE_STATE_PRESENT,
 		}
 	};
-	dxContext.GetCommandList()->ResourceBarrier(_countof(barrier), barrier);
+	dxContext.GetCommandListGraphics()->ResourceBarrier(_countof(barrier), barrier);
 }
 
 void DXWindow::Present()
