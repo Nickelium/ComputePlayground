@@ -64,6 +64,8 @@ int __cdecl CrtDbgHook(int nReportType, char* szMsg, int* pnRet);
 #define ASSERT(x) UNUSED(x)
 #endif
 
+#define countof _countof
+
 void MemoryTrack();
 void MemoryDump();
 void AssertHook();

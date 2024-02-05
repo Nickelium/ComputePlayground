@@ -11,6 +11,33 @@ DXContext::~DXContext()
 
 }
 
+D3D_FEATURE_LEVEL GetMaxFeatureLevel(ComPtr<IDXGIAdapter4> adapter)
+{
+	// All D3D12 compliant feature levels
+	const D3D_FEATURE_LEVEL feature_levels[] =
+	{
+		D3D_FEATURE_LEVEL_11_0,
+		D3D_FEATURE_LEVEL_11_1,
+		D3D_FEATURE_LEVEL_12_0,
+		D3D_FEATURE_LEVEL_12_1,
+		D3D_FEATURE_LEVEL_12_2
+	};
+
+	// Require to support atleast bare d3d12
+	const D3D_FEATURE_LEVEL min_feature_level = feature_levels[0];
+	ComPtr<ID3D12Device9> device{};
+	D3D12CreateDevice(adapter.Get(), min_feature_level, IID_PPV_ARGS(&device)) >> CHK;
+
+	const D3D12_FEATURE feature{ D3D12_FEATURE_FEATURE_LEVELS };
+	D3D12_FEATURE_DATA_FEATURE_LEVELS feature_data =
+	{
+		.NumFeatureLevels = countof(feature_levels),
+		.pFeatureLevelsRequested = feature_levels,
+	};
+	device->CheckFeatureSupport(feature, &feature_data, sizeof(feature_data)) >> CHK;
+	return feature_data.MaxSupportedFeatureLevel;
+}
+
 void DXContext::Init()
 {
 	uint32 dxgi_factory_flag{ 0 };
@@ -35,8 +62,10 @@ void DXContext::Init()
 	output->QueryInterface(IID_PPV_ARGS(&m_output)) >> CHK;
 	DXGI_OUTPUT_DESC1 output_desc{};
 	m_output->GetDesc1(&output_desc);
-	D3D12CreateDevice(m_adapter.Get(), D3D_FEATURE_LEVEL_12_1, IID_PPV_ARGS(&m_device)) >> CHK;
 
+	D3D_FEATURE_LEVEL max_feature_level = GetMaxFeatureLevel(m_adapter);
+	D3D12CreateDevice(m_adapter.Get(), max_feature_level, IID_PPV_ARGS(&m_device)) >> CHK;
+	
 	const D3D12_COMMAND_QUEUE_DESC graphics_queue_desc =
 	{
 		.Type = D3D12_COMMAND_LIST_TYPE_DIRECT,
