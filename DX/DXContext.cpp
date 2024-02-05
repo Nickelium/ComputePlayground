@@ -100,9 +100,11 @@ void DXContext::Init()
 	m_device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_fence_gpu)) >> CHK;
 	m_fence_event = CreateEvent(nullptr, FALSE, FALSE, nullptr);
 
+#if defined(_DEBUG)
 	m_factory->SetPrivateData(WKPDID_D3DDebugObjectNameW, sizeof(wchar_t) * _countof(L"Factory"), L"Factory") >> CHK;
 	m_adapter->SetPrivateData(WKPDID_D3DDebugObjectNameW, sizeof(wchar_t) * _countof(L"Adapter"), L"Adapter") >> CHK;
 	m_output->SetPrivateData(WKPDID_D3DDebugObjectNameW, sizeof(wchar_t) * _countof(L"Adapter"), L"Output") >> CHK;
+
 	m_device->SetName(L"Device") >> CHK;
 	m_graphics_queue->SetName(L"CommandQueue::Direct") >> CHK;
 	m_command_allocator_graphics->SetName(L"CommandAllocator::Direct") >> CHK;
@@ -112,6 +114,7 @@ void DXContext::Init()
 	m_command_allocator_copy->SetName(L"CommandAllocator::Copy") >> CHK;
 	m_command_list_copy->SetName(L"CommandList::Copy") >> CHK;
 	m_fence_gpu->SetName(L"FenceGPU") >> CHK;
+#endif
 
 	m_command_list_graphics->Close() >> CHK;
 	m_is_graphics_command_list_open = false;
