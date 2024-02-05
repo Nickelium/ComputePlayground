@@ -35,11 +35,11 @@ public:
 	ComPtr<ID3D12GraphicsCommandList6> GetCommandListGraphics() const;
 	ComPtr<ID3D12GraphicsCommandList6> GetCommandListCompute() const;
 	ComPtr<ID3D12GraphicsCommandList6> GetCommandListCopy() const;
-	ComPtr<IDXGIFactory6> GetFactory() const;
+	ComPtr<IDXGIFactory7> GetFactory() const;
 	ComPtr<ID3D12CommandQueue> GetCommandQueue() const;
 protected:
-	ComPtr<IDXGIFactory6> m_factory;
-	ComPtr<IDXGIAdapter3> m_adapter; // GPU
+	ComPtr<IDXGIFactory7> m_factory;
+	ComPtr<IDXGIAdapter4> m_adapter; // GPU
 	ComPtr<IDXGIOutput6> m_output; // Monitor
 	ComPtr<ID3D12Device9> m_device;
 

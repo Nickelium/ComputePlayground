@@ -180,7 +180,7 @@ ComPtr<ID3D12GraphicsCommandList6> DXContext::GetCommandListCopy() const
 	return m_command_list_copy;
 }
 
-ComPtr<IDXGIFactory6> DXContext::GetFactory() const
+ComPtr<IDXGIFactory7> DXContext::GetFactory() const
 {
 	return m_factory;
 }
