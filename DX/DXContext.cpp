@@ -13,7 +13,11 @@ DXContext::~DXContext()
 
 void DXContext::Init()
 {
-	CreateDXGIFactory2(DXGI_CREATE_FACTORY_DEBUG, IID_PPV_ARGS(&m_factory)) >> CHK;
+	uint32 dxgi_factory_flag{ 0 };
+#if defined(_DEBUG)
+	dxgi_factory_flag |= DXGI_CREATE_FACTORY_DEBUG;
+#endif
+	CreateDXGIFactory2(dxgi_factory_flag, IID_PPV_ARGS(&m_factory)) >> CHK;
 	m_factory->EnumAdapterByGpuPreference(0, DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE, IID_PPV_ARGS(&m_adapter)) >> CHK;
 	DXGI_ADAPTER_DESC1 adapter_desc{};
 	m_adapter->GetDesc1(&adapter_desc) >> CHK;
