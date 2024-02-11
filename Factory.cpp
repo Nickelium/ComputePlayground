@@ -25,12 +25,7 @@ std::shared_ptr<IDXDebugLayer> CreateDebugLayer(const GRAPHICS_DEBUGGER_TYPE gd_
 std::shared_ptr<DXContext> CreateDXContext(const GRAPHICS_DEBUGGER_TYPE gd_type)
 {
 	std::shared_ptr<DXContext> dx_context{};
-#if defined(_DEBUG)
-	dx_context = std::make_shared<DXDebugContext>(gd_type == GRAPHICS_DEBUGGER_TYPE::RENDERDOC);
-#else
-	UNUSED(gd_type);
-	dx_context = std::make_shared<DXContext>();
-#endif
+	dx_context = std::make_shared<DXContext>(gd_type == GRAPHICS_DEBUGGER_TYPE::RENDERDOC);
 	dx_context->Init();
 	return dx_context;
 }
@@ -38,13 +33,7 @@ std::shared_ptr<DXContext> CreateDXContext(const GRAPHICS_DEBUGGER_TYPE gd_type)
 std::shared_ptr<DXCompiler> CreateDXCompiler(const std::wstring& directory)
 {
 	std::shared_ptr<DXCompiler> dx_compiler = std::make_shared<DXCompiler>();
-	bool compile_debug{};
-#if defined(_DEBUG)
-	compile_debug = true;
-#else
-	compile_debug = false;
-#endif
-	dx_compiler->Init(compile_debug, directory);
+	dx_compiler->Init(directory);
 	return dx_compiler;
 }
 

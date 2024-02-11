@@ -201,6 +201,7 @@ void DXDebugLayer::Init()
 	DXGIGetDebugInterface1(0, IID_PPV_ARGS(&m_dxgi_debug)) >> CHK;
 	m_dxgi_debug->EnableLeakTrackingForThread();
 
+	// Dont need to store -> can scope out
 	D3D12GetDebugInterface(IID_PPV_ARGS(&m_d3d12_debug)) >> CHK;
 	m_d3d12_debug->EnableDebugLayer();
 	m_d3d12_debug->SetEnableGPUBasedValidation(true);

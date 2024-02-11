@@ -111,6 +111,7 @@ xcopy /y /d $(ProjectDir)dependencies\DXC\bin\x64\dxil.dll $(OutDir)</Command>
     <ClCompile Include="DX\DXContext.cpp" />
     <ClCompile Include="DX\DXDebugContext.cpp" />
     <ClCompile Include="DX\DXDebugLayer.cpp" />
+    <ClCompile Include="DX\DXQuery.cpp" />
     <ClCompile Include="DX\DXResource.cpp" />
     <ClCompile Include="DX\DXWindow.cpp" />
     <ClCompile Include="Factory.cpp" />
@@ -132,6 +133,7 @@ xcopy /y /d $(ProjectDir)dependencies\DXC\bin\x64\dxil.dll $(OutDir)</Command>
     <ClInclude Include="DX\DXDebugContext.h" />
     <ClInclude Include="DX\DXDebugLayer.h" />
     <ClInclude Include="DX\DXNullDebugLayer.h" />
+    <ClInclude Include="DX\DXQuery.h" />
     <ClInclude Include="DX\DXResource.h" />
     <ClInclude Include="DX\DXWindow.h" />
     <ClInclude Include="DX\IDXDebugLayer.h" />

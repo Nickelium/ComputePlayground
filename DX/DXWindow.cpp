@@ -123,7 +123,7 @@ void DXWindow::BeginFrame(const DXContext& dxContext)
 			.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET,
 		}
 	};
-	dxContext.GetCommandListGraphics()->ResourceBarrier(_countof(barrier), barrier);
+	dxContext.GetCommandListGraphics()->ResourceBarrier(countof(barrier), barrier);
 
 	const float4 color{ 85.0f / 255.0f, 230.0f / 255.0f, 23.0f / 255.0f, 1.0f };
 	dxContext.GetCommandListGraphics()->ClearRenderTargetView(m_rtv_handles[m_current_buffer_index], color, 0, nullptr);
@@ -145,7 +145,7 @@ void DXWindow::EndFrame(const DXContext& dxContext)
 			.StateAfter = D3D12_RESOURCE_STATE_PRESENT,
 		}
 	};
-	dxContext.GetCommandListGraphics()->ResourceBarrier(_countof(barrier), barrier);
+	dxContext.GetCommandListGraphics()->ResourceBarrier(countof(barrier), barrier);
 }
 
 void DXWindow::Present()
@@ -315,14 +315,16 @@ void DXWindow::CreateSwapChain(const DXContext& dxContext)
 		.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH | DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING,
 	};
 	ComPtr<IDXGISwapChain1> swapChain{};
-	dxContext.GetFactory()->CreateSwapChainForHwnd
+	ComPtr<IDXGIFactory5> factory3{};
+	dxContext.GetFactory()->QueryInterface(IID_PPV_ARGS(&factory3)) >> CHK;
+	factory3->CreateSwapChainForHwnd
 	(
 		dxContext.GetCommandQueue().Get(), m_handle,
 		&swapChainDesc, nullptr, nullptr,
 		&swapChain
 	) >> CHK;
 	swapChain->QueryInterface(IID_PPV_ARGS(&m_swap_chain)) >> CHK;
-	m_swap_chain->SetPrivateData(WKPDID_D3DDebugObjectNameW, sizeof(wchar_t) * _countof(L"SwapChain"), L"SwapChain") >> CHK;
+	m_swap_chain->SetPrivateData(WKPDID_D3DDebugObjectNameW, sizeof(wchar_t) * countof(L"SwapChain"), L"SwapChain") >> CHK;
 }
 
 void DXWindow::GetBuffers(const DXContext& dxContext)

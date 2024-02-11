@@ -19,7 +19,7 @@ struct ID3D12DebugCommandQueue;
 class DXContext
 {
 public:
-	DXContext();
+	DXContext(const bool load_renderdoc);
 	virtual ~DXContext();
 	virtual void Init();
 
@@ -31,11 +31,11 @@ public:
 	void SignalAndWait();
 	void Flush(const uint32_t flush_count);
 
-	ComPtr<ID3D12Device9> GetDevice() const;
-	ComPtr<ID3D12GraphicsCommandList6> GetCommandListGraphics() const;
-	ComPtr<ID3D12GraphicsCommandList6> GetCommandListCompute() const;
-	ComPtr<ID3D12GraphicsCommandList6> GetCommandListCopy() const;
-	ComPtr<IDXGIFactory7> GetFactory() const;
+	ComPtr<ID3D12Device> GetDevice() const;
+	ComPtr<ID3D12GraphicsCommandList> GetCommandListGraphics() const;
+	ComPtr<ID3D12GraphicsCommandList> GetCommandListCompute() const;
+	ComPtr<ID3D12GraphicsCommandList> GetCommandListCopy() const;
+	ComPtr<IDXGIFactory> GetFactory() const;
 	ComPtr<ID3D12CommandQueue> GetCommandQueue() const;
 protected:
 	ComPtr<IDXGIFactory7> m_factory;
@@ -45,11 +45,11 @@ protected:
 
 
 	// Graphics + Compute + Copy
-	ComPtr<ID3D12CommandQueue> m_graphics_queue;
+	ComPtr<ID3D12CommandQueue> m_queue_graphics;
 	// Compute + Copy
-	ComPtr<ID3D12CommandQueue> m_compute_queue;
+	ComPtr<ID3D12CommandQueue> m_queue_compute;
 	// Copy
-	ComPtr<ID3D12CommandQueue> m_copy_queue;
+	ComPtr<ID3D12CommandQueue> m_queue_copy;
 	
 	bool m_is_graphics_command_list_open = false;
 	ComPtr<ID3D12GraphicsCommandList6> m_command_list_graphics;
@@ -66,4 +66,14 @@ protected:
 	ComPtr<ID3D12Fence> m_fence_gpu;
 	uint64_t m_fence_cpu;
 	HANDLE m_fence_event;
+
+#if defined(_DEBUG)
+	bool m_load_renderdoc;
+	DWORD m_callback_handle;
+	// TODO how to remove includes for these templates
+	ComPtr<ID3D12InfoQueue1> m_info_queue;
+	ComPtr<ID3D12DebugDevice2> m_debug_device;
+	ComPtr<ID3D12DebugCommandList1> m_debug_command_list;
+	ComPtr<ID3D12DebugCommandQueue> m_debug_command_queue;
+#endif
 };

@@ -37,9 +37,9 @@ Resources CreateResources(const DXContext& dx_context, const DXCompiler& dx_comp
 	resources.m_group_size = 1024;
 	resources.m_dispatch_count = 1;
 
-	dx_compiler.Compile(&resources.m_compute_shader, L"ComputeShader.hlsl", ShaderType::COMPUTE_SHADER);
-	dx_compiler.Compile(&resources.m_vertex_shader, L"VertexShader.hlsl", ShaderType::VERTEX_SHADER);
-	dx_compiler.Compile(&resources.m_pixel_shader, L"PixelShader.hlsl", ShaderType::PIXEL_SHADER);
+	dx_compiler.Compile(dx_context.GetDevice(), &resources.m_compute_shader, L"ComputeShader.hlsl", ShaderType::COMPUTE_SHADER);
+	dx_compiler.Compile(dx_context.GetDevice(), &resources.m_vertex_shader, L"VertexShader.hlsl", ShaderType::VERTEX_SHADER);
+	dx_compiler.Compile(dx_context.GetDevice(), &resources.m_pixel_shader, L"PixelShader.hlsl", ShaderType::PIXEL_SHADER);
 
 	resources.m_uav.m_desc.Width = resources.m_group_size * resources.m_dispatch_count * sizeof(float32) * 4;
 	resources.m_uav.m_readback_desc.Width = resources.m_uav.m_desc.Width;
@@ -72,7 +72,7 @@ int main()
 	{
 		State state{};
 
-		const GRAPHICS_DEBUGGER_TYPE gd_type{ GRAPHICS_DEBUGGER_TYPE::PIX };
+		const GRAPHICS_DEBUGGER_TYPE gd_type{ GRAPHICS_DEBUGGER_TYPE::NONE};
 		std::shared_ptr<IDXDebugLayer> dx_debug_layer = CreateDebugLayer(gd_type);
 		std::shared_ptr <DXContext> dx_context = CreateDXContext(gd_type);
 		std::shared_ptr <DXCompiler> dx_compiler = CreateDXCompiler(L"shaders");
@@ -105,7 +105,7 @@ int main()
 					{ {-0.25f, -0.25f}, {0.0f, 0.0f, 1.0f} },
 				};
 
-				vertex_count = _countof(vertex_data);
+				vertex_count = countof(vertex_data);
 
 				const D3D12_RESOURCE_DESC vertex_desc =
 				{
@@ -210,7 +210,7 @@ int main()
 				const D3D12_INPUT_LAYOUT_DESC layout_desc =
 				{
 					.pInputElementDescs = element_descs,
-					.NumElements = _countof(element_descs),
+					.NumElements = countof(element_descs),
 				};
 
 				dx_context->GetDevice()->CreateRootSignature(0, resource.m_vertex_shader->GetBufferPointer(), resource.m_vertex_shader->GetBufferSize(), IID_PPV_ARGS(&resource.m_gfx_root_signature)) >> CHK;
@@ -363,7 +363,7 @@ int main()
 									.StateAfter = D3D12_RESOURCE_STATE_COPY_SOURCE,
 								},
 							};
-							dx_context->GetCommandListGraphics()->ResourceBarrier(_countof(barriers), &barriers[0]);
+							dx_context->GetCommandListGraphics()->ResourceBarrier(countof(barriers), &barriers[0]);
 							dx_context->GetCommandListGraphics()->CopyResource(resource.m_uav.m_read_back_resource.Get(), resource.m_uav.m_gpu_resource.Get());
 						}
 						// Draw Work
@@ -405,8 +405,13 @@ int main()
 					float32* data = nullptr;
 					const D3D12_RANGE range = { 0, resource.m_uav.m_readback_desc.Width };
 					resource.m_uav.m_read_back_resource->Map(0, &range, (void**)&data);
-					for (int i = 0; i < resource.m_uav.m_readback_desc.Width / sizeof(float32) / 4; i++)
-						printf("uav[%d] = %.3f, %.3f, %.3f, %.3f\n", i, data[i * 4 + 0], data[i * 4 + 1], data[i * 4 + 2], data[i * 4 + 3]);
+					static bool has_display = false;
+					if (!has_display)
+					{
+						for (int i = 0; i < resource.m_uav.m_readback_desc.Width / sizeof(float32) / 4; i++)
+							printf("uav[%d] = %.3f, %.3f, %.3f, %.3f\n", i, data[i * 4 + 0], data[i * 4 + 1], data[i * 4 + 2], data[i * 4 + 3]);
+						has_display = true;
+					}
 					resource.m_uav.m_read_back_resource->Unmap(0, nullptr);
 				}
 				if (state.m_capture)

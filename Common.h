@@ -66,6 +66,12 @@ int __cdecl CrtDbgHook(int nReportType, char* szMsg, int* pnRet);
 
 #define countof _countof
 
+#if defined(_DEBUG)
+#define NAME_OBJECT(object, name) object->SetName(name) >> CHK
+#else
+#define NAME_OBJECT(object, name)
+#endif
+
 void MemoryTrack();
 void MemoryDump();
 void AssertHook();

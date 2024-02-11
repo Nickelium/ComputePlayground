@@ -1,16 +1,34 @@
 #include "DXCompiler.h"
 #include "dxcapi.h" // DXC compiler
+#include "DXContext.h"
+#include "DXQuery.h"
 
-void DXCompiler::Init(const bool debug, const std::wstring& directory)
+static const std::pair<ShaderType, std::string> g_shader_type_map_string[] =
 {
-	m_debug = debug;
+	{ShaderType::VERTEX_SHADER, "vs"},
+	{ShaderType::PIXEL_SHADER, "ps"},
+	{ShaderType::COMPUTE_SHADER, "cs"},
+};
+
+std::string GetShaderTypeString(const ShaderType& shader_type)
+{
+	return g_shader_type_map_string[static_cast<int32>(shader_type)].second;
+}
+
+void DXCompiler::Init(const std::wstring& directory)
+{
+#if defined(_DEBUG)
+	m_debug = true;
+#else
+	m_debug = false;
+#endif
 	m_directory = directory;
 	DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(&m_utils)) >> CHK;
 	DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(&m_compiler)) >> CHK;
 	m_utils->CreateDefaultIncludeHandler(&m_include_handler);
 }
 
-void DXCompiler::Compile(ComPtr<IDxcBlob>* outShaderBlob, const std::wstring& shaderFile, const ShaderType shaderType) const
+void DXCompiler::Compile(ComPtr<ID3D12Device> device, ComPtr<IDxcBlob>* outShaderBlob, const std::wstring& shaderFile, const ShaderType shaderType) const
 {
 	ComPtr<IDxcBlobEncoding> shaderSource{};
 	const std::wstring shaderFullPath = m_directory + std::wstring(L"\\") + shaderFile;
@@ -23,21 +41,13 @@ void DXCompiler::Compile(ComPtr<IDxcBlob>* outShaderBlob, const std::wstring& sh
 	compileArguments.push_back(L"-E "); // Entry point 
 	compileArguments.push_back(L"main");
 	compileArguments.push_back(L"-T"); // Target profile 
-	std::wstring shaderModel{};
-	switch (shaderType)
-	{
-	case ShaderType::VERTEX_SHADER:
-		shaderModel = L"vs_6_6";
-		break;
-	case ShaderType::PIXEL_SHADER:
-		shaderModel = L"ps_6_6";
-		break;
-	case ShaderType::COMPUTE_SHADER:
-		shaderModel = L"cs_6_6";
-		break;
+	std::wstring shader_type_model_string = std::to_wstring(GetShaderTypeString(shaderType));
 
-	}
-	compileArguments.push_back(shaderModel.c_str());
+	const D3D_SHADER_MODEL shader_model = GetMaxShaderModel(device);
+	const std::string& shader_model_string = GetShaderModelString(shader_model);
+	shader_type_model_string += L"_" + std::to_wstring(shader_model_string);
+
+	compileArguments.push_back(shader_type_model_string.c_str());
 	if (m_debug)
 	{
 		compileArguments.push_back(L"-Od"); // Disable Optimizations
