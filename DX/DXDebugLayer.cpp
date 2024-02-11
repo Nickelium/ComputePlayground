@@ -78,7 +78,6 @@ void DXDebugLayer::RenderdocCaptureStart()
 {
 	if (m_renderdoc_api)
 	{
-		/*m_renderdoc_api->SetCaptureFilePathTemplate("captures/rdc");*/
 		m_renderdoc_api->StartFrameCapture(nullptr, nullptr);
 	}
 }
@@ -118,13 +117,8 @@ std::vector<int32_t> GetRegexIndexOfFileNames(const std::vector<std::string>& fi
 
 void DXDebugLayer::RenderdocCaptureEnd()
 {
-	// index session, index current
-	// rdc_0_capture
-	// rdc_0_capture_2
-	// rdc_1_capture
-	// rdc_1_capture_2
-	// rdc_1_capture_3
-
+	if (!m_renderdoc_api)
+		return;
 
 	const std::string path = ".\\captures\\";
 	const std::vector<std::string> file_names = GetAllFileNames(path);
@@ -148,8 +142,7 @@ void DXDebugLayer::RenderdocCaptureEnd()
 	const std::string& renderdoc_extension = ".rdc";
 	const std::string& renderdoc_absolute_path = GetNewestCaptureName(renderdoc_relative_path, renderdoc_template_name, renderdoc_extension);
 
-	if (m_renderdoc_api)
-		m_renderdoc_api->EndFrameCapture(nullptr, nullptr);
+	m_renderdoc_api->EndFrameCapture(nullptr, nullptr);
 	// TODO scope out these function calls
 	const std::wstring& renderdoc_absolute_path_wstring = std::to_wstring(renderdoc_absolute_path);
 	ShellExecute(0, 0, renderdoc_absolute_path_wstring.c_str(), 0, 0, SW_SHOW);

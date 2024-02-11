@@ -63,16 +63,12 @@ Resources CreateResources(const DXContext& dx_context, const DXCompiler& dx_comp
 
 int main()
 {
-	//while (true)
-	//{
-
-	//}
 	AssertHook();
 	MemoryTrack();
 	{
 		State state{};
 
-		const GRAPHICS_DEBUGGER_TYPE gd_type{ GRAPHICS_DEBUGGER_TYPE::NONE};
+		const GRAPHICS_DEBUGGER_TYPE gd_type{ GRAPHICS_DEBUGGER_TYPE::RENDERDOC};
 		std::shared_ptr<IDXDebugLayer> dx_debug_layer = CreateDebugLayer(gd_type);
 		std::shared_ptr <DXContext> dx_context = CreateDXContext(gd_type);
 		std::shared_ptr <DXCompiler> dx_compiler = CreateDXCompiler(L"shaders");
