@@ -20,8 +20,18 @@ DXContext::DXContext(const bool load_renderdoc) :
 DXContext::~DXContext()
 {
 #if defined(_DEBUG)
-	if (m_info_queue)
-		m_info_queue->UnregisterMessageCallback(m_callback_handle) >> CHK;
+	if (!m_load_renderdoc)
+	{
+		ComPtr<ID3D12InfoQueue1> info_queue{};
+		m_device->QueryInterface(IID_PPV_ARGS(&info_queue)) >> CHK;
+		info_queue->UnregisterMessageCallback(m_callback_handle) >> CHK;
+	}
+
+	ComPtr<ID3D12DebugDevice2> debug_device;
+	m_device->QueryInterface(IID_PPV_ARGS(&debug_device)) >> CHK;
+	OutputDebugStringW(L"Report Live D3D12 Objects:\n");
+	// TODO resolve crash on report
+	debug_device->ReportLiveDeviceObjects(D3D12_RLDO_SUMMARY | D3D12_RLDO_DETAIL | D3D12_RLDO_IGNORE_INTERNAL) >> CHK;
 #endif
 }
 
@@ -135,16 +145,12 @@ void DXContext::Init()
 #if defined(_DEBUG)
 	if (!m_load_renderdoc)
 	{
-		// TODO report live objects for d3d12 objects not only dxgi
-		m_device->QueryInterface(IID_PPV_ARGS(&m_debug_device)) >> CHK;
-		m_device->QueryInterface(IID_PPV_ARGS(&m_info_queue)) >> CHK;
-		m_info_queue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_CORRUPTION, true) >> CHK;
-		m_info_queue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_WARNING, true) >> CHK;
-		m_info_queue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, true) >> CHK;
-		m_info_queue->RegisterMessageCallback(CallbackD3D12, D3D12_MESSAGE_CALLBACK_FLAG_NONE, nullptr, &m_callback_handle) >> CHK;
-
-		m_command_list_graphics->QueryInterface(IID_PPV_ARGS(&m_debug_command_list)) >> CHK;
-		m_queue_graphics->QueryInterface(IID_PPV_ARGS(&m_debug_command_queue)) >> CHK;
+		ComPtr<ID3D12InfoQueue1> info_queue{};
+		m_device->QueryInterface(IID_PPV_ARGS(&info_queue)) >> CHK;
+		info_queue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_CORRUPTION, true) >> CHK;
+		info_queue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_WARNING, true) >> CHK;
+		info_queue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, true) >> CHK;
+		info_queue->RegisterMessageCallback(CallbackD3D12, D3D12_MESSAGE_CALLBACK_FLAG_NONE, nullptr, &m_callback_handle) >> CHK;
 	}
 
 	printf("%s", DumpDX12Capabilities(m_device).c_str());

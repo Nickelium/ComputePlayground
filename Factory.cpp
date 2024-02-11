@@ -2,7 +2,6 @@
 
 #include "DX/DXContext.h"
 #if defined(_DEBUG)
-#include "DX/DXDebugContext.h"
 #include "DX/DXDebugLayer.h"
 #else
 #include "DX/DXNullDebugLayer.h"

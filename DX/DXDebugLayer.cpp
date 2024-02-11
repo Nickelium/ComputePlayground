@@ -204,9 +204,6 @@ void DXDebugLayer::Init()
 
 void DXDebugLayer::Close()
 {
-	OutputDebugStringW(L"Report Live Objects:\n");
-	m_dxgi_debug->ReportLiveObjects(DXGI_DEBUG_ALL, DXGI_DEBUG_RLO_FLAGS(DXGI_DEBUG_RLO_DETAIL | DXGI_DEBUG_RLO_IGNORE_INTERNAL)) >> CHK;
-
 	if (m_pix_module)
 	{
 		const bool success = FreeLibrary(m_pix_module);
@@ -217,6 +214,10 @@ void DXDebugLayer::Close()
 		const bool success = FreeLibrary(m_renderdoc_module);
 		ASSERT(success);
 	}
+
+	OutputDebugStringW(L"Report Live DXGI Objects:\n");
+	m_dxgi_debug->ReportLiveObjects(DXGI_DEBUG_ALL, DXGI_DEBUG_RLO_FLAGS(DXGI_DEBUG_RLO_DETAIL | DXGI_DEBUG_RLO_IGNORE_INTERNAL)) >> CHK;
+
 }
 
 void DXDebugLayer::PIXCaptureAndOpen()
