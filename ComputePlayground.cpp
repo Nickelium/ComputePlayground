@@ -74,9 +74,6 @@ int main()
 		std::shared_ptr <DXCompiler> dx_compiler = CreateDXCompiler(L"shaders");
 		std::shared_ptr<DXWindow> dx_window = CreateDXWindow(*dx_context, &state, "Playground");
 		{
-			D3D12_FEATURE_DATA_D3D12_OPTIONS feature{};
-			dx_context->GetDevice()->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS, &feature, sizeof(feature)) >> CHK;
-
 			D3D12_DESCRIPTOR_HEAP_DESC desc_heap_desc = 
 			{
 				.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,

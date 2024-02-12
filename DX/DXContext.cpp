@@ -20,18 +20,29 @@ DXContext::DXContext(const bool load_renderdoc) :
 DXContext::~DXContext()
 {
 #if defined(_DEBUG)
-	if (!m_load_renderdoc)
+	if (!m_load_renderdoc && m_callback_handle != 0)
 	{
 		ComPtr<ID3D12InfoQueue1> info_queue{};
-		m_device->QueryInterface(IID_PPV_ARGS(&info_queue)) >> CHK;
-		info_queue->UnregisterMessageCallback(m_callback_handle) >> CHK;
+		HRESULT result = m_device->QueryInterface(IID_PPV_ARGS(&info_queue));
+		// Query fails if debug layer disabled
+		if (result == S_OK)
+		{
+			// Reset back breaks otherwise breaks in ReportLiveDeviceObjects
+			info_queue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_CORRUPTION, false) >> CHK;
+			info_queue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_WARNING, false) >> CHK;
+			info_queue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, false) >> CHK;
+			info_queue->UnregisterMessageCallback(m_callback_handle) >> CHK;
+		}
 	}
 
 	ComPtr<ID3D12DebugDevice2> debug_device;
-	m_device->QueryInterface(IID_PPV_ARGS(&debug_device)) >> CHK;
-	OutputDebugStringW(L"Report Live D3D12 Objects:\n");
-	// TODO resolve crash on report
-	debug_device->ReportLiveDeviceObjects(D3D12_RLDO_SUMMARY | D3D12_RLDO_DETAIL | D3D12_RLDO_IGNORE_INTERNAL) >> CHK;
+	HRESULT result = m_device->QueryInterface(IID_PPV_ARGS(&debug_device));
+	// Query fails if debug layer disabled
+	if (result == S_OK)
+	{
+		OutputDebugStringW(L"Report Live D3D12 Objects:\n");
+		debug_device->ReportLiveDeviceObjects(D3D12_RLDO_SUMMARY | D3D12_RLDO_DETAIL | D3D12_RLDO_IGNORE_INTERNAL) >> CHK;
+	}
 #endif
 }
 
@@ -146,11 +157,15 @@ void DXContext::Init()
 	if (!m_load_renderdoc)
 	{
 		ComPtr<ID3D12InfoQueue1> info_queue{};
-		m_device->QueryInterface(IID_PPV_ARGS(&info_queue)) >> CHK;
-		info_queue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_CORRUPTION, true) >> CHK;
-		info_queue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_WARNING, true) >> CHK;
-		info_queue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, true) >> CHK;
-		info_queue->RegisterMessageCallback(CallbackD3D12, D3D12_MESSAGE_CALLBACK_FLAG_NONE, nullptr, &m_callback_handle) >> CHK;
+		HRESULT result = m_device->QueryInterface(IID_PPV_ARGS(&info_queue));
+		// Query fails if debug layer disabled
+		if (result == S_OK)
+		{
+			info_queue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_CORRUPTION, true) >> CHK;
+			info_queue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_WARNING, true) >> CHK;
+			info_queue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, true) >> CHK;
+			info_queue->RegisterMessageCallback(CallbackD3D12, D3D12_MESSAGE_CALLBACK_FLAG_NONE, nullptr, &m_callback_handle) >> CHK;
+		}
 	}
 
 	printf("%s", DumpDX12Capabilities(m_device).c_str());
