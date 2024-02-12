@@ -16,12 +16,30 @@ struct ID3D12DebugDevice2;
 struct ID3D12DebugCommandList1;
 struct ID3D12DebugCommandQueue;
 
+class DXReportContext
+{
+public:
+	DXReportContext() = default;
+	~DXReportContext();
+
+	// Keeps device alive to report then free
+	void SetDevice(ComPtr<ID3D12Device> device);
+private:
+	// ReportLiveDeviceObjects, ref count 1 is normal since debug_device is the last one
+	void ReportLDO() const;
+	ComPtr<ID3D12DebugDevice2> m_debug_device;
+};
+
+
 class DXContext
 {
 public:
 	DXContext(const bool load_renderdoc);
-	virtual ~DXContext();
-	virtual void Init();
+	~DXContext();
+	void Init();
+
+	// ReportLiveDeviceObjects
+	static void ReportLDO();
 
 	void InitCommandLists();
 	void ExecuteCommandListGraphics();
@@ -37,7 +55,7 @@ public:
 	ComPtr<ID3D12GraphicsCommandList> GetCommandListCopy() const;
 	ComPtr<IDXGIFactory> GetFactory() const;
 	ComPtr<ID3D12CommandQueue> GetCommandQueue() const;
-protected:
+private:
 	ComPtr<IDXGIFactory7> m_factory;
 	ComPtr<IDXGIAdapter4> m_adapter; // GPU
 	ComPtr<IDXGIOutput6> m_output; // Monitor

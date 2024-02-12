@@ -65,13 +65,16 @@ int main()
 {
 	AssertHook();
 	MemoryTrack();
+
+	DXReportContext dx_report_context{};
 	{
 		State state{};
-
-		const GRAPHICS_DEBUGGER_TYPE gd_type{ GRAPHICS_DEBUGGER_TYPE::NONE};
+		// TODO PIX and renderdoc in release mode
+		const GRAPHICS_DEBUGGER_TYPE gd_type{ GRAPHICS_DEBUGGER_TYPE::RENDERDOC};
 		std::shared_ptr<IDXDebugLayer> dx_debug_layer = CreateDebugLayer(gd_type);
-		std::shared_ptr <DXContext> dx_context = CreateDXContext(gd_type);
-		std::shared_ptr <DXCompiler> dx_compiler = CreateDXCompiler(L"shaders");
+		std::shared_ptr<DXContext> dx_context = CreateDXContext(gd_type);
+		dx_report_context.SetDevice(dx_context->GetDevice());
+		std::shared_ptr<DXCompiler> dx_compiler = CreateDXCompiler(L"shaders");
 		std::shared_ptr<DXWindow> dx_window = CreateDXWindow(*dx_context, &state, "Playground");
 		{
 			D3D12_DESCRIPTOR_HEAP_DESC desc_heap_desc = 

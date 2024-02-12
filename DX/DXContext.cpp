@@ -34,17 +34,10 @@ DXContext::~DXContext()
 			info_queue->UnregisterMessageCallback(m_callback_handle) >> CHK;
 		}
 	}
-
-	ComPtr<ID3D12DebugDevice2> debug_device;
-	HRESULT result = m_device->QueryInterface(IID_PPV_ARGS(&debug_device));
-	// Query fails if debug layer disabled
-	if (result == S_OK)
-	{
-		OutputDebugStringW(L"Report Live D3D12 Objects:\n");
-		debug_device->ReportLiveDeviceObjects(D3D12_RLDO_SUMMARY | D3D12_RLDO_DETAIL | D3D12_RLDO_IGNORE_INTERNAL) >> CHK;
-	}
 #endif
 }
+
+
 
 namespace
 {
@@ -268,4 +261,25 @@ ComPtr<IDXGIFactory> DXContext::GetFactory() const
 ComPtr<ID3D12CommandQueue> DXContext::GetCommandQueue() const
 {
 	return m_queue_graphics;
+}
+
+DXReportContext::~DXReportContext()
+{
+	ReportLDO();
+}
+
+void DXReportContext::SetDevice(ComPtr<ID3D12Device> device)
+{
+	// Query fails if debug layer disabled
+	HRESULT result = device->QueryInterface(IID_PPV_ARGS(&m_debug_device));
+	UNUSED(result);
+}
+
+void DXReportContext::ReportLDO() const
+{
+	if (m_debug_device)
+	{
+		OutputDebugStringW(L"Report Live D3D12 Objects:\n");
+		m_debug_device->ReportLiveDeviceObjects(D3D12_RLDO_SUMMARY | D3D12_RLDO_DETAIL | D3D12_RLDO_IGNORE_INTERNAL) >> CHK;
+	}
 }

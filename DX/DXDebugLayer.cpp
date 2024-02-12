@@ -191,6 +191,7 @@ void DXDebugLayer::Init()
 	}
 	}
 
+	// Requires windows "Graphics Tool" optional feature
 	DXGIGetDebugInterface1(0, IID_PPV_ARGS(&m_dxgi_debug)) >> CHK;
 	m_dxgi_debug->EnableLeakTrackingForThread();
 

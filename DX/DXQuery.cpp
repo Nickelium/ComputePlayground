@@ -52,7 +52,7 @@ std::string GetFeatureLevelString(const D3D_FEATURE_LEVEL& feature_level)
 	{
 		return iterator->second;
 	}
-	assert(false && "Invalid feature level");
+	ASSERT(false && "Invalid feature level");
 	return "";
 }
 
@@ -99,7 +99,7 @@ D3D_SHADER_MODEL GetMaxShaderModel(ComPtr<ID3D12Device> device)
 			return shader_model_option.HighestShaderModel;
 		}
 	}
-	assert(false && "None of the shader models are supported");
+	ASSERT(false && "None of the shader models are supported");
 	return g_lowest_shader_model;
 }
 
@@ -110,7 +110,7 @@ std::string GetShaderModelString(const D3D_SHADER_MODEL& shader_model)
 	{
 		return iterator->second;
 	}
-	assert(false && "Shader model invalid or not supported");
+	ASSERT(false && "Shader model invalid or not supported");
 	return "";
 }
 
@@ -244,7 +244,7 @@ static_assert(countof(g_dxgi_format_map_string) == g_dxgi_format_last_stored + 1
 
 std::string GetDXGIFormatString(const DXGI_FORMAT& dxgi_format)
 {
-	assert(dxgi_format <= g_dxgi_format_last_stored);
+	ASSERT(dxgi_format <= g_dxgi_format_last_stored);
 	return g_dxgi_format_map_string[dxgi_format];
 }
 
