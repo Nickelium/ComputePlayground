@@ -123,21 +123,21 @@ void DXContext::Init()
 	m_device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_fence_gpu)) >> CHK;
 	m_fence_event = CreateEvent(nullptr, FALSE, FALSE, nullptr);
 
-	m_factory->SetPrivateData(WKPDID_D3DDebugObjectNameW, sizeof(wchar_t) * countof(L"Factory"), L"Factory") >> CHK;
-	m_adapter->SetPrivateData(WKPDID_D3DDebugObjectNameW, sizeof(wchar_t) * countof(L"Adapter"), L"Adapter") >> CHK;
-	m_output->SetPrivateData(WKPDID_D3DDebugObjectNameW, sizeof(wchar_t) * countof(L"Adapter"), L"Output") >> CHK;
+	NAME_DXGI_OBJECT(m_factory, "Factory");
+	NAME_DXGI_OBJECT(m_adapter, "Adapter");
+	NAME_DXGI_OBJECT(m_output, "Output");
 
-	NAME_OBJECT(m_device, L"Device");
-	NAME_OBJECT(m_queue_graphics, L"Queue graphics");
-	NAME_OBJECT(m_command_allocator_graphics, L"Command allocator graphics");
-	NAME_OBJECT(m_command_list_graphics, L"Command list graphics");
-	NAME_OBJECT(m_queue_compute, L"QUeue compute");
-	NAME_OBJECT(m_command_allocator_compute, L"Command allocator compute");
-	NAME_OBJECT(m_command_list_compute, L"Command list compute");
-	NAME_OBJECT(m_queue_copy, L"Command allocator copy");
-	NAME_OBJECT(m_command_allocator_copy, L"Command allocator copy");
-	NAME_OBJECT(m_command_list_copy, L"Command list copy");
-	NAME_OBJECT(m_fence_gpu, L"FenceGPU");
+	NAME_DX_OBJECT(m_device, "Device");
+	NAME_DX_OBJECT(m_queue_graphics, "Queue graphics");
+	NAME_DX_OBJECT(m_command_allocator_graphics, "Command allocator graphics");
+	NAME_DX_OBJECT(m_command_list_graphics, "Command list graphics");
+	NAME_DX_OBJECT(m_queue_compute, "Queue compute");
+	NAME_DX_OBJECT(m_command_allocator_compute, "Command allocator compute");
+	NAME_DX_OBJECT(m_command_list_compute, "Command list compute");
+	NAME_DX_OBJECT(m_queue_copy, "Command allocator copy");
+	NAME_DX_OBJECT(m_command_allocator_copy, "Command allocator copy");
+	NAME_DX_OBJECT(m_command_list_copy, "Command list copy");
+	NAME_DX_OBJECT(m_fence_gpu, "FenceGPU");
 
 	m_command_list_graphics->Close() >> CHK;
 	m_is_graphics_command_list_open = false;
@@ -279,7 +279,7 @@ void DXReportContext::ReportLDO() const
 {
 	if (m_debug_device)
 	{
-		OutputDebugStringW(L"Report Live D3D12 Objects:\n");
+		OutputDebugStringW(std::to_wstring("Report Live D3D12 Objects:\n").c_str());
 		m_debug_device->ReportLiveDeviceObjects(D3D12_RLDO_SUMMARY | D3D12_RLDO_DETAIL | D3D12_RLDO_IGNORE_INTERNAL) >> CHK;
 	}
 }

@@ -67,9 +67,11 @@ int __cdecl CrtDbgHook(int nReportType, char* szMsg, int* pnRet);
 #define countof _countof
 
 #if defined(_DEBUG)
-#define NAME_OBJECT(object, name) object->SetName(name) >> CHK
+#define NAME_DX_OBJECT(object, name) object->SetName(std::to_wstring(name).c_str()) >> CHK
+#define NAME_DXGI_OBJECT(object, name) object->SetPrivateData(WKPDID_D3DDebugObjectName, sizeof(char)* countof(name), name) >> CHK;
 #else
-#define NAME_OBJECT(object, name)
+#define NAME_DX_OBJECT(object, name)
+#define NAME_DXGI_OBJECT(object, name)
 #endif
 
 void MemoryTrack();

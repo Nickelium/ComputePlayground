@@ -69,8 +69,8 @@ int main()
 	DXReportContext dx_report_context{};
 	{
 		State state{};
-		// TODO PIX and renderdoc in release mode
-		const GRAPHICS_DEBUGGER_TYPE gd_type{ GRAPHICS_DEBUGGER_TYPE::RENDERDOC};
+		// TODO PIX and renderdoc in release mode?
+		const GRAPHICS_DEBUGGER_TYPE gd_type{ GRAPHICS_DEBUGGER_TYPE::NONE};
 		std::shared_ptr<IDXDebugLayer> dx_debug_layer = CreateDebugLayer(gd_type);
 		std::shared_ptr<DXContext> dx_context = CreateDXContext(gd_type);
 		dx_report_context.SetDevice(dx_context->GetDevice());
@@ -134,7 +134,7 @@ int main()
 					D3D12_RESOURCE_STATE_COPY_DEST, nullptr,
 					IID_PPV_ARGS(&vertex_buffer)
 				) >> CHK;
-				vertex_buffer->SetName(L"VertexBuffer");
+				NAME_DX_OBJECT(vertex_buffer, "VertexBuffer");
 
 				const D3D12_HEAP_PROPERTIES heap_properties_upload =
 				{
@@ -151,7 +151,8 @@ int main()
 					D3D12_RESOURCE_STATE_GENERIC_READ, nullptr,
 					IID_PPV_ARGS(&vertex_upload_buffer)
 				) >> CHK;
-				vertex_upload_buffer->SetName(L"VertexUploadBuffer");
+				NAME_DX_OBJECT(vertex_upload_buffer, "VertexUploadBuffer");
+
 				Vertex* data = nullptr;
 				vertex_upload_buffer->Map(0, nullptr, reinterpret_cast<void**>(&data)) >> CHK;
 				memcpy(data, vertex_data, sizeof(vertex_data));

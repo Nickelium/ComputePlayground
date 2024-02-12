@@ -8,13 +8,13 @@ void operator>>(const HRSourceLocation hrSourceLocation, const CheckToken chk_to
 	if (hrSourceLocation.m_hr != S_OK)
 	{
 		// TODO HResult into string
-		std::wstring stringOuput =
-			L"Error: " +
-			std::to_wstring(hrSourceLocation.m_hr) + L" at " +
-			std::to_wstring(hrSourceLocation.m_sourceLocation.function_name()) + L" line " +
-			std::to_wstring(hrSourceLocation.m_sourceLocation.line()) + L"\n";
-		OutputDebugStringW(stringOuput.c_str());
-		printf("%ls", stringOuput.c_str());
+		std::string stringOuput =
+			"Error: " +
+			std::to_string(hrSourceLocation.m_hr) + " at " +
+			std::string(hrSourceLocation.m_sourceLocation.function_name()) + " line " +
+			std::to_string(hrSourceLocation.m_sourceLocation.line()) + "\n";
+		OutputDebugStringW(std::to_wstring(stringOuput).c_str());
+		printf("%s", stringOuput.c_str());
 		ASSERT(false);
 	}
 #else

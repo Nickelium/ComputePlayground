@@ -275,7 +275,7 @@ void DXWindow::CreateWindowHandle(const std::string& window_name)
 		.hbrBackground = nullptr,
 		.lpszMenuName = nullptr,
 		// TODO unique identifier to support multi windows
-		.lpszClassName = L"WndClass",
+		.lpszClassName = std::to_wstring("WndClass").c_str(),
 		.hIconSm = LoadIconW(nullptr, IDI_APPLICATION),
 	};
 	m_wnd_class_atom = RegisterClassExW(&wndClassExW);
@@ -324,7 +324,7 @@ void DXWindow::CreateSwapChain(const DXContext& dxContext)
 		&swapChain
 	) >> CHK;
 	swapChain->QueryInterface(IID_PPV_ARGS(&m_swap_chain)) >> CHK;
-	m_swap_chain->SetPrivateData(WKPDID_D3DDebugObjectNameW, sizeof(wchar_t) * countof(L"SwapChain"), L"SwapChain") >> CHK;
+	NAME_DXGI_OBJECT(m_swap_chain, "SwapChain");
 }
 
 void DXWindow::GetBuffers(const DXContext& dxContext)
@@ -335,8 +335,8 @@ void DXWindow::GetBuffers(const DXContext& dxContext)
 	for (uint32_t i = 0; i < GetBackBufferCount(); ++i)
 	{
 		m_swap_chain->GetBuffer(i, IID_PPV_ARGS(&m_buffers[i])) >> CHK;
-		std::wstring str = L"Backbuffer " + std::to_wstring(i);
-		m_buffers[i]->SetName(str.c_str());
+		std::string str = "Backbuffer " + std::to_string(i);
+		NAME_DX_OBJECT(m_buffers[i], str.c_str());
 
 		const D3D12_RENDER_TARGET_VIEW_DESC rtvDesc =
 		{
