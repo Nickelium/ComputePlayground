@@ -41,10 +41,42 @@ namespace std
 {
 	inline std::wstring to_wstring(const std::string& str)
 	{
-		int count = MultiByteToWideChar(CP_UTF8, 0, str.c_str(), (int)str.length(), NULL, 0);
-		std::wstring wstr(count, 0);
-		MultiByteToWideChar(CP_UTF8, 0, str.c_str(), (int)str.length(), &wstr[0], count);
+		std::wstring wstr;
+		size_t size;
+		wstr.resize(str.length());
+		mbstowcs_s(&size, &wstr[0], wstr.size() + 1, str.c_str(), str.size());
 		return wstr;
+	}
+
+	inline std::string to_string(const std::wstring& wstr)
+	{
+		std::string str;
+		size_t size;
+		str.resize(wstr.length());
+		wcstombs_s(&size, &str[0], str.size() + 1, wstr.c_str(), wstr.size());
+		return str;
+	}
+
+	inline std::vector<std::wstring> to_wstring(const std::vector<std::string>& array_string)
+	{
+		std::vector<std::wstring> array_wstring{};
+		array_wstring.reserve(array_string.size());
+		for (const std::string& str : array_string)
+		{
+			array_wstring.push_back(std::to_wstring(str));
+		}
+		return array_wstring;
+	}
+
+	inline std::vector<std::string> to_string(const std::vector<std::wstring>& array_wstring)
+	{
+		std::vector<std::string> array_string{};
+		array_string.reserve(array_wstring.size());
+		for (const std::wstring& wstr : array_wstring)
+		{
+			array_string.push_back(std::to_string(wstr));
+		}
+		return array_string;
 	}
 }
 

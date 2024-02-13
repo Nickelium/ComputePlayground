@@ -37,9 +37,9 @@ Resources CreateResources(const DXContext& dx_context, const DXCompiler& dx_comp
 	resources.m_group_size = 1024;
 	resources.m_dispatch_count = 1;
 
-	dx_compiler.Compile(dx_context.GetDevice(), &resources.m_compute_shader, L"ComputeShader.hlsl", ShaderType::COMPUTE_SHADER);
-	dx_compiler.Compile(dx_context.GetDevice(), &resources.m_vertex_shader, L"VertexShader.hlsl", ShaderType::VERTEX_SHADER);
-	dx_compiler.Compile(dx_context.GetDevice(), &resources.m_pixel_shader, L"PixelShader.hlsl", ShaderType::PIXEL_SHADER);
+	dx_compiler.Compile(dx_context.GetDevice(), &resources.m_compute_shader, "ComputeShader.hlsl", ShaderType::COMPUTE_SHADER);
+	dx_compiler.Compile(dx_context.GetDevice(), &resources.m_vertex_shader, "VertexShader.hlsl", ShaderType::VERTEX_SHADER);
+	dx_compiler.Compile(dx_context.GetDevice(), &resources.m_pixel_shader, "PixelShader.hlsl", ShaderType::PIXEL_SHADER);
 
 	resources.m_uav.m_desc.Width = resources.m_group_size * resources.m_dispatch_count * sizeof(float32) * 4;
 	resources.m_uav.m_readback_desc.Width = resources.m_uav.m_desc.Width;
@@ -70,11 +70,12 @@ int main()
 	{
 		State state{};
 		// TODO PIX and renderdoc in release mode?
+		// TODO PIX / renderdoc markers
 		const GRAPHICS_DEBUGGER_TYPE gd_type{ GRAPHICS_DEBUGGER_TYPE::NONE};
 		std::shared_ptr<IDXDebugLayer> dx_debug_layer = CreateDebugLayer(gd_type);
 		std::shared_ptr<DXContext> dx_context = CreateDXContext(gd_type);
 		dx_report_context.SetDevice(dx_context->GetDevice());
-		std::shared_ptr<DXCompiler> dx_compiler = CreateDXCompiler(L"shaders");
+		std::shared_ptr<DXCompiler> dx_compiler = CreateDXCompiler("shaders");
 		std::shared_ptr<DXWindow> dx_window = CreateDXWindow(*dx_context, &state, "Playground");
 		{
 			D3D12_DESCRIPTOR_HEAP_DESC desc_heap_desc = 

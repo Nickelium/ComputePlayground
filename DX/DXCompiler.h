@@ -18,11 +18,11 @@ enum class ShaderType
 class DXCompiler
 {
 public:
-	void Init(const std::wstring& directory);
-	void Compile(ComPtr<ID3D12Device> device, ComPtr<IDxcBlob>* out_shader_blob, const std::wstring& shader_path, const ShaderType shader_type) const;
+	void Init(const std::string& directory);
+	void Compile(ComPtr<ID3D12Device> device, ComPtr<IDxcBlob>* out_shader_blob, const std::string& shader_path, const ShaderType shader_type) const;
 private:
 	bool m_debug;
-	std::wstring m_directory;
+	std::string m_directory;
 
 	ComPtr<IDxcUtils> m_utils;
 	ComPtr<IDxcCompiler3> m_compiler;

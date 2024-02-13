@@ -15,7 +15,7 @@ std::string GetShaderTypeString(const ShaderType& shader_type)
 	return g_shader_type_map_string[static_cast<int32>(shader_type)].second;
 }
 
-void DXCompiler::Init(const std::wstring& directory)
+void DXCompiler::Init(const std::string& directory)
 {
 #if defined(_DEBUG)
 	m_debug = true;
@@ -28,45 +28,53 @@ void DXCompiler::Init(const std::wstring& directory)
 	m_utils->CreateDefaultIncludeHandler(&m_include_handler);
 }
 
-void DXCompiler::Compile(ComPtr<ID3D12Device> device, ComPtr<IDxcBlob>* outShaderBlob, const std::wstring& shaderFile, const ShaderType shaderType) const
+void DXCompiler::Compile(ComPtr<ID3D12Device> device, ComPtr<IDxcBlob>* outShaderBlob, const std::string& shaderFile, const ShaderType shaderType) const
 {
 	ComPtr<IDxcBlobEncoding> shaderSource{};
-	const std::wstring shaderFullPath = m_directory + std::wstring(L"\\") + shaderFile;
-	m_utils->LoadFile(shaderFullPath.c_str(), nullptr, &shaderSource) >> CHK;
+	const std::string shaderFullPath = m_directory + "\\" + shaderFile;
+	m_utils->LoadFile(std::to_wstring(shaderFullPath).c_str(), nullptr, &shaderSource) >> CHK;
 	DxcBuffer sourceBuffer{};
 	sourceBuffer.Ptr = shaderSource->GetBufferPointer();
 	sourceBuffer.Size = shaderSource->GetBufferSize();
 
-	std::vector<LPCWSTR> compileArguments{};
-	compileArguments.push_back(L"-E "); // Entry point 
-	compileArguments.push_back(L"main");
-	compileArguments.push_back(L"-T"); // Target profile 
-	std::wstring shader_type_model_string = std::to_wstring(GetShaderTypeString(shaderType));
+	std::vector<std::string> compile_arguments{};
+	compile_arguments.push_back("-E "); // Entry point 
+	compile_arguments.push_back("main");
+	compile_arguments.push_back("-T"); // Target profile 
+	std::string shader_type_model_string = GetShaderTypeString(shaderType);
 
 	const D3D_SHADER_MODEL shader_model = GetMaxShaderModel(device);
 	const std::string& shader_model_string = GetShaderModelString(shader_model);
-	shader_type_model_string += L"_" + std::to_wstring(shader_model_string);
+	shader_type_model_string += "_" + shader_model_string;
 
-	compileArguments.push_back(shader_type_model_string.c_str());
+	compile_arguments.push_back(shader_type_model_string.c_str());
 	if (m_debug)
 	{
-		compileArguments.push_back(L"-Od"); // Disable Optimizations
-		compileArguments.push_back(L"-Zi"); // Debug symbols
+		compile_arguments.push_back("-Od"); // Disable Optimizations
+		compile_arguments.push_back("-Zi"); // Debug symbols
 	}
 	else
 	{
-		//compileArguments.push_back(L"-O1"); // Min Optimizations
-		//compileArguments.push_back(L"-O2"); // Mid Optimizations
-		compileArguments.push_back(L"-O3"); // Max Optimizations
+		//compile_arguments.push_back("-O1"); // Min Optimizations
+		//compile_arguments.push_back("-O2"); // Mid Optimizations
+		compile_arguments.push_back("-O3"); // Max Optimizations
 	}
-	//compileArguments.push_back(L"-Fd"); // PDB options followed by pdbpath
-	compileArguments.push_back(L"-HV 2021"); // HLSL 2021
-	compileArguments.push_back(L"-WX"); // Warnings are errors
-	std::wstring include_string_argument = L"-I " + m_directory;
-	compileArguments.push_back(include_string_argument.c_str());
+	//compile_arguments.push_back("-Fd"); // PDB options followed by pdbpath
+	compile_arguments.push_back("-HV 2021"); // HLSL 2021
+	compile_arguments.push_back("-WX"); // Warnings are errors
+	std::string include_string_argument = "-I " + m_directory;
+	compile_arguments.push_back(include_string_argument.c_str());
+
+	// Keep compile_arguments_wstring alive when passing compile_arguments_lpcwstr to compile
+	std::vector<std::wstring> compile_arguments_wstring = std::to_wstring(compile_arguments);
+	std::vector<LPCWSTR> compile_arguments_lpcwstr{};
+	for (const std::wstring& argument : compile_arguments_wstring)
+	{
+		compile_arguments_lpcwstr.push_back(argument.c_str());
+	}
 
 	ComPtr<IDxcResult> compileResult{};
-	m_compiler->Compile(&sourceBuffer, compileArguments.data(), (UINT32)compileArguments.size(), m_include_handler.Get(), IID_PPV_ARGS(&compileResult)) >> CHK;
+	m_compiler->Compile(&sourceBuffer, compile_arguments_lpcwstr.data(), (uint32)compile_arguments_lpcwstr.size(), m_include_handler.Get(), IID_PPV_ARGS(&compileResult)) >> CHK;
 
 	ComPtr<IDxcBlobUtf8> pErrors{};
 	compileResult->GetOutput(DXC_OUT_ERRORS, IID_PPV_ARGS(&pErrors), nullptr) >> CHK;

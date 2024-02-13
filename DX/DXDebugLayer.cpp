@@ -15,12 +15,16 @@ bool LoadRenderdoc(HMODULE* renderdoc_module_out, RENDERDOC_API_1_6_0** renderdo
 	TCHAR current_directory[MAX_PATH + 1] = { 0 };
 	const DWORD number_characters_written = ::GetCurrentDirectory(MAX_PATH, current_directory);
 	ASSERT(number_characters_written != 0 && "Failed current directory, call GetLastError");
-	const std::wstring renderdoc_dll_name = L"renderdoc.dll";
-	const std::wstring renderdoc_dll_relative_path = L"\\dependencies\\renderdoc\\bin\\";
-	std::wstring renderdoc_dll_absolute_path = current_directory;
+	std::string current_directory_string = std::to_string(current_directory);
+
+	const std::string renderdoc_dll_name = "renderdoc.dll";
+	const std::string renderdoc_dll_relative_path = "\\dependencies\\renderdoc\\bin\\";
+	std::string renderdoc_dll_absolute_path = current_directory_string;
 	renderdoc_dll_absolute_path += renderdoc_dll_relative_path;
 	renderdoc_dll_absolute_path += renderdoc_dll_name;
-	renderdoc_module = LoadLibraryExW(renderdoc_dll_absolute_path.c_str(), NULL, LOAD_LIBRARY_SEARCH_DEFAULT_DIRS);
+
+	std::wstring renderdoc_dll_absolute_path_wstring = std::to_wstring(renderdoc_dll_absolute_path);
+	renderdoc_module = LoadLibraryExW(renderdoc_dll_absolute_path_wstring.c_str(), NULL, LOAD_LIBRARY_SEARCH_DEFAULT_DIRS);
 	ASSERT(renderdoc_module && "Missing renderdoc dependencies");
 	pRENDERDOC_GetAPI renderdoc_get_API =
 		(pRENDERDOC_GetAPI)GetProcAddress(renderdoc_module, "RENDERDOC_GetAPI");
@@ -44,12 +48,15 @@ bool LoadPIX(HMODULE* pix_module_out)
 	TCHAR current_directory[MAX_PATH + 1] = { 0 };
 	const DWORD number_characters_written = ::GetCurrentDirectory(MAX_PATH, current_directory);
 	ASSERT(number_characters_written != 0 && "Failed current directory, call GetLastError");
-	const std::wstring pix_dll_name = L"WinPixGpuCapturer.dll";
-	const std::wstring pix_dll_relative_path = L"\\dependencies\\pix\\bin\\";
-	std::wstring pix_dll_absolute_path = current_directory;
+	std::string current_directory_string = std::to_string(current_directory);
+	const std::string pix_dll_name = "WinPixGpuCapturer.dll";
+	const std::string pix_dll_relative_path = "\\dependencies\\pix\\bin\\";
+	std::string pix_dll_absolute_path = current_directory_string;
 	pix_dll_absolute_path += pix_dll_relative_path;
 	pix_dll_absolute_path += pix_dll_name;
-	pix_module = LoadLibraryExW(pix_dll_absolute_path.c_str(), NULL, LOAD_LIBRARY_SEARCH_DEFAULT_DIRS);
+
+	std::wstring pix_dll_absolute_path_wstring = std::to_wstring(pix_dll_absolute_path);
+	pix_module = LoadLibraryExW(pix_dll_absolute_path_wstring.c_str(), NULL, LOAD_LIBRARY_SEARCH_DEFAULT_DIRS);
 	ASSERT(pix_module && "Missing PIX dependencies");
 	*pix_module_out = pix_module;
 

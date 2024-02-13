@@ -7,5 +7,5 @@
 
 std::shared_ptr<IDXDebugLayer> CreateDebugLayer(const GRAPHICS_DEBUGGER_TYPE gd_type);
 std::shared_ptr<DXContext> CreateDXContext(const GRAPHICS_DEBUGGER_TYPE gd_type);
-std::shared_ptr<DXCompiler> CreateDXCompiler(const std::wstring& directory);
+std::shared_ptr<DXCompiler> CreateDXCompiler(const std::string& directory);
 std::shared_ptr<DXWindow> CreateDXWindow(const DXContext& dx_context, State* state, const std::string& window_name);
