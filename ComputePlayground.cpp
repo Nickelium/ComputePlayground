@@ -174,6 +174,11 @@ int main()
 				};
 				dx_context->GetCommandListGraphics()->ResourceBarrier(_countof(barriers), &barriers[0]);
 				// Copy queue has some constraints regarding copy state and barriers
+				// TODO use enhanced barrier?
+				//D3D12_BARRIER_GROUP a[1]{};
+				//D3D12_TEXTURE_BARRIER b;
+				//ID3D12GraphicsCommandList9* c{};
+				//c->Barrier(1, a);
 				// Compute has synchronization issue
 				dx_context->ExecuteCommandListGraphics();
 

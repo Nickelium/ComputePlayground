@@ -198,16 +198,21 @@ void DXDebugLayer::Init()
 	}
 	}
 
-	// Requires windows "Graphics Tool" optional feature
-	DXGIGetDebugInterface1(0, IID_PPV_ARGS(&m_dxgi_debug)) >> CHK;
-	m_dxgi_debug->EnableLeakTrackingForThread();
+	{
+		ComPtr<IDXGIDebug1> m_dxgi_debug{};
+		// Requires windows "Graphics Tool" optional feature
+		DXGIGetDebugInterface1(0, IID_PPV_ARGS(&m_dxgi_debug)) >> CHK;
+		m_dxgi_debug->EnableLeakTrackingForThread();
+	}
 
-	// Dont need to store -> can scope out
-	D3D12GetDebugInterface(IID_PPV_ARGS(&m_d3d12_debug)) >> CHK;
-	m_d3d12_debug->EnableDebugLayer();
-	m_d3d12_debug->SetEnableGPUBasedValidation(true);
-	m_d3d12_debug->SetEnableAutoName(true);
-	m_d3d12_debug->SetEnableSynchronizedCommandQueueValidation(true);
+	{
+		ComPtr<ID3D12Debug5> m_d3d12_debug{};
+		D3D12GetDebugInterface(IID_PPV_ARGS(&m_d3d12_debug)) >> CHK;
+		m_d3d12_debug->EnableDebugLayer();
+		m_d3d12_debug->SetEnableGPUBasedValidation(true);
+		m_d3d12_debug->SetEnableAutoName(true);
+		m_d3d12_debug->SetEnableSynchronizedCommandQueueValidation(true);
+	}
 }
 
 void DXDebugLayer::Close()
@@ -223,9 +228,13 @@ void DXDebugLayer::Close()
 		ASSERT(success);
 	}
 
-	OutputDebugStringW(std::to_wstring("Report Live DXGI Objects:\n").c_str());
-	m_dxgi_debug->ReportLiveObjects(DXGI_DEBUG_ALL, DXGI_DEBUG_RLO_FLAGS(DXGI_DEBUG_RLO_DETAIL | DXGI_DEBUG_RLO_IGNORE_INTERNAL)) >> CHK;
-
+	{
+		ComPtr<IDXGIDebug1> dxgi_debug{};
+		// Requires windows "Graphics Tool" optional feature
+		DXGIGetDebugInterface1(0, IID_PPV_ARGS(&dxgi_debug)) >> CHK;
+		OutputDebugStringW(std::to_wstring("Report Live DXGI Objects:\n").c_str());
+		dxgi_debug->ReportLiveObjects(DXGI_DEBUG_ALL, DXGI_DEBUG_RLO_FLAGS(DXGI_DEBUG_RLO_DETAIL | DXGI_DEBUG_RLO_IGNORE_INTERNAL)) >> CHK;
+	}
 }
 
 void DXDebugLayer::PIXCaptureAndOpen()

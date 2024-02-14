@@ -18,8 +18,6 @@ public:
 	virtual void RenderdocCaptureStart() override;
 	virtual void RenderdocCaptureEnd() override;
 private:
-	ComPtr<IDXGIDebug1> m_dxgi_debug;
-	ComPtr<ID3D12Debug5> m_d3d12_debug;
 	HMODULE m_pix_module;
 
 	HMODULE m_renderdoc_module;
