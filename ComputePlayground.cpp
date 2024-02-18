@@ -1,3 +1,4 @@
+
 #include "Common.h"
 //#include "DX.h"
 #include <dxcapi.h> // DXC compiler
@@ -10,6 +11,10 @@
 #include "maths/LinearAlgebra.h"
 
 #include "Factory.h"
+
+// Agility SDK doesnt work when not in this file?
+extern "C" { __declspec(dllexport) extern const UINT D3D12SDKVersion = 611; }
+extern "C" { __declspec(dllexport) extern const char* D3D12SDKPath = ".\\D3D12\\"; }
 
 DISABLE_OPTIMISATIONS()
 
@@ -43,7 +48,8 @@ Resources CreateResources(const DXContext& dx_context, const DXCompiler& dx_comp
 
 	resources.m_uav.m_desc.Width = resources.m_group_size * resources.m_dispatch_count * sizeof(float32) * 4;
 	resources.m_uav.m_readback_desc.Width = resources.m_uav.m_desc.Width;
-	dx_context.GetDevice()->CreateCommittedResource(&resources.m_uav.m_heap_properties, D3D12_HEAP_FLAG_NONE, &resources.m_uav.m_desc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&resources.m_uav.m_gpu_resource)) >> CHK;
+	// TODO do we need transition to proper state when using?
+	dx_context.GetDevice()->CreateCommittedResource(&resources.m_uav.m_heap_properties, D3D12_HEAP_FLAG_NONE, &resources.m_uav.m_desc, D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&resources.m_uav.m_gpu_resource)) >> CHK;
 	dx_context.GetDevice()->CreateCommittedResource(&resources.m_uav.m_readback_heap_properties, D3D12_HEAP_FLAG_NONE, &resources.m_uav.m_readback_desc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&resources.m_uav.m_read_back_resource)) >> CHK;
 	// Root signature embed in the shader already
 	dx_context.GetDevice()->CreateRootSignature(0, resources.m_compute_shader->GetBufferPointer(), resources.m_compute_shader->GetBufferSize(), IID_PPV_ARGS(&resources.m_compute_root_signature)) >> CHK;
@@ -72,7 +78,7 @@ int main()
 		// TODO PIX and renderdoc in release mode?
 		// TODO PIX / renderdoc markers
 		const GRAPHICS_DEBUGGER_TYPE gd_type{ GRAPHICS_DEBUGGER_TYPE::NONE};
-		std::shared_ptr<IDXDebugLayer> dx_debug_layer = CreateDebugLayer(gd_type);
+		std::shared_ptr<DXDebugLayer> dx_debug_layer = CreateDebugLayer(gd_type);
 		std::shared_ptr<DXContext> dx_context = CreateDXContext(gd_type);
 		dx_report_context.SetDevice(dx_context->GetDevice());
 		std::shared_ptr<DXCompiler> dx_compiler = CreateDXCompiler("shaders");
@@ -129,10 +135,11 @@ int main()
 					.CreationNodeMask = 1,
 					.VisibleNodeMask = 1,
 				};
+				// TODO do we need to transition to proper state?
 				dx_context->GetDevice()->CreateCommittedResource
 				(
 					&heap_properties, D3D12_HEAP_FLAG_NONE, &vertex_desc,
-					D3D12_RESOURCE_STATE_COPY_DEST, nullptr,
+					D3D12_RESOURCE_STATE_COMMON, nullptr,
 					IID_PPV_ARGS(&vertex_buffer)
 				) >> CHK;
 				NAME_DX_OBJECT(vertex_buffer, "VertexBuffer");

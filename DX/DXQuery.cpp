@@ -250,59 +250,71 @@ std::string GetDXGIFormatString(const DXGI_FORMAT& dxgi_format)
 
 D3D12_RESOURCE_BINDING_TIER GetResourceBindingTier(ComPtr<ID3D12Device> device)
 {
-	D3D12_FEATURE_DATA_D3D12_OPTIONS Options{};
-	device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS, &Options, sizeof(Options)) >> CHK;
-	return Options.ResourceBindingTier;
+	D3D12_FEATURE_DATA_D3D12_OPTIONS options{};
+	device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS, &options, sizeof(options)) >> CHK;
+	return options.ResourceBindingTier;
 }
 
 D3D12_RESOURCE_HEAP_TIER GetResourceHeapTier(ComPtr<ID3D12Device> device)
 {
-	D3D12_FEATURE_DATA_D3D12_OPTIONS Options{};
-	device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS, &Options, sizeof(Options)) >> CHK;
-	return Options.ResourceHeapTier;
+	D3D12_FEATURE_DATA_D3D12_OPTIONS options{};
+	device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS, &options, sizeof(options)) >> CHK;
+	return options.ResourceHeapTier;
 }
 
 bool IsDXGIFormatSupported(ComPtr<ID3D12Device> device, const DXGI_FORMAT& format)
 {
-	D3D12_FEATURE_DATA_FORMAT_SUPPORT Options = {};
-	Options.Format = format;
-	const HRESULT& result = device->CheckFeatureSupport(D3D12_FEATURE_FORMAT_SUPPORT, &Options, sizeof(Options));
+	D3D12_FEATURE_DATA_FORMAT_SUPPORT options
+	{
+		.Format = format
+	};
+	const HRESULT& result = device->CheckFeatureSupport(D3D12_FEATURE_FORMAT_SUPPORT, &options, sizeof(options));
 	return result == S_OK;
 }
 
 D3D_ROOT_SIGNATURE_VERSION GetMaxRootSignature(ComPtr<ID3D12Device> device)
 {
-	D3D12_FEATURE_DATA_ROOT_SIGNATURE  Options = { D3D_ROOT_SIGNATURE_VERSION_1_1 };
-	device->CheckFeatureSupport(D3D12_FEATURE_ROOT_SIGNATURE, &Options, sizeof(Options)) >> CHK;
-	return Options.HighestVersion;
+	D3D12_FEATURE_DATA_ROOT_SIGNATURE  options 
+	{ 
+		.HighestVersion = D3D_ROOT_SIGNATURE_VERSION_1_1
+	};
+	device->CheckFeatureSupport(D3D12_FEATURE_ROOT_SIGNATURE, &options, sizeof(options)) >> CHK;
+	return options.HighestVersion;
 }
 
 D3D12_RAYTRACING_TIER GetRaytracingTier(ComPtr<ID3D12Device> device)
 {
-	D3D12_FEATURE_DATA_D3D12_OPTIONS5 Options;
-	device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS5, &Options, sizeof(Options)) >> CHK;
-	return Options.RaytracingTier;
+	D3D12_FEATURE_DATA_D3D12_OPTIONS5 options{};
+	device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS5, &options, sizeof(options)) >> CHK;
+	return options.RaytracingTier;
 }
 
 D3D12_VARIABLE_SHADING_RATE_TIER GetVariableShadingRateTier(ComPtr<ID3D12Device> device)
 {
-	D3D12_FEATURE_DATA_D3D12_OPTIONS6 Options;
-	device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS6, &Options, sizeof(Options)) >> CHK;
-	return Options.VariableShadingRateTier;
+	D3D12_FEATURE_DATA_D3D12_OPTIONS6 options{};
+	device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS6, &options, sizeof(options)) >> CHK;
+	return options.VariableShadingRateTier;
 }
 
 D3D12_MESH_SHADER_TIER GetMeshShaderTier(ComPtr<ID3D12Device> device)
 {
-	D3D12_FEATURE_DATA_D3D12_OPTIONS7 Options;
-	device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS7, &Options, sizeof(Options)) >> CHK;
-	return Options.MeshShaderTier;
+	D3D12_FEATURE_DATA_D3D12_OPTIONS7 options{};
+	device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS7, &options, sizeof(options)) >> CHK;
+	return options.MeshShaderTier;
 }
 
 D3D12_SAMPLER_FEEDBACK_TIER GetSamplerFeedbackTier(ComPtr<ID3D12Device> device)
 {
-	D3D12_FEATURE_DATA_D3D12_OPTIONS7 Options;
-	device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS7, &Options, sizeof(Options)) >> CHK;
-	return Options.SamplerFeedbackTier;
+	D3D12_FEATURE_DATA_D3D12_OPTIONS7 options{};
+	device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS7, &options, sizeof(options)) >> CHK;
+	return options.SamplerFeedbackTier;
+}
+
+bool GetEnhancedBarrierSupported(ComPtr<ID3D12Device> device)
+{
+	D3D12_FEATURE_DATA_D3D12_OPTIONS12 options{};
+	device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS12, &options, sizeof(options)) >> CHK;
+	return options.EnhancedBarriersSupported;
 }
 
 std::string DumpDX12Capabilities(ComPtr<ID3D12Device> device)
@@ -318,6 +330,7 @@ std::string DumpDX12Capabilities(ComPtr<ID3D12Device> device)
 	pair_data.push_back({ "VariableShadingRateTier", std::format("{0}", (uint32)GetVariableShadingRateTier(device)) });
 	pair_data.push_back({ "MeshShaderTier", std::format("{0}", (uint32)GetMeshShaderTier(device)) });
 	pair_data.push_back({ "SamplerFeedbackTier", std::format("{0}", (uint32)GetSamplerFeedbackTier(device)) });
+	pair_data.push_back({ "EnhancedBarrier", std::format("{0}", GetEnhancedBarrierSupported(device)) });
 
 	std::string ret{};
 	for (auto& P : pair_data)

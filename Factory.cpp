@@ -8,15 +8,10 @@
 #endif
 #include "dxcapi.h" // DXC compiler TODO remove include
 
-std::shared_ptr<IDXDebugLayer> CreateDebugLayer(const GRAPHICS_DEBUGGER_TYPE gd_type)
+std::shared_ptr<DXDebugLayer> CreateDebugLayer(const GRAPHICS_DEBUGGER_TYPE gd_type)
 {
-	std::shared_ptr<IDXDebugLayer> dx_debug_layer{};
-#if defined(_DEBUG)
+	std::shared_ptr<DXDebugLayer> dx_debug_layer{};
 	dx_debug_layer = std::make_shared<DXDebugLayer>(gd_type);
-#else
-	UNUSED(gd_type);
-	dx_debug_layer = std::make_shared<DXNullDebugLayer>();
-#endif
 	dx_debug_layer->Init();
 	return dx_debug_layer;
 }

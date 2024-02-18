@@ -6,17 +6,17 @@ struct IDXGIDebug1;
 struct ID3D12Debug5;
 struct RENDERDOC_API_1_6_0;
 
-class DXDebugLayer : public IDXDebugLayer
+class DXDebugLayer
 {
 public:
 	DXDebugLayer(const GRAPHICS_DEBUGGER_TYPE gd_type);
-	virtual ~DXDebugLayer();
-	virtual void Init() override;
+	~DXDebugLayer();
+	void Init();
 	void Close();
 
-	virtual void PIXCaptureAndOpen() override;
-	virtual void RenderdocCaptureStart() override;
-	virtual void RenderdocCaptureEnd() override;
+	void PIXCaptureAndOpen();
+	void RenderdocCaptureStart();
+	void RenderdocCaptureEnd();
 private:
 	HMODULE m_pix_module;
 

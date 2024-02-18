@@ -19,5 +19,6 @@ D3D12_RAYTRACING_TIER GetRaytracingTier(ComPtr<ID3D12Device> device);
 D3D12_VARIABLE_SHADING_RATE_TIER GetVariableShadingRateTier(ComPtr<ID3D12Device> device);
 D3D12_MESH_SHADER_TIER GetMeshShaderTier(ComPtr<ID3D12Device> device);
 D3D12_SAMPLER_FEEDBACK_TIER GetSamplerFeedbackTier(ComPtr<ID3D12Device> device);
+bool GetEnhancedBarrierSupported(ComPtr<ID3D12Device> device);
 
 std::string DumpDX12Capabilities(ComPtr<ID3D12Device> device);
