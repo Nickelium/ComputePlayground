@@ -339,15 +339,23 @@ void DXCommand::BeginFrame()
 	ComPtr<ID3D12CommandAllocator> command_allocator = m_command_allocators[m_frame_index];
 	// Wait GPU using command allocator
 	// Free command allocator
+	command_allocator->Reset() >> CHK;
 	// Free commandlist
-
+	m_command_list->Reset(command_allocator.Get(), nullptr) >> CHK;
 	// Command recording
+	// ..
 }
 
 void DXCommand::EndFrame()
 {
 	// Close commandlist
+	m_command_list->Close() >> CHK;
 	// Submit commandlist
+	ID3D12CommandList* command_lists[] =
+	{
+		m_command_list.Get()
+	};
+	m_command_queue->ExecuteCommandLists(countof(command_lists), command_lists);
 
 	m_frame_index = (m_frame_index + 1) % g_backbuffer_count;
 }
