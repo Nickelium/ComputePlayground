@@ -105,7 +105,7 @@ D3D_SHADER_MODEL GetMaxShaderModel(ComPtr<ID3D12Device> device)
 
 std::string GetShaderModelString(const D3D_SHADER_MODEL& shader_model)
 {
-	const auto iterator = g_shader_model_map_string.find(shader_model);
+	const auto& iterator = g_shader_model_map_string.find(shader_model);
 	if (iterator != g_shader_model_map_string.cend())
 	{
 		return iterator->second;

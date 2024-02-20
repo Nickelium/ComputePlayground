@@ -69,7 +69,6 @@ private:
 	uint32_t m_width;
 	uint32_t m_height;
 
-	uint32_t m_backbuffer_count = 3u;
 	uint32_t m_current_buffer_index = 0u;
 
 	State* m_state;

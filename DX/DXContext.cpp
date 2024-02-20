@@ -283,3 +283,71 @@ void DXReportContext::ReportLDO() const
 		m_debug_device->ReportLiveDeviceObjects(D3D12_RLDO_SUMMARY | D3D12_RLDO_DETAIL | D3D12_RLDO_IGNORE_INTERNAL) >> CHK;
 	}
 }
+
+#include <map>
+
+static const std::map<D3D12_COMMAND_LIST_TYPE, std::string> g_command_list_type_map_string =
+{
+	{D3D12_COMMAND_LIST_TYPE_DIRECT, "Graphics"},
+	{D3D12_COMMAND_LIST_TYPE_COMPUTE, "Compute"},
+	{D3D12_COMMAND_LIST_TYPE_COPY, "Copy"}
+};
+
+std::string GetCommandTypeToString(const D3D12_COMMAND_LIST_TYPE& command_type)
+{
+	const auto& iterator = g_command_list_type_map_string.find(command_type);
+	if (iterator != g_command_list_type_map_string.cend())
+	{
+		return iterator->second;
+	}
+	ASSERT(false && "Command type invalid or not supported");
+	return "";
+}
+
+DXCommand::DXCommand(ComPtr<ID3D12Device> device, const D3D12_COMMAND_LIST_TYPE& command_type)
+	: m_command_type(command_type)
+{
+	const D3D12_COMMAND_QUEUE_DESC queue_desc =
+	{
+		.Type = m_command_type,
+		.Priority = D3D12_COMMAND_QUEUE_PRIORITY_HIGH,
+		.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE,
+	};
+	device->CreateCommandQueue(&queue_desc, IID_PPV_ARGS(&m_command_queue)) >> CHK;
+	for (uint32 i = 0; i < g_backbuffer_count; ++i)
+	{
+		device->CreateCommandAllocator(command_type, IID_PPV_ARGS(&m_command_allocators[i])) >> CHK;
+	}
+	
+	device->CreateCommandList(0, command_type, m_command_allocators[m_frame_index].Get(), nullptr, IID_PPV_ARGS(&m_command_list)) >> CHK;
+
+	NAME_DX_OBJECT(m_command_queue, "Command Queue: " + GetCommandTypeToString(m_command_type));
+	for (uint32 i = 0; i < g_backbuffer_count; ++i)
+	{
+		NAME_DX_OBJECT(m_command_allocators[i], "Command Allocator: " + GetCommandTypeToString(m_command_type) + std::to_string(i));
+	}
+	NAME_DX_OBJECT(m_command_list, "Command List: " + GetCommandTypeToString(m_command_type));
+}
+
+DXCommand::~DXCommand()
+{
+
+}
+
+void DXCommand::BeginFrame()
+{
+	ComPtr<ID3D12CommandAllocator> command_allocator = m_command_allocators[m_frame_index];
+	// Wait GPU using command allocator
+	// Free command allocator
+	// Free commandlist
+
+	// Command recording
+}
+
+void DXCommand::EndFrame()
+{
+	// Close commandlist
+	// Submit commandlist
+
+	m_frame_index = (m_frame_index + 1) % g_backbuffer_count;
+}

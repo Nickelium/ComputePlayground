@@ -196,7 +196,7 @@ void DXWindow::Resize(const DXContext& dxContext)
 
 uint32_t DXWindow::GetBackBufferCount() const
 {
-	return m_backbuffer_count;
+	return g_backbuffer_count;
 }
 
 void DXWindow::SetFullScreen(bool enable)
@@ -307,7 +307,7 @@ void DXWindow::CreateSwapChain(const DXContext& dxContext)
 			.Quality = 0,
 		},
 		.BufferUsage = DXGI_USAGE_BACK_BUFFER | DXGI_USAGE_RENDER_TARGET_OUTPUT,
-		.BufferCount = m_backbuffer_count,
+		.BufferCount = g_backbuffer_count,
 		.Scaling = DXGI_SCALING_NONE,
 		// FLIP_DISCARD (can discard backbuffer after present) or FLIP_SEQ (keeps backbuffer alive after present) in DX12
 		.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD,

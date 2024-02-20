@@ -30,6 +30,28 @@ private:
 	ComPtr<ID3D12DebugDevice2> m_debug_device;
 };
 
+// Structure for a single thread to submit
+class DXCommand
+{
+public:
+	DXCommand(ComPtr<ID3D12Device> device, const D3D12_COMMAND_LIST_TYPE& command_type);
+	~DXCommand();
+
+	void BeginFrame();
+	void EndFrame();
+private:
+	// Command type
+	D3D12_COMMAND_LIST_TYPE m_command_type;
+
+	ComPtr<ID3D12CommandQueue> m_command_queue;
+	// Number of command list == number of threads, can reuse commandlist after submission
+	ComPtr<ID3D12GraphicsCommandList6> m_command_list;
+	// Number of command allocator == number of threads x backbuffer count
+	ComPtr<ID3D12CommandAllocator> m_command_allocators[g_backbuffer_count];
+
+	uint32 m_frame_index{ 0 };
+};
+
 
 class DXContext
 {
@@ -37,9 +59,6 @@ public:
 	DXContext(const bool load_renderdoc);
 	~DXContext();
 	void Init();
-
-	// ReportLiveDeviceObjects
-	static void ReportLDO();
 
 	void InitCommandLists();
 	void ExecuteCommandListGraphics();

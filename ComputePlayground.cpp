@@ -77,7 +77,7 @@ int main()
 		State state{};
 		// TODO PIX and renderdoc in release mode?
 		// TODO PIX / renderdoc markers
-		const GRAPHICS_DEBUGGER_TYPE gd_type{ GRAPHICS_DEBUGGER_TYPE::NONE};
+		const GRAPHICS_DEBUGGER_TYPE gd_type{ GRAPHICS_DEBUGGER_TYPE::PIX};
 		std::shared_ptr<DXDebugLayer> dx_debug_layer = CreateDebugLayer(gd_type);
 		std::shared_ptr<DXContext> dx_context = CreateDXContext(gd_type);
 		dx_report_context.SetDevice(dx_context->GetDevice());
