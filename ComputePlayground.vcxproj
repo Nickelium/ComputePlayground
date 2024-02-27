@@ -133,7 +133,6 @@ xcopy /y /d $(ProjectDir)dependencies\DXC\bin\x64\dxil.dll $(OutDir)</Command>
     <ClInclude Include="DX\DXCompiler.h" />
     <ClInclude Include="DX\DXContext.h" />
     <ClInclude Include="DX\DXDebugLayer.h" />
-    <ClInclude Include="DX\DXNullDebugLayer.h" />
     <ClInclude Include="DX\DXQuery.h" />
     <ClInclude Include="DX\DXResource.h" />
     <ClInclude Include="DX\DXWindow.h" />

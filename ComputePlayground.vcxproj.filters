@@ -71,9 +71,6 @@
     <ClInclude Include="DX\IDXDebugLayer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="DX\DXNullDebugLayer.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="DX\DXDebugLayer.h">
       <Filter>Header Files</Filter>
     </ClInclude>

@@ -2,6 +2,10 @@
 #include "DXCommon.h"
 #include "DXQuery.h"
 
+#if defined(_DEBUG)
+#include <dxgidebug.h>
+#endif
+
 
 DXContext::DXContext(const bool load_renderdoc) :
 	m_fence_cpu(0u), 
@@ -34,6 +38,14 @@ DXContext::~DXContext()
 			info_queue->UnregisterMessageCallback(m_callback_handle) >> CHK;
 		}
 	}
+
+	{
+		ComPtr<IDXGIDebug1> dxgi_debug{};
+		// Requires windows "Graphics Tool" optional feature
+		DXGIGetDebugInterface1(0, IID_PPV_ARGS(&dxgi_debug)) >> CHK;
+		OutputDebugStringW(std::to_wstring("Report Live DXGI Objects:\n").c_str());
+		dxgi_debug->ReportLiveObjects(DXGI_DEBUG_ALL, DXGI_DEBUG_RLO_FLAGS(DXGI_DEBUG_RLO_DETAIL | DXGI_DEBUG_RLO_IGNORE_INTERNAL)) >> CHK;
+	}
 #endif
 }
 
@@ -60,9 +72,40 @@ namespace
 		ASSERT(false);
 	}
 }
+#include <system_error>
+
+std::string RemapHResult(HRESULT hr)
+{
+	return std::system_category().message(hr);
+}
+
+void OnDeviceRemoved(PVOID context, BOOLEAN)
+{
+	ID3D12Device* removedDevice = (ID3D12Device*)context;
+	HRESULT removedReason = removedDevice->GetDeviceRemovedReason();
+	std::string removed_reason_string = RemapHResult(removedReason);
+	// Perform app-specific device removed operation, such as logging or inspecting DRED output
+	assert(removedReason == S_OK);
+}
 
 void DXContext::Init()
 {
+	{
+		ComPtr<IDXGIDebug1> dxgi_debug{};
+		// Requires windows "Graphics Tool" optional feature
+		DXGIGetDebugInterface1(0, IID_PPV_ARGS(&dxgi_debug)) >> CHK;
+		dxgi_debug->EnableLeakTrackingForThread();
+	}
+
+	{
+		ComPtr<ID3D12Debug5> d3d12_debug{};
+		D3D12GetDebugInterface(IID_PPV_ARGS(&d3d12_debug)) >> CHK;
+		d3d12_debug->EnableDebugLayer();
+		//d3d12_debug->SetEnableGPUBasedValidation(true);
+		//d3d12_debug->SetEnableAutoName(true);
+		//d3d12_debug->SetEnableSynchronizedCommandQueueValidation(true);
+	}
+
 	uint32 dxgi_factory_flag{ 0 };
 #if defined(_DEBUG)
 	dxgi_factory_flag |= DXGI_CREATE_FACTORY_DEBUG;
@@ -122,6 +165,20 @@ void DXContext::Init()
 
 	m_device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_fence_gpu)) >> CHK;
 	m_fence_event = CreateEvent(nullptr, FALSE, FALSE, nullptr);
+
+	HANDLE deviceRemovedEvent = CreateEventW(NULL, FALSE, FALSE, NULL);
+	assert(deviceRemovedEvent != NULL);
+	m_fence_gpu->SetEventOnCompletion(UINT64_MAX, deviceRemovedEvent);
+
+	HANDLE waitHandle;
+	RegisterWaitForSingleObject(
+		&waitHandle,
+		deviceRemovedEvent,
+		OnDeviceRemoved,
+		m_device.Get(), // Pass the device as our context
+		INFINITE, // No timeout
+		0 // No flags
+	);
 
 	NAME_DXGI_OBJECT(m_factory, "Factory");
 	NAME_DXGI_OBJECT(m_adapter, "Adapter");
