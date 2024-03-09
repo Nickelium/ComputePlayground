@@ -16,10 +16,10 @@ std::shared_ptr<DXDebugLayer> CreateDebugLayer(const GRAPHICS_DEBUGGER_TYPE gd_t
 	return dx_debug_layer;
 }
 
-std::shared_ptr<DXContext> CreateDXContext(const GRAPHICS_DEBUGGER_TYPE gd_type)
+std::shared_ptr<DXContext> CreateDXContext()
 {
 	std::shared_ptr<DXContext> dx_context{};
-	dx_context = std::make_shared<DXContext>(gd_type == GRAPHICS_DEBUGGER_TYPE::RENDERDOC);
+	dx_context = std::make_shared<DXContext>();
 	dx_context->Init();
 	return dx_context;
 }

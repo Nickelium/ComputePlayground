@@ -79,7 +79,7 @@ int main()
 		// TODO PIX / renderdoc markers
 		const GRAPHICS_DEBUGGER_TYPE gd_type{ GRAPHICS_DEBUGGER_TYPE::PIX};
 		std::shared_ptr<DXDebugLayer> dx_debug_layer = CreateDebugLayer(gd_type);
-		std::shared_ptr<DXContext> dx_context = CreateDXContext(gd_type);
+		std::shared_ptr<DXContext> dx_context = CreateDXContext();
 		dx_report_context.SetDevice(dx_context->GetDevice());
 		std::shared_ptr<DXCompiler> dx_compiler = CreateDXCompiler("shaders");
 		std::shared_ptr<DXWindow> dx_window = CreateDXWindow(*dx_context, &state, "Playground");

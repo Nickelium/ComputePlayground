@@ -6,13 +6,11 @@
 #include <dxgidebug.h>
 #endif
 
-
-DXContext::DXContext(const bool load_renderdoc) :
+DXContext::DXContext() :
 	m_fence_cpu(0u), 
 	m_fence_event(0)
 #if defined(_DEBUG)
 	,
-	m_load_renderdoc(load_renderdoc),
 	m_callback_handle(0)
 #endif
 {
@@ -24,27 +22,19 @@ DXContext::DXContext(const bool load_renderdoc) :
 DXContext::~DXContext()
 {
 #if defined(_DEBUG)
-	if (!m_load_renderdoc && m_callback_handle != 0)
+	ComPtr<ID3D12InfoQueue1> info_queue{};
+	HRESULT result = m_device->QueryInterface(IID_PPV_ARGS(&info_queue));
+	// Query fails if debug layer disabled
+	if (result == S_OK)
 	{
-		ComPtr<ID3D12InfoQueue1> info_queue{};
-		HRESULT result = m_device->QueryInterface(IID_PPV_ARGS(&info_queue));
-		// Query fails if debug layer disabled
-		if (result == S_OK)
+		// Reset back breaks otherwise breaks in ReportLiveDeviceObjects
+		info_queue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_CORRUPTION, false) >> CHK;
+		info_queue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_WARNING, false) >> CHK;
+		info_queue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, false) >> CHK;
+		if (m_callback_handle != 0)
 		{
-			// Reset back breaks otherwise breaks in ReportLiveDeviceObjects
-			info_queue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_CORRUPTION, false) >> CHK;
-			info_queue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_WARNING, false) >> CHK;
-			info_queue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, false) >> CHK;
 			info_queue->UnregisterMessageCallback(m_callback_handle) >> CHK;
 		}
-	}
-
-	{
-		ComPtr<IDXGIDebug1> dxgi_debug{};
-		// Requires windows "Graphics Tool" optional feature
-		DXGIGetDebugInterface1(0, IID_PPV_ARGS(&dxgi_debug)) >> CHK;
-		OutputDebugStringW(std::to_wstring("Report Live DXGI Objects:\n").c_str());
-		dxgi_debug->ReportLiveObjects(DXGI_DEBUG_ALL, DXGI_DEBUG_RLO_FLAGS(DXGI_DEBUG_RLO_DETAIL | DXGI_DEBUG_RLO_IGNORE_INTERNAL)) >> CHK;
 	}
 #endif
 }
@@ -101,9 +91,9 @@ void DXContext::Init()
 		ComPtr<ID3D12Debug5> d3d12_debug{};
 		D3D12GetDebugInterface(IID_PPV_ARGS(&d3d12_debug)) >> CHK;
 		d3d12_debug->EnableDebugLayer();
-		//d3d12_debug->SetEnableGPUBasedValidation(true);
+		d3d12_debug->SetEnableGPUBasedValidation(true);
 		//d3d12_debug->SetEnableAutoName(true);
-		//d3d12_debug->SetEnableSynchronizedCommandQueueValidation(true);
+		d3d12_debug->SetEnableSynchronizedCommandQueueValidation(true);
 	}
 
 	uint32 dxgi_factory_flag{ 0 };
@@ -204,18 +194,15 @@ void DXContext::Init()
 	m_is_copy_command_list_open = false;
 
 #if defined(_DEBUG)
-	if (!m_load_renderdoc)
+	ComPtr<ID3D12InfoQueue1> info_queue{};
+	HRESULT result = m_device->QueryInterface(IID_PPV_ARGS(&info_queue));
+	// Query fails if debug layer disabled
+	if (result == S_OK)
 	{
-		ComPtr<ID3D12InfoQueue1> info_queue{};
-		HRESULT result = m_device->QueryInterface(IID_PPV_ARGS(&info_queue));
-		// Query fails if debug layer disabled
-		if (result == S_OK)
-		{
-			info_queue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_CORRUPTION, true) >> CHK;
-			info_queue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_WARNING, true) >> CHK;
-			info_queue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, true) >> CHK;
-			info_queue->RegisterMessageCallback(CallbackD3D12, D3D12_MESSAGE_CALLBACK_FLAG_NONE, nullptr, &m_callback_handle) >> CHK;
-		}
+		info_queue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_CORRUPTION, true) >> CHK;
+		info_queue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_WARNING, true) >> CHK;
+		info_queue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, true) >> CHK;
+		info_queue->RegisterMessageCallback(CallbackD3D12, D3D12_MESSAGE_CALLBACK_FLAG_NONE, nullptr, &m_callback_handle) >> CHK;
 	}
 
 	printf("%s", DumpDX12Capabilities(m_device).c_str());
@@ -338,6 +325,14 @@ void DXReportContext::ReportLDO() const
 	{
 		OutputDebugStringW(std::to_wstring("Report Live D3D12 Objects:\n").c_str());
 		m_debug_device->ReportLiveDeviceObjects(D3D12_RLDO_SUMMARY | D3D12_RLDO_DETAIL | D3D12_RLDO_IGNORE_INTERNAL) >> CHK;
+	}
+
+	{
+		ComPtr<IDXGIDebug1> dxgi_debug{};
+		// Requires windows "Graphics Tool" optional feature
+		DXGIGetDebugInterface1(0, IID_PPV_ARGS(&dxgi_debug)) >> CHK;
+		OutputDebugStringW(std::to_wstring("Report Live DXGI Objects:\n").c_str());
+		dxgi_debug->ReportLiveObjects(DXGI_DEBUG_ALL, DXGI_DEBUG_RLO_FLAGS(DXGI_DEBUG_RLO_DETAIL | DXGI_DEBUG_RLO_IGNORE_INTERNAL)) >> CHK;
 	}
 }
 

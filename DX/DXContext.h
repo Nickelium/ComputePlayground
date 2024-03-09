@@ -56,7 +56,7 @@ private:
 class DXContext
 {
 public:
-	DXContext(const bool load_renderdoc);
+	DXContext();
 	~DXContext();
 	void Init();
 
@@ -79,7 +79,6 @@ private:
 	ComPtr<IDXGIAdapter4> m_adapter; // GPU
 	ComPtr<IDXGIOutput6> m_output; // Monitor
 	ComPtr<ID3D12Device9> m_device;
-
 
 	// Graphics + Compute + Copy
 	ComPtr<ID3D12CommandQueue> m_queue_graphics;
@@ -105,7 +104,6 @@ private:
 	HANDLE m_fence_event;
 
 #if defined(_DEBUG)
-	bool m_load_renderdoc;
 	DWORD m_callback_handle;
 #endif
 };
