@@ -3,8 +3,6 @@
 #include "DX/DXContext.h"
 #if defined(_DEBUG)
 #include "DX/DXDebugLayer.h"
-#else
-#include "DX/DXNullDebugLayer.h"
 #endif
 #include "dxcapi.h" // DXC compiler TODO remove include
 

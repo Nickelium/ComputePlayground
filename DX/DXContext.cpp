@@ -14,9 +14,6 @@ DXContext::DXContext() :
 	m_callback_handle(0)
 #endif
 {
-#if !defined(_DEBUG)
-	UNUSED(load_renderdoc);
-#endif
 }
 
 DXContext::~DXContext()
@@ -75,11 +72,12 @@ void OnDeviceRemoved(PVOID context, BOOLEAN)
 	HRESULT removedReason = removedDevice->GetDeviceRemovedReason();
 	std::string removed_reason_string = RemapHResult(removedReason);
 	// Perform app-specific device removed operation, such as logging or inspecting DRED output
-	assert(removedReason == S_OK);
+	ASSERT(removedReason == S_OK);
 }
 
 void DXContext::Init()
 {
+#if defined(_DEBUG)
 	{
 		ComPtr<IDXGIDebug1> dxgi_debug{};
 		// Requires windows "Graphics Tool" optional feature
@@ -95,6 +93,7 @@ void DXContext::Init()
 		//d3d12_debug->SetEnableAutoName(true);
 		d3d12_debug->SetEnableSynchronizedCommandQueueValidation(true);
 	}
+#endif
 
 	uint32 dxgi_factory_flag{ 0 };
 #if defined(_DEBUG)
@@ -157,7 +156,7 @@ void DXContext::Init()
 	m_fence_event = CreateEvent(nullptr, FALSE, FALSE, nullptr);
 
 	HANDLE deviceRemovedEvent = CreateEventW(NULL, FALSE, FALSE, NULL);
-	assert(deviceRemovedEvent != NULL);
+	ASSERT(deviceRemovedEvent != NULL);
 	m_fence_gpu->SetEventOnCompletion(UINT64_MAX, deviceRemovedEvent);
 
 	HANDLE waitHandle;
@@ -321,6 +320,7 @@ void DXReportContext::SetDevice(ComPtr<ID3D12Device> device)
 
 void DXReportContext::ReportLDO() const
 {
+#if defined(_DEBUG)
 	if (m_debug_device)
 	{
 		OutputDebugStringW(std::to_wstring("Report Live D3D12 Objects:\n").c_str());
@@ -334,6 +334,7 @@ void DXReportContext::ReportLDO() const
 		OutputDebugStringW(std::to_wstring("Report Live DXGI Objects:\n").c_str());
 		dxgi_debug->ReportLiveObjects(DXGI_DEBUG_ALL, DXGI_DEBUG_RLO_FLAGS(DXGI_DEBUG_RLO_DETAIL | DXGI_DEBUG_RLO_IGNORE_INTERNAL)) >> CHK;
 	}
+#endif
 }
 
 #include <map>
