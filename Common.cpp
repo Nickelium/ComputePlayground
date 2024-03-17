@@ -1,24 +1,34 @@
 #include "Common.h"
+#include <system_error>
 
+// Note: Requires C++23
+#include <stacktrace> 
 CheckToken CHK = CheckToken{};
 
-void operator>>(const HRSourceLocation hrSourceLocation, const CheckToken chk_token)
+std::string RemapHResult(const HRESULT& hr)
+{
+	return std::system_category().message(hr);
+}
+
+void operator>>(const HRSourceLocation hr_source_location, const CheckToken chk_token)
 {
 #if defined(_DEBUG)
-	if (hrSourceLocation.m_hr != S_OK)
+	if (hr_source_location.m_hr != S_OK)
 	{
-		// TODO HResult into string
-		std::string stringOuput =
-			"Error: " +
-			std::to_string(hrSourceLocation.m_hr) + " at " +
-			std::string(hrSourceLocation.m_sourceLocation.function_name()) + " line " +
-			std::to_string(hrSourceLocation.m_sourceLocation.line()) + "\n";
-		OutputDebugStringW(std::to_wstring(stringOuput).c_str());
-		printf("%s", stringOuput.c_str());
+		std::string error_code_string = RemapHResult(hr_source_location.m_hr);
+		std::string line_string =
+			"Error at " +
+			std::string(hr_source_location.m_source_location.function_name()) + " line " +
+			std::to_string(hr_source_location.m_source_location.line());
+		
+		auto trace = std::stacktrace::current();
+		LogError(std::to_string(trace));
+		LogError(line_string);
+		LogError("Error Code " + std::to_string(hr_source_location.m_hr) + ": "+ error_code_string);
 		ASSERT(false);
 	}
 #else
-	UNUSED(hrSourceLocation);
+	UNUSED(hr_source_location);
 #endif
 	UNUSED(chk_token);
 }
@@ -46,11 +56,11 @@ void MemoryDump()
 #endif
 }
 
-void AssertHook()
-{
-#if defined(_DEBUG)
-	// TODO assert hook stop hooking memory tracker
-	// Hook up callback on assert
-	_CrtSetReportHook2(_CRT_RPTHOOK_INSTALL, CrtDbgHook);
-#endif
-}
+//void AssertHook()
+//{
+//#if defined(_DEBUG)
+//	// TODO assert hook stop hooking memory tracker
+//	// Hook up callback on assert
+//	_CrtSetReportHook2(_CRT_RPTHOOK_INSTALL, CrtDbgHook);
+//#endif
+//}

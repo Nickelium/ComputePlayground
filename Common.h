@@ -25,16 +25,18 @@ using namespace Microsoft::WRL;
 
 #include "Types.h"
 
+std::string RemapHResult(const HRESULT& hr);
+
 struct CheckToken {};
 extern CheckToken CHK;
 struct HRSourceLocation 
 {
 	HRSourceLocation(const HRESULT hr, std::source_location loc = std::source_location::current())
 		: m_hr(hr),
-		m_sourceLocation(loc)
+		m_source_location(loc)
 	{}
 	HRESULT m_hr;
-	std::source_location m_sourceLocation;
+	std::source_location m_source_location;
 };
 
 namespace std
@@ -82,16 +84,13 @@ namespace std
 
 void operator>>(HRSourceLocation hrSourceLocation, CheckToken);
 
-int __cdecl CrtDbgHook(int nReportType, char* szMsg, int* pnRet);
-
 #define DISABLE_OPTIMISATIONS() __pragma( optimize( "", off ) )
 #define ENABLE_OPTIMISATIONS() __pragma( optimize( "", on ) )
 #define DEBUG_BREAK() __debugbreak()
 // https://web.archive.org/web/20201129200055/http://cnicholson.net/2009/02/stupid-c-tricks-adventures-in-assert/
 #define UNUSED(x) do { (void)sizeof(x); } while(false)
 #if defined(_DEBUG)
-#include <cassert>
-#define ASSERT(x) assert(x)
+#define ASSERT(x) if(!(x)) __debugbreak()
 #else
 #define ASSERT(x) UNUSED(x)
 #endif
@@ -123,3 +122,5 @@ struct State
 {
 	bool m_capture;
 };
+
+#include "Logger.h"

@@ -1,3 +1,4 @@
+#include "../Common.h"
 #include "DXContext.h"
 #include "DXCommon.h"
 #include "DXQuery.h"
@@ -58,12 +59,6 @@ namespace
 		OutputDebugStringW(str.c_str());
 		ASSERT(false);
 	}
-}
-#include <system_error>
-
-std::string RemapHResult(HRESULT hr)
-{
-	return std::system_category().message(hr);
 }
 
 void OnDeviceRemoved(PVOID context, BOOLEAN)
@@ -204,7 +199,7 @@ void DXContext::Init()
 		info_queue->RegisterMessageCallback(CallbackD3D12, D3D12_MESSAGE_CALLBACK_FLAG_NONE, nullptr, &m_callback_handle) >> CHK;
 	}
 
-	printf("%s", DumpDX12Capabilities(m_device).c_str());
+	LogTrace(DumpDX12Capabilities(m_device));
 #endif
 }
 

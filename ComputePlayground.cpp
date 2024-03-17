@@ -69,7 +69,7 @@ Resources CreateResources(const DXContext& dx_context, const DXCompiler& dx_comp
 
 int main()
 {
-	AssertHook();
+	//AssertHook();
 	MemoryTrack();
 
 	DXReportContext dx_report_context{};
@@ -160,7 +160,6 @@ int main()
 					IID_PPV_ARGS(&vertex_upload_buffer)
 				) >> CHK;
 				NAME_DX_OBJECT(vertex_upload_buffer, "VertexUploadBuffer");
-
 				Vertex* data = nullptr;
 				vertex_upload_buffer->Map(0, nullptr, reinterpret_cast<void**>(&data)) >> CHK;
 				memcpy(data, vertex_data, sizeof(vertex_data));
@@ -418,8 +417,10 @@ int main()
 					static bool has_display = false;
 					if (!has_display)
 					{
-						for (int i = 0; i < resource.m_uav.m_readback_desc.Width / sizeof(float32) / 4; i++)
-							printf("uav[%d] = %.3f, %.3f, %.3f, %.3f\n", i, data[i * 4 + 0], data[i * 4 + 1], data[i * 4 + 2], data[i * 4 + 3]);
+						for (uint32 i = 0; i < resource.m_uav.m_readback_desc.Width / sizeof(float32) / 4; i++)
+						{
+							LogTrace("uav[{}] = {}, {}, {}, {}\n", i, data[i * 4 + 0], data[i * 4 + 1], data[i * 4 + 2], data[i * 4 + 3]);
+						}
 						has_display = true;
 					}
 					resource.m_uav.m_read_back_resource->Unmap(0, nullptr);
@@ -434,6 +435,8 @@ int main()
 			dx_context->Flush(dx_window->GetBackBufferCount());
 		}
 	}
+//	HRESULT hr = E_OUTOFMEMORY;
+//	hr >> CHK;
 	MemoryTrack();
 	return 0;
 }
