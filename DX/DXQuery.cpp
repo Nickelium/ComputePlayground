@@ -30,7 +30,7 @@ D3D_FEATURE_LEVEL GetMaxFeatureLevel(ComPtr<ID3D12Device> device)
 	const D3D12_FEATURE feature{ D3D12_FEATURE_FEATURE_LEVELS };
 	D3D12_FEATURE_DATA_FEATURE_LEVELS feature_data =
 	{
-		.NumFeatureLevels = countof(g_feature_levels),
+		.NumFeatureLevels = COUNT(g_feature_levels),
 		.pFeatureLevelsRequested = g_feature_levels,
 	};
 	device->CheckFeatureSupport(feature, &feature_data, sizeof(feature_data)) >> CHK;
@@ -89,7 +89,7 @@ static const std::map< D3D_SHADER_MODEL, std::string> g_shader_model_map_string 
 
 D3D_SHADER_MODEL GetMaxShaderModel(ComPtr<ID3D12Device> device)
 {
-	for (int32 i = (countof(g_shader_models) - 1); i >= 0; --i)
+	for (int32 i = (COUNT(g_shader_models) - 1); i >= 0; --i)
 	{
 		D3D12_FEATURE_DATA_SHADER_MODEL shader_model_option{};
 		shader_model_option.HighestShaderModel = { g_shader_models[i] };
@@ -119,7 +119,6 @@ std::string GetShaderModelString(const D3D_SHADER_MODEL& shader_model)
 // Keep in sync with DXGI_FORMAT
 // Only stored continuous values till DXGI_FORMAT_B4G4R4A4_UNORM = 115
 static const DXGI_FORMAT g_dxgi_format_last_stored = DXGI_FORMAT_B4G4R4A4_UNORM;
-// TODO stringify
 static const std::string g_dxgi_format_map_string[] =
 {
 	"DXGI_FORMAT_UNKNOWN",
@@ -240,7 +239,7 @@ static const std::string g_dxgi_format_map_string[] =
 	"DXGI_FORMAT_B4G4R4A4_UNORM",
 };
 
-static_assert(countof(g_dxgi_format_map_string) == g_dxgi_format_last_stored + 1);
+static_assert(COUNT(g_dxgi_format_map_string) == g_dxgi_format_last_stored + 1);
 
 std::string GetDXGIFormatString(const DXGI_FORMAT& dxgi_format)
 {

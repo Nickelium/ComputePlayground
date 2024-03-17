@@ -1,7 +1,11 @@
 #include "DXCompiler.h"
-#include "dxcapi.h" // DXC compiler
+#include "DXC/inc/dxcapi.h" // DXC compiler
 #include "DXContext.h"
 #include "DXQuery.h"
+
+#if defined(_DEBUG)
+#define DXC_COMPILER_DEBUG_ENABLE
+#endif
 
 static const std::pair<ShaderType, std::string> g_shader_type_map_string[] =
 {
@@ -15,13 +19,18 @@ std::string GetShaderTypeString(const ShaderType& shader_type)
 	return g_shader_type_map_string[static_cast<int32>(shader_type)].second;
 }
 
+DXCompiler::DXCompiler(const std::string& directory)
+{
+	Init(directory);
+}
+
 void DXCompiler::Init(const std::string& directory)
 {
-#if defined(_DEBUG)
-	m_debug = true;
-#else
-	m_debug = false;
-#endif
+	#if defined(DXC_COMPILER_DEBUG_ENABLE)
+		m_debug = true;
+	#else
+		m_debug = false;
+	#endif
 	m_directory = directory;
 	DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(&m_utils)) >> CHK;
 	DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(&m_compiler)) >> CHK;

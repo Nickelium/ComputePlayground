@@ -1,24 +1,19 @@
-
-#include "Common.h"
-//#include "DX.h"
-#include <dxcapi.h> // DXC compiler
+#include "core/Common.h"
 #include "DX/DXCommon.h"
 
 #include "DX/DXWindow.h"
 #include "DX/DXCommon.h"
 #include "DX/DXResource.h"
+#include "DX/DXCompiler.h"
+#include "DX/DXContext.h"
+#include "core/GPUCapture.h"
 
 #include "maths/LinearAlgebra.h"
 
-#include "Factory.h"
-
-// Agility SDK doesnt work when not in this file?
-extern "C" { __declspec(dllexport) extern const UINT D3D12SDKVersion = 611; }
-extern "C" { __declspec(dllexport) extern const char* D3D12SDKPath = ".\\D3D12\\"; }
+AGILITY_SDK_DECLARE()
 
 DISABLE_OPTIMISATIONS()
 
-using namespace Microsoft::WRL; // ComPtr
 
 struct Resources
 {
@@ -69,20 +64,18 @@ Resources CreateResources(const DXContext& dx_context, const DXCompiler& dx_comp
 
 int main()
 {
-	//AssertHook();
-	MemoryTrack();
-
+	MemoryTrackStart();
 	DXReportContext dx_report_context{};
 	{
 		State state{};
-		// TODO PIX and renderdoc in release mode?
 		// TODO PIX / renderdoc markers
 		const GRAPHICS_DEBUGGER_TYPE gd_type{ GRAPHICS_DEBUGGER_TYPE::PIX};
-		std::shared_ptr<DXDebugLayer> dx_debug_layer = CreateDebugLayer(gd_type);
-		std::shared_ptr<DXContext> dx_context = CreateDXContext();
-		dx_report_context.SetDevice(dx_context->GetDevice());
-		std::shared_ptr<DXCompiler> dx_compiler = CreateDXCompiler("shaders");
-		std::shared_ptr<DXWindow> dx_window = CreateDXWindow(*dx_context, &state, "Playground");
+		GPUCapture gpu_capture(gd_type);
+		DXContext dx_context{};
+		dx_report_context.SetDevice(dx_context.GetDevice());
+		DXCompiler dx_compiler("shaders");
+
+		DXWindow dx_window(dx_context, &state, "Playground");
 		{
 			D3D12_DESCRIPTOR_HEAP_DESC desc_heap_desc = 
 			{
@@ -90,7 +83,7 @@ int main()
 				.NumDescriptors = 1,
 				.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE,
 			};
-			Resources resource = CreateResources(*dx_context, *dx_compiler);
+			Resources resource = CreateResources(dx_context, dx_compiler);
 			ComPtr<ID3D12Resource2> vertex_buffer{};
 			D3D12_VERTEX_BUFFER_VIEW vertex_buffer_view{};
 			uint32_t vertex_count{};
@@ -108,7 +101,7 @@ int main()
 					{ {-0.25f, -0.25f}, {0.0f, 0.0f, 1.0f} },
 				};
 
-				vertex_count = countof(vertex_data);
+				vertex_count = COUNT(vertex_data);
 
 				const D3D12_RESOURCE_DESC vertex_desc =
 				{
@@ -136,7 +129,7 @@ int main()
 					.VisibleNodeMask = 1,
 				};
 				// TODO do we need to transition to proper state?
-				dx_context->GetDevice()->CreateCommittedResource
+				dx_context.GetDevice()->CreateCommittedResource
 				(
 					&heap_properties, D3D12_HEAP_FLAG_NONE, &vertex_desc,
 					D3D12_RESOURCE_STATE_COMMON, nullptr,
@@ -153,7 +146,7 @@ int main()
 					.VisibleNodeMask = 1,
 				};
 				ComPtr<ID3D12Resource2> vertex_upload_buffer{};
-				dx_context->GetDevice()->CreateCommittedResource
+				dx_context.GetDevice()->CreateCommittedResource
 				(
 					&heap_properties_upload, D3D12_HEAP_FLAG_NONE, &vertex_desc,
 					D3D12_RESOURCE_STATE_GENERIC_READ, nullptr,
@@ -164,8 +157,8 @@ int main()
 				vertex_upload_buffer->Map(0, nullptr, reinterpret_cast<void**>(&data)) >> CHK;
 				memcpy(data, vertex_data, sizeof(vertex_data));
 				vertex_upload_buffer->Unmap(0, nullptr);
-				dx_context->InitCommandLists();
-				dx_context->GetCommandListGraphics()->CopyResource(vertex_buffer.Get(), vertex_upload_buffer.Get());
+				dx_context.InitCommandLists();
+				dx_context.GetCommandListGraphics()->CopyResource(vertex_buffer.Get(), vertex_upload_buffer.Get());
 				D3D12_RESOURCE_BARRIER barriers[1]{};
 				barriers[0] =
 				{
@@ -178,7 +171,7 @@ int main()
 						.StateAfter = D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER,
 					},
 				};
-				dx_context->GetCommandListGraphics()->ResourceBarrier(_countof(barriers), &barriers[0]);
+				dx_context.GetCommandListGraphics()->ResourceBarrier(_countof(barriers), &barriers[0]);
 				// Copy queue has some constraints regarding copy state and barriers
 				// TODO use enhanced barrier?
 				//D3D12_BARRIER_GROUP a[1]{};
@@ -186,7 +179,7 @@ int main()
 				//ID3D12GraphicsCommandList9* c{};
 				//c->Barrier(1, a);
 				// Compute has synchronization issue
-				dx_context->ExecuteCommandListGraphics();
+				dx_context.ExecuteCommandListGraphics();
 
 				vertex_buffer_view =
 				{
@@ -219,10 +212,10 @@ int main()
 				const D3D12_INPUT_LAYOUT_DESC layout_desc =
 				{
 					.pInputElementDescs = element_descs,
-					.NumElements = countof(element_descs),
+					.NumElements = COUNT(element_descs),
 				};
 
-				dx_context->GetDevice()->CreateRootSignature(0, resource.m_vertex_shader->GetBufferPointer(), resource.m_vertex_shader->GetBufferSize(), IID_PPV_ARGS(&resource.m_gfx_root_signature)) >> CHK;
+				dx_context.GetDevice()->CreateRootSignature(0, resource.m_vertex_shader->GetBufferPointer(), resource.m_vertex_shader->GetBufferSize(), IID_PPV_ARGS(&resource.m_gfx_root_signature)) >> CHK;
 		
 				const D3D12_GRAPHICS_PIPELINE_STATE_DESC gfx_pso_desc =
 				{
@@ -327,39 +320,39 @@ int main()
 					},
 					.Flags = D3D12_PIPELINE_STATE_FLAG_NONE,
 				};
-				dx_context->GetDevice()->CreateGraphicsPipelineState(&gfx_pso_desc, IID_PPV_ARGS(&resource.m_gfx_pso)) >> CHK;
+				dx_context.GetDevice()->CreateGraphicsPipelineState(&gfx_pso_desc, IID_PPV_ARGS(&resource.m_gfx_pso)) >> CHK;
 		}
 
 			//dxWindow->SetFullScreen(false);
-			while (!dx_window->ShouldClose())
+			while (!dx_window.ShouldClose())
 			{
 				// Process window message
-				dx_window->Update();
+				dx_window.Update();
 
 				if (state.m_capture)
 				{
-					dx_debug_layer->PIXCaptureAndOpen();
-					dx_debug_layer->RenderdocCaptureStart();
+					gpu_capture.PIXCaptureAndOpen();
+					gpu_capture.RenderdocCaptureStart();
 				}
 				// rendering
 				{
 					// Handle resizing
-					if (dx_window->ShouldResize())
+					if (dx_window.ShouldResize())
 					{
-						dx_context->Flush(dx_window->GetBackBufferCount());
-						dx_window->Resize(*dx_context);
+						dx_context.Flush(dx_window.GetBackBufferCount());
+						dx_window.Resize(dx_context);
 					}
 
-					dx_context->InitCommandLists();
+					dx_context.InitCommandLists();
 					{
 						// Fill CommandList
-						dx_window->BeginFrame(*dx_context);
+						dx_window.BeginFrame(dx_context);
 						// Compute Work
 						{
-							dx_context->GetCommandListGraphics()->SetComputeRootSignature(resource.m_compute_root_signature.Get());
-							dx_context->GetCommandListGraphics()->SetPipelineState(resource.m_compute_pso.Get());
-							dx_context->GetCommandListGraphics()->SetComputeRootUnorderedAccessView(0, resource.m_uav.m_gpu_resource->GetGPUVirtualAddress());
-							dx_context->GetCommandListGraphics()->Dispatch(resource.m_dispatch_count, 1, 1);
+							dx_context.GetCommandListGraphics()->SetComputeRootSignature(resource.m_compute_root_signature.Get());
+							dx_context.GetCommandListGraphics()->SetPipelineState(resource.m_compute_pso.Get());
+							dx_context.GetCommandListGraphics()->SetComputeRootUnorderedAccessView(0, resource.m_uav.m_gpu_resource->GetGPUVirtualAddress());
+							dx_context.GetCommandListGraphics()->Dispatch(resource.m_dispatch_count, 1, 1);
 							D3D12_RESOURCE_BARRIER barriers[1]{};
 							barriers[0] =
 							{
@@ -372,8 +365,8 @@ int main()
 									.StateAfter = D3D12_RESOURCE_STATE_COPY_SOURCE,
 								},
 							};
-							dx_context->GetCommandListGraphics()->ResourceBarrier(countof(barriers), &barriers[0]);
-							dx_context->GetCommandListGraphics()->CopyResource(resource.m_uav.m_read_back_resource.Get(), resource.m_uav.m_gpu_resource.Get());
+							dx_context.GetCommandListGraphics()->ResourceBarrier(COUNT(barriers), &barriers[0]);
+							dx_context.GetCommandListGraphics()->CopyResource(resource.m_uav.m_read_back_resource.Get(), resource.m_uav.m_gpu_resource.Get());
 						}
 						// Draw Work
 						{
@@ -382,8 +375,8 @@ int main()
 								{
 									.TopLeftX = 0,
 									.TopLeftY = 0,
-									.Width = (float)dx_window->GetWidth(),
-									.Height = (float)dx_window->GetHeight(),
+									.Width = (float)dx_window.GetWidth(),
+									.Height = (float)dx_window.GetHeight(),
 									.MinDepth = 0,
 									.MaxDepth = 1,
 								}
@@ -393,23 +386,23 @@ int main()
 								{
 									.left = 0,
 									.top = 0,
-									.right = (long)dx_window->GetWidth(),
-									.bottom = (long)dx_window->GetHeight(),
+									.right = (long)dx_window.GetWidth(),
+									.bottom = (long)dx_window.GetHeight(),
 								}
 							};
-							dx_context->GetCommandListGraphics()->RSSetViewports(1, view_ports);
-							dx_context->GetCommandListGraphics()->RSSetScissorRects(1, scissor_rects);
-							dx_context->GetCommandListGraphics()->SetPipelineState(resource.m_gfx_pso.Get());
-							dx_context->GetCommandListGraphics()->SetGraphicsRootSignature(resource.m_gfx_root_signature.Get());
-							dx_context->GetCommandListGraphics()->IASetVertexBuffers(0, 1, &vertex_buffer_view);
-							dx_context->GetCommandListGraphics()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-							dx_context->GetCommandListGraphics()->DrawInstanced(vertex_count, 1, 0, 0);
+							dx_context.GetCommandListGraphics()->RSSetViewports(1, view_ports);
+							dx_context.GetCommandListGraphics()->RSSetScissorRects(1, scissor_rects);
+							dx_context.GetCommandListGraphics()->SetPipelineState(resource.m_gfx_pso.Get());
+							dx_context.GetCommandListGraphics()->SetGraphicsRootSignature(resource.m_gfx_root_signature.Get());
+							dx_context.GetCommandListGraphics()->IASetVertexBuffers(0, 1, &vertex_buffer_view);
+							dx_context.GetCommandListGraphics()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+							dx_context.GetCommandListGraphics()->DrawInstanced(vertex_count, 1, 0, 0);
 						}
-						dx_window->EndFrame(*dx_context);
+						dx_window.EndFrame(dx_context);
 
 					}
-					dx_context->ExecuteCommandListGraphics();
-					dx_window->Present();
+					dx_context.ExecuteCommandListGraphics();
+					dx_window.Present();
 
 					float32* data = nullptr;
 					const D3D12_RANGE range = { 0, resource.m_uav.m_readback_desc.Width };
@@ -427,16 +420,14 @@ int main()
 				}
 				if (state.m_capture)
 				{
-					dx_debug_layer->RenderdocCaptureEnd();
+					gpu_capture.RenderdocCaptureEnd();
 					state.m_capture = !state.m_capture;
 				}
 
 			}
-			dx_context->Flush(dx_window->GetBackBufferCount());
+			dx_context.Flush(dx_window.GetBackBufferCount());
 		}
 	}
-//	HRESULT hr = E_OUTOFMEMORY;
-//	hr >> CHK;
-	MemoryTrack();
+	
 	return 0;
 }

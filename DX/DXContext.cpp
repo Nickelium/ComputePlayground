@@ -1,4 +1,4 @@
-#include "../Common.h"
+#include "../core/Common.h"
 #include "DXContext.h"
 #include "DXCommon.h"
 #include "DXQuery.h"
@@ -15,6 +15,7 @@ DXContext::DXContext() :
 	m_callback_handle(0)
 #endif
 {
+	Init();
 }
 
 DXContext::~DXContext()
@@ -232,7 +233,7 @@ void DXContext::ExecuteCommandListGraphics()
 	m_command_list_graphics->Close() >> CHK;
 	m_is_graphics_command_list_open = false;
 	ID3D12CommandList* command_lists[] = { m_command_list_graphics.Get() };
-	m_queue_graphics->ExecuteCommandLists(countof(command_lists), command_lists);
+	m_queue_graphics->ExecuteCommandLists(COUNT(command_lists), command_lists);
 	SignalAndWait();
 }
 
@@ -241,7 +242,7 @@ void DXContext::ExecuteCommandListCompute()
 	m_command_list_compute->Close() >> CHK;
 	m_is_compute_command_list_open = false;
 	ID3D12CommandList* command_lists[] = { m_command_list_compute.Get() };
-	m_queue_compute->ExecuteCommandLists(countof(command_lists), command_lists);
+	m_queue_compute->ExecuteCommandLists(COUNT(command_lists), command_lists);
 	SignalAndWait();
 }
 
@@ -250,7 +251,7 @@ void DXContext::ExecuteCommandListCopy()
 	m_command_list_copy->Close() >> CHK;
 	m_is_copy_command_list_open = false;
 	ID3D12CommandList* command_lists[] = { m_command_list_copy.Get() };
-	m_queue_copy->ExecuteCommandLists(countof(command_lists), command_lists);
+	m_queue_copy->ExecuteCommandLists(COUNT(command_lists), command_lists);
 	SignalAndWait();
 }
 
@@ -403,7 +404,7 @@ void DXCommand::EndFrame()
 	{
 		m_command_list.Get()
 	};
-	m_command_queue->ExecuteCommandLists(countof(command_lists), command_lists);
+	m_command_queue->ExecuteCommandLists(COUNT(command_lists), command_lists);
 
 	m_frame_index = (m_frame_index + 1) % g_backbuffer_count;
 }

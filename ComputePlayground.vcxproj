@@ -107,18 +107,19 @@ xcopy /y /d $(ProjectDir)dependencies\DXC\bin\x64\dxil.dll $(OutDir)</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="Common.cpp" />
+    <ClCompile Include="core\Common.cpp" />
     <ClCompile Include="ComputePlayground.cpp" />
     <ClCompile Include="DX\DXCommon.cpp" />
     <ClCompile Include="DX\DXCompiler.cpp" />
     <ClCompile Include="DX\DXContext.cpp" />
-    <ClCompile Include="DX\DXDebugLayer.cpp" />
+    <ClCompile Include="core\GPUCapture.cpp" />
     <ClCompile Include="DX\DXQuery.cpp" />
     <ClCompile Include="DX\DXResource.cpp" />
     <ClCompile Include="DX\DXWindow.cpp" />
-    <ClCompile Include="Factory.cpp" />
-    <ClCompile Include="Logger.cpp" />
+    <ClCompile Include="core\Factory.cpp" />
+    <ClCompile Include="core\Logger.cpp" />
     <ClCompile Include="maths\LinearAlgebra.cpp" />
+    <ClCompile Include="core\MemoryReporting.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />
@@ -129,19 +130,20 @@ xcopy /y /d $(ProjectDir)dependencies\DXC\bin\x64\dxil.dll $(OutDir)</Command>
     </None>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Common.h" />
+    <ClInclude Include="core\Common.h" />
     <ClInclude Include="DX\DXCommon.h" />
     <ClInclude Include="DX\DXCompiler.h" />
     <ClInclude Include="DX\DXContext.h" />
-    <ClInclude Include="DX\DXDebugLayer.h" />
+    <ClInclude Include="core\GPUCapture.h" />
     <ClInclude Include="DX\DXQuery.h" />
     <ClInclude Include="DX\DXResource.h" />
     <ClInclude Include="DX\DXWindow.h" />
     <ClInclude Include="DX\IDXDebugLayer.h" />
-    <ClInclude Include="Factory.h" />
-    <ClInclude Include="Logger.h" />
+    <ClInclude Include="core\Factory.h" />
+    <ClInclude Include="core\Logger.h" />
     <ClInclude Include="maths\LinearAlgebra.h" />
-    <ClInclude Include="Types.h" />
+    <ClInclude Include="core\MemoryReporting.h" />
+    <ClInclude Include="core\Types.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="shaders\VertexShader.hlsl">

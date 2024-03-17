@@ -1,5 +1,5 @@
 #pragma once
-#include "../Common.h"
+#include "../core/Common.h"
 #include "DXCommon.h"
 
 struct IDXGIFactory6;
@@ -58,7 +58,6 @@ class DXContext
 public:
 	DXContext();
 	~DXContext();
-	void Init();
 
 	void InitCommandLists();
 	void ExecuteCommandListGraphics();
@@ -75,6 +74,8 @@ public:
 	ComPtr<IDXGIFactory> GetFactory() const;
 	ComPtr<ID3D12CommandQueue> GetCommandQueue() const;
 private:
+	void Init();
+
 	ComPtr<IDXGIFactory7> m_factory;
 	ComPtr<IDXGIAdapter4> m_adapter; // GPU
 	ComPtr<IDXGIOutput6> m_output; // Monitor

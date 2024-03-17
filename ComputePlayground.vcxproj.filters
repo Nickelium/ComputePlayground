@@ -21,7 +21,7 @@
     <ClCompile Include="DX\DXCompiler.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Common.cpp">
+    <ClCompile Include="core\Common.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="DX\DXContext.cpp">
@@ -30,7 +30,7 @@
     <ClCompile Include="DX\DXCommon.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="DX\DXDebugLayer.cpp">
+    <ClCompile Include="core\GPUCapture.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="DX\DXWindow.cpp">
@@ -42,13 +42,16 @@
     <ClCompile Include="maths\LinearAlgebra.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Factory.cpp">
+    <ClCompile Include="core\Factory.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="DX\DXQuery.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Logger.cpp">
+    <ClCompile Include="core\Logger.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="core\MemoryReporting.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -62,7 +65,7 @@
     <ClInclude Include="DX\DXCompiler.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Common.h">
+    <ClInclude Include="core\Common.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="DX\DXContext.h">
@@ -74,7 +77,7 @@
     <ClInclude Include="DX\IDXDebugLayer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="DX\DXDebugLayer.h">
+    <ClInclude Include="core\GPUCapture.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="DX\DXWindow.h">
@@ -86,16 +89,19 @@
     <ClInclude Include="maths\LinearAlgebra.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Types.h">
+    <ClInclude Include="core\Types.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Factory.h">
+    <ClInclude Include="core\Factory.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="DX\DXQuery.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Logger.h">
+    <ClInclude Include="core\Logger.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="core\MemoryReporting.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

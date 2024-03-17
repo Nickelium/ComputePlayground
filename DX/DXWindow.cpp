@@ -1,6 +1,6 @@
 #include "DXWindow.h"
 #include "DXCommon.h"
-#include "DXDebugLayer.h"
+//#include "../GPUCapture.h"
 #include "DXContext.h"
 
 LRESULT CALLBACK DXWindow::OnWindowMessage(HWND handle, UINT msg, WPARAM wParam, LPARAM lParam)
@@ -123,7 +123,7 @@ void DXWindow::BeginFrame(const DXContext& dxContext)
 			.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET,
 		}
 	};
-	dxContext.GetCommandListGraphics()->ResourceBarrier(countof(barrier), barrier);
+	dxContext.GetCommandListGraphics()->ResourceBarrier(COUNT(barrier), barrier);
 
 	const float4 color{ 85.0f / 255.0f, 230.0f / 255.0f, 23.0f / 255.0f, 1.0f };
 	dxContext.GetCommandListGraphics()->ClearRenderTargetView(m_rtv_handles[m_current_buffer_index], color, 0, nullptr);
@@ -145,7 +145,7 @@ void DXWindow::EndFrame(const DXContext& dxContext)
 			.StateAfter = D3D12_RESOURCE_STATE_PRESENT,
 		}
 	};
-	dxContext.GetCommandListGraphics()->ResourceBarrier(countof(barrier), barrier);
+	dxContext.GetCommandListGraphics()->ResourceBarrier(COUNT(barrier), barrier);
 }
 
 void DXWindow::Present()
@@ -255,9 +255,11 @@ void DXWindow::SetResolutionToMonitor()
 	MONITORINFO monitorInfo{};
 	monitorInfo.cbSize = sizeof(monitorInfo);
 	const bool success = GetMonitorInfoW(monitorHandle, &monitorInfo);
-	/*assert*/(success);
-	m_width = monitorInfo.rcMonitor.right - monitorInfo.rcMonitor.left,
-		m_height = monitorInfo.rcMonitor.bottom - monitorInfo.rcMonitor.top;
+	ASSERT(success);
+	m_width = monitorInfo.rcMonitor.right - monitorInfo.rcMonitor.left;
+	m_height = monitorInfo.rcMonitor.bottom - monitorInfo.rcMonitor.top;
+	// TODO fix starts not full resolution or not fit to screen?
+	// TODO fix 2 GPU captures, second doesnt open PIX
 }
 
 void DXWindow::CreateWindowHandle(const std::string& window_name)
@@ -281,7 +283,6 @@ void DXWindow::CreateWindowHandle(const std::string& window_name)
 	m_wnd_class_atom = RegisterClassExW(&wndClassExW);
 	ASSERT(m_wnd_class_atom);
 
-	// TODO provide user name window
 	m_handle = CreateWindowExW
 	(
 		WS_EX_OVERLAPPEDWINDOW | WS_EX_APPWINDOW, (LPCWSTR)m_wnd_class_atom,

@@ -13,7 +13,6 @@
 #endif
 
 #if defined(LOG_ENABLE)
-// Internal
 namespace
 {
 	enum class LogLevel

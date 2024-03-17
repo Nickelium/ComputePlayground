@@ -1,5 +1,5 @@
 #pragma once
-#include "../Common.h"
+#include "../core/Common.h"
 #include "DXCommon.h"
 
 D3D_FEATURE_LEVEL GetMaxFeatureLevel(ComPtr<ID3D12Device> device);

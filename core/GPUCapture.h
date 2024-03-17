@@ -1,23 +1,25 @@
 #pragma once
-#include "../Common.h"
-#include "IDXDebugLayer.h"
+#include "Common.h"
+#include "../DX/IDXDebugLayer.h"
 
 struct IDXGIDebug1;
 struct ID3D12Debug5;
 struct RENDERDOC_API_1_6_0;
 
-class DXDebugLayer
+// TODO split out renderdoc and pix
+class GPUCapture
 {
 public:
-	DXDebugLayer(const GRAPHICS_DEBUGGER_TYPE gd_type);
-	~DXDebugLayer();
-	void Init();
-	void Close();
+	GPUCapture(const GRAPHICS_DEBUGGER_TYPE gd_type);
+	~GPUCapture();
 
 	void PIXCaptureAndOpen();
 	void RenderdocCaptureStart();
 	void RenderdocCaptureEnd();
 private:
+	void Init();
+	void Close();
+
 	HMODULE m_pix_module;
 
 	HMODULE m_renderdoc_module;

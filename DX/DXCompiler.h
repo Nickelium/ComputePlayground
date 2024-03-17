@@ -1,5 +1,6 @@
 #pragma once
-#include "../Common.h"
+#include "../core/Common.h"
+#include "DXC/inc/dxcapi.h" // DXC compiler TODO remove include
 
 struct IDxcUtils;
 struct IDxcBlob;
@@ -18,9 +19,11 @@ enum class ShaderType
 class DXCompiler
 {
 public:
-	void Init(const std::string& directory);
+	DXCompiler(const std::string& directory);
 	void Compile(ComPtr<ID3D12Device> device, ComPtr<IDxcBlob>* out_shader_blob, const std::string& shader_path, const ShaderType shader_type) const;
 private:
+	void Init(const std::string& directory);
+	
 	bool m_debug;
 	std::string m_directory;
 

@@ -1,6 +1,5 @@
-#include "DXDebugLayer.h"
-#include "../Common.h"
-#include "DXCommon.h"
+#include "GPUCapture.h"
+#include "../DX/DXCommon.h"
 
 #define USE_PIX
 #include <pix3.h>
@@ -80,7 +79,7 @@ std::string GetNewestCaptureName(const std::string& capture_relative_path, const
 	return capture_absolute_path;
 }
 
-void DXDebugLayer::RenderdocCaptureStart()
+void GPUCapture::RenderdocCaptureStart()
 {
 	if (m_renderdoc_api)
 	{
@@ -121,7 +120,7 @@ std::vector<int32_t> GetRegexIndexOfFileNames(const std::vector<std::string>& fi
 	return index_array;
 }
 
-void DXDebugLayer::RenderdocCaptureEnd()
+void GPUCapture::RenderdocCaptureEnd()
 {
 	if (!m_renderdoc_api)
 		return;
@@ -149,26 +148,26 @@ void DXDebugLayer::RenderdocCaptureEnd()
 	const std::string& renderdoc_absolute_path = GetNewestCaptureName(renderdoc_relative_path, renderdoc_template_name, renderdoc_extension);
 
 	m_renderdoc_api->EndFrameCapture(nullptr, nullptr);
-	// TODO scope out these function calls
+	//  scope out these function calls
 	const std::wstring& renderdoc_absolute_path_wstring = std::to_wstring(renderdoc_absolute_path);
 	ShellExecute(0, 0, renderdoc_absolute_path_wstring.c_str(), 0, 0, SW_SHOW);
 }
 
-DXDebugLayer::DXDebugLayer(const GRAPHICS_DEBUGGER_TYPE type) :
+GPUCapture::GPUCapture(const GRAPHICS_DEBUGGER_TYPE type) :
 	m_pix_module(0u),
 	m_renderdoc_module(0u),
 	m_renderdoc_api(nullptr),
 	m_graphics_debugger_type(type)
 {
-
+	Init();
 }
 
-DXDebugLayer::~DXDebugLayer()
+GPUCapture::~GPUCapture()
 {
 	Close();
 }
 
-void DXDebugLayer::Init()
+void GPUCapture::Init()
 {
 	_set_error_mode(_OUT_TO_STDERR);
 	switch (m_graphics_debugger_type)
@@ -178,7 +177,7 @@ void DXDebugLayer::Init()
 		bool success = LoadPIX(&m_pix_module);
 		if (!success)
 		{
-			printf("PIX not installed %d\n", GetLastError());
+			LogError("PIX not installed {}\n", GetLastError());
 		}
 		break;
 	}
@@ -187,7 +186,7 @@ void DXDebugLayer::Init()
 		const bool success = LoadRenderdoc(&m_renderdoc_module, &m_renderdoc_api);
 		if (!success)
 		{
-			printf("RenderDoc not installed %d\n", GetLastError());
+			LogError("RenderDoc not installed {}\n", GetLastError());
 		}
 		break;
 	}
@@ -198,7 +197,7 @@ void DXDebugLayer::Init()
 	}
 }
 
-void DXDebugLayer::Close()
+void GPUCapture::Close()
 {
 	if (m_pix_module)
 	{
@@ -212,7 +211,7 @@ void DXDebugLayer::Close()
 	}
 }
 
-void DXDebugLayer::PIXCaptureAndOpen()
+void GPUCapture::PIXCaptureAndOpen()
 {
 #if defined(_DEBUG)
 	if (m_pix_module)

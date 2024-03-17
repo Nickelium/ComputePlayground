@@ -1,12 +1,6 @@
 #pragma once
 
-#ifdef _DEBUG
-#define _CRTDBG_MAP_ALLOC
-#include <crtdbg.h>
-// Display file and line number on memory leak
-#define DEBUG_NEW new(_NORMAL_BLOCK, __FILE__, __LINE__)
-#define new DEBUG_NEW
-#endif
+#include "MemoryReporting.h"
 
 #include <vector>
 #include <string>
@@ -41,45 +35,10 @@ struct HRSourceLocation
 
 namespace std
 {
-	inline std::wstring to_wstring(const std::string& str)
-	{
-		std::wstring wstr;
-		size_t size;
-		wstr.resize(str.length());
-		mbstowcs_s(&size, &wstr[0], wstr.size() + 1, str.c_str(), str.size());
-		return wstr;
-	}
-
-	inline std::string to_string(const std::wstring& wstr)
-	{
-		std::string str;
-		size_t size;
-		str.resize(wstr.length());
-		wcstombs_s(&size, &str[0], str.size() + 1, wstr.c_str(), wstr.size());
-		return str;
-	}
-
-	inline std::vector<std::wstring> to_wstring(const std::vector<std::string>& array_string)
-	{
-		std::vector<std::wstring> array_wstring{};
-		array_wstring.reserve(array_string.size());
-		for (const std::string& str : array_string)
-		{
-			array_wstring.push_back(std::to_wstring(str));
-		}
-		return array_wstring;
-	}
-
-	inline std::vector<std::string> to_string(const std::vector<std::wstring>& array_wstring)
-	{
-		std::vector<std::string> array_string{};
-		array_string.reserve(array_wstring.size());
-		for (const std::wstring& wstr : array_wstring)
-		{
-			array_string.push_back(std::to_string(wstr));
-		}
-		return array_string;
-	}
+	std::wstring to_wstring(const std::string& str);
+	std::string to_string(const std::wstring& wstr);
+	std::vector<std::wstring> to_wstring(const std::vector<std::string>& array_string);
+	std::vector<std::string> to_string(const std::vector<std::wstring>& array_wstring);
 }
 
 void operator>>(HRSourceLocation hrSourceLocation, CheckToken);
@@ -95,21 +54,18 @@ void operator>>(HRSourceLocation hrSourceLocation, CheckToken);
 #define ASSERT(x) UNUSED(x)
 #endif
 
-#define countof _countof
+#define COUNT _countof
 
 #if defined(_DEBUG)
 #define NAME_DX_OBJECT(object, name) object->SetName(std::to_wstring(name).c_str()) >> CHK
-#define NAME_DXGI_OBJECT(object, name) object->SetPrivateData(WKPDID_D3DDebugObjectName, sizeof(char) * countof(name), name) >> CHK;
+#define NAME_DXGI_OBJECT(object, name) object->SetPrivateData(WKPDID_D3DDebugObjectName, sizeof(char) * COUNT(name), name) >> CHK;
 #else
 #define NAME_DX_OBJECT(object, name)
 #define NAME_DXGI_OBJECT(object, name)
 #endif
 
-void MemoryTrack();
-void MemoryDump();
-void AssertHook();
+void MemoryTrackStart();
 
-// TODO remove this from non debug
 enum class GRAPHICS_DEBUGGER_TYPE
 {
 	PIX,

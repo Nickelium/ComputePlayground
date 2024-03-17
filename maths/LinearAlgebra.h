@@ -1,7 +1,7 @@
 #pragma once
 
-#include "../Common.h"
-#include "../Types.h"
+#include "../core/Common.h"
+#include "../core/Types.h"
 
 namespace LA
 {
