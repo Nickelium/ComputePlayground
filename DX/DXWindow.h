@@ -12,6 +12,15 @@ struct D3D12_CPU_DESCRIPTOR_HANDLE;
 
 struct State;
 
+struct WindowDesc
+{
+	std::string m_window_name;
+	uint32 m_width;
+	uint32 m_height;
+	uint32 m_origin_x;
+	uint32 m_origin_y;
+};
+
 class DXWindow
 {
 public:
@@ -26,9 +35,13 @@ public:
 		Count
 	};
 
-	DXWindow(const DXContext& dx_context, const DXWindowManager& window_manager, State* state, const std::string& window_name);
+	DXWindow(const DXContext& dx_context, const DXWindowManager& window_manager, State* state, const WindowDesc& window_desc);
 	~DXWindow();
-	void Init(const DXContext& dx_context, const DXWindowManager& window_manager, const std::string& window_name);
+	void Init
+	(
+		const DXContext& dx_context, const DXWindowManager& window_manager, 
+		const WindowDesc& window_desc
+	);
 
 	void BeginFrame(const DXContext& dx_context);
 

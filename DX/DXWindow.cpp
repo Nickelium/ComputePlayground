@@ -69,10 +69,10 @@ LRESULT CALLBACK DXWindow::OnWindowMessage(HWND handle, UINT msg, WPARAM wParam,
 }
 
 
-DXWindow::DXWindow(const DXContext& dx_context, const DXWindowManager& window_manager, State* state, const std::string& window_name)
+DXWindow::DXWindow(const DXContext& dx_context, const DXWindowManager& window_manager, State* state, const WindowDesc& window_desc)
 	:m_state(state)
 {
-	Init(dx_context, window_manager, window_name);
+	Init(dx_context, window_manager, window_desc);
 }
 
 DXWindow::~DXWindow()
@@ -80,20 +80,23 @@ DXWindow::~DXWindow()
 	Close();
 }
 
-void DXWindow::Init(const DXContext& dx_context, const DXWindowManager& window_manager, const std::string& window_name)
+void DXWindow::Init
+ (
+	 const DXContext& dx_context, const DXWindowManager& window_manager, 
+	 const WindowDesc& window_desc
+ )
 {
 	m_hdr = false;
 
 	m_window_mode = WindowMode::Normal;
 	m_window_mode_request = m_window_mode;
 
-	// TODO expose to the user
-	m_width = m_windowed_width = 500;
-	m_height = m_windowed_height =  500;
-	m_windowed_origin_x = (1920 >> 1) - (m_windowed_width >> 1);
-	m_windowed_origin_y = (1080 >> 1) - (m_windowed_height >> 1);
+	m_width = m_windowed_width = window_desc.m_width;
+	m_height = m_windowed_height =  window_desc.m_height;
+	m_windowed_origin_x = window_desc.m_origin_x;
+	m_windowed_origin_y = window_desc.m_origin_y;
 
-	CreateWindowHandle(window_manager, window_name);
+	CreateWindowHandle(window_manager, window_desc.m_window_name);
 	ApplyWindowStyle();
 	ApplyWindowMode();
 	CreateSwapChain(dx_context);

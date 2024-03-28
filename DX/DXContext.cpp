@@ -265,7 +265,6 @@ void DXContext::SignalAndWait()
 
 void DXContext::Flush(uint32 flush_count)
 {
-	// TODO proper flush
 	for (uint32 i = 0; i < flush_count; ++i)
 	{
 		SignalAndWait();

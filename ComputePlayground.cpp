@@ -382,15 +382,26 @@ int main()
 	{
 		State state{};
 		// TODO PIX / renderdoc markers
-		const GRAPHICS_DEBUGGER_TYPE gd_type{ GRAPHICS_DEBUGGER_TYPE::PIX};
+		const GRAPHICS_DEBUGGER_TYPE gd_type{ GRAPHICS_DEBUGGER_TYPE::NONE};
 		GPUCapture gpu_capture(gd_type);
 		DXContext dx_context{};
 		dx_report_context.SetDevice(dx_context.GetDevice());
 		DXCompiler dx_compiler("shaders");
 		DXWindowManager window_manager;
 		{
-			DXWindow dx_window(dx_context, window_manager, &state, "Playground");
-			//DXWindow dx_window1(dx_context, window_manager, &state, "Playground1");
+			uint32 width = 600;
+			uint32 height = 500;
+			WindowDesc window_desc =
+			{
+				.m_window_name = { "Playground" },
+				.m_width = width,
+				.m_height = height,
+				.m_origin_x = (1920 >> 1) - (width >> 1),
+				.m_origin_y = (1080 >> 1) - (height >> 1),
+			};
+			DXWindow dx_window(dx_context, window_manager, &state, window_desc);
+			window_desc.m_window_name = "Playground 1";
+			DXWindow dx_window1(dx_context, window_manager, &state, window_desc);
 			{
 				Resources resource = CreateResources(dx_context, dx_compiler);
 				ComPtr<ID3D12Resource2> vertex_buffer{};
@@ -398,10 +409,17 @@ int main()
 				uint32 vertex_count{};
 				CreateSetup(dx_context, dx_compiler, dx_window, resource, vertex_buffer, vertex_buffer_view, vertex_count);
 
-				while (!dx_window.ShouldClose())
+				Resources resource1 = CreateResources(dx_context, dx_compiler);
+				ComPtr<ID3D12Resource2> vertex_buffer1{};
+				D3D12_VERTEX_BUFFER_VIEW vertex_buffer_view1{};
+				uint32 vertex_count1{};
+				CreateSetup(dx_context, dx_compiler, dx_window1, resource1, vertex_buffer1, vertex_buffer_view1, vertex_count1);
+
+				while (!dx_window.ShouldClose() && !dx_window1.ShouldClose())
 				{
 					// Process window message
 					dx_window.Update();
+					dx_window1.Update();
 
 					if (state.m_capture)
 					{
@@ -417,10 +435,18 @@ int main()
 							dx_window.Resize(dx_context);
 						}
 
+						if (dx_window1.ShouldResize())
+						{
+							dx_context.Flush(dx_window1.GetBackBufferCount());
+							dx_window1.Resize(dx_context);
+						}
+
 						dx_context.InitCommandLists();
 						FillCommandList(dx_context, dx_window, resource, vertex_buffer_view, vertex_count);
+						FillCommandList(dx_context, dx_window1, resource1, vertex_buffer_view1, vertex_count1);
 						dx_context.ExecuteCommandListGraphics();
 						dx_window.Present();
+						dx_window1.Present();
 
 						float32* data = nullptr;
 						const D3D12_RANGE range = { 0, resource.m_uav.m_readback_desc.Width };
