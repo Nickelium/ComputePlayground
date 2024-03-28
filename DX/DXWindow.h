@@ -14,6 +14,8 @@ class DXWindow
 {
 public:
 	static LRESULT CALLBACK OnWindowMessage(HWND handle, UINT msg, WPARAM w_param, LPARAM l_param);
+	static void GlobalInit();
+	static void GlobalClose();
 
 	DXWindow(const DXContext& dx_context, State* state, const std::string& window_name);
 	~DXWindow();
@@ -45,6 +47,12 @@ public:
 	uint32_t GetHeight() const { return m_height; }
 
 private:
+	// Declaration of static class variables
+	static ATOM s_wnd_class_atom;
+	static WNDCLASSEXW s_wnd_class_exw;
+	static std::wstring s_wnd_class_name;
+	static bool s_is_initialized;
+
 	void SetResolutionToMonitor();
 	void CreateWindowHandle(const std::string& window_name);
 	void CreateSwapChain(const DXContext& dx_context);
@@ -53,11 +61,11 @@ private:
 
 	void ReleaseBuffers();
 
-	ATOM m_wnd_class_atom;
 	HWND m_handle;
 
 	bool m_should_close = false;
 	bool m_should_resize = false;
+	// This is not exclusive fullscreen, we dont support that
 	bool m_full_screen = false;
 
 	ComPtr<IDXGISwapChain4> m_swap_chain;

@@ -27,8 +27,8 @@ LRESULT CALLBACK DXWindow::OnWindowMessage(HWND handle, UINT msg, WPARAM wParam,
 	case WM_SIZE:
 	{
 		// Handle minimize & maximize
-		const uint32_t reqWidth = HIWORD(lParam);
-		const uint32_t reqHeight = LOWORD(lParam);
+		const uint32_t reqWidth = LOWORD(lParam);
+		const uint32_t reqHeight = HIWORD(lParam);
 		if
 		(
 			lParam &&
@@ -60,6 +60,46 @@ LRESULT CALLBACK DXWindow::OnWindowMessage(HWND handle, UINT msg, WPARAM wParam,
 		break;
 	}
 	return DefWindowProcW(handle, msg, wParam, lParam);
+}
+
+// Definition and initialization of static class variables
+ATOM DXWindow::s_wnd_class_atom{};
+WNDCLASSEXW DXWindow::s_wnd_class_exw{};
+// Keeps this variable around so s_wnd_class_exw refers to an existing string
+std::wstring DXWindow::s_wnd_class_name{ L"WndClass"};
+bool DXWindow::s_is_initialized = false;
+
+void DXWindow::GlobalInit()
+{
+	s_wnd_class_exw =
+	{
+		.cbSize = sizeof(s_wnd_class_exw),
+		.style = CS_HREDRAW | CS_VREDRAW,
+		.lpfnWndProc = DXWindow::OnWindowMessage,
+		.cbClsExtra = 0,
+		.cbWndExtra = 0,
+		.hInstance = GetModuleHandle(nullptr),
+		.hIcon = LoadIconW(nullptr, IDI_APPLICATION),
+		.hCursor = LoadCursorW(nullptr, IDC_ARROW),
+		.hbrBackground = nullptr,
+		.lpszMenuName = nullptr,
+		.lpszClassName = s_wnd_class_name.c_str(),
+		.hIconSm = LoadIconW(nullptr, IDI_APPLICATION),
+	};
+	s_wnd_class_atom = RegisterClassExW(&s_wnd_class_exw);
+	ASSERT(s_wnd_class_atom);
+
+	s_is_initialized = true;
+}
+
+void DXWindow::GlobalClose()
+{
+	if (s_wnd_class_atom)
+	{
+		ASSERT(UnregisterClassW((LPCWSTR)s_wnd_class_atom, GetModuleHandleW(nullptr)));
+	}
+
+	s_is_initialized = false;
 }
 
 DXWindow::DXWindow(const DXContext& dx_context, State* state, const std::string& window_name)
@@ -150,7 +190,10 @@ void DXWindow::EndFrame(const DXContext& dxContext)
 
 void DXWindow::Present()
 {
-	m_swap_chain->Present(1, 0) >> CHK;
+	// sync interval [0;4] where 0 is uncapped
+	uint32 vsync_interval = 0;
+	uint32 present_flags = 0;
+	m_swap_chain->Present(vsync_interval, present_flags) >> CHK;
 }
 
 void DXWindow::Close()
@@ -158,11 +201,6 @@ void DXWindow::Close()
 	if (m_handle)
 	{
 		ASSERT(DestroyWindow(m_handle));
-	}
-
-	if (m_wnd_class_atom)
-	{
-		ASSERT(UnregisterClassW((LPCWSTR)m_wnd_class_atom, GetModuleHandleW(nullptr)));
 	}
 }
 
@@ -199,17 +237,21 @@ uint32_t DXWindow::GetBackBufferCount() const
 	return g_backbuffer_count;
 }
 
+// TODO
+// There should be 3 modes, normal window, maximized window and borderless window
+//Normal window : WS_OVERLAPPED, shown with ShowWindow(hwnd, SW_SHOW)
+//
+//Maximized window : WS_OVERLAPPED, shown with ShowWindow(hwnd, SW_MAXMIZE) covers the whole screen, not including the taskbar
+//
+//Fullscreen : WS_POPUP flag, with width& height set to SM_CXSCREEN / SM_CYSCREEN, covers the whole screen, it goes over the task bar
 void DXWindow::SetFullScreen(bool enable)
 {
 	DWORD style = WS_OVERLAPPEDWINDOW | WS_VISIBLE;
-	DWORD exStyle = WS_EX_OVERLAPPEDWINDOW | WS_EX_APPWINDOW;
 	if (enable)
 	{
 		style = WS_POPUP | WS_VISIBLE;
-		exStyle = WS_EX_APPWINDOW;
 	}
 	SetWindowLongW(m_handle, GWL_STYLE, style);
-	SetWindowLongW(m_handle, GWL_EXSTYLE, exStyle);
 
 	if (enable)
 	{
@@ -258,40 +300,34 @@ void DXWindow::SetResolutionToMonitor()
 	ASSERT(success);
 	m_width = monitorInfo.rcMonitor.right - monitorInfo.rcMonitor.left;
 	m_height = monitorInfo.rcMonitor.bottom - monitorInfo.rcMonitor.top;
-	// TODO fix starts not full resolution or not fit to screen?
 	// TODO fix 2 GPU captures, second doesnt open PIX
 }
 
 void DXWindow::CreateWindowHandle(const std::string& window_name)
 {
-	const WNDCLASSEXW wndClassExW =
-	{
-		.cbSize = sizeof(wndClassExW),
-		.style = CS_OWNDC,
-		.lpfnWndProc = DXWindow::OnWindowMessage,
-		.cbClsExtra = 0,
-		.cbWndExtra = 0,
-		.hInstance = GetModuleHandle(nullptr),
-		.hIcon = LoadIconW(nullptr, IDI_APPLICATION),
-		.hCursor = LoadCursorW(nullptr, IDC_ARROW),
-		.hbrBackground = nullptr,
-		.lpszMenuName = nullptr,
-		// TODO unique identifier to support multi windows
-		.lpszClassName = std::to_wstring("WndClass").c_str(),
-		.hIconSm = LoadIconW(nullptr, IDI_APPLICATION),
-	};
-	m_wnd_class_atom = RegisterClassExW(&wndClassExW);
-	ASSERT(m_wnd_class_atom);
+	ASSERT(s_is_initialized);
 
-	m_handle = CreateWindowExW
+	RECT windowRect = { 0, 0, static_cast<long>(m_width), static_cast<long>(m_height)};
+	AdjustWindowRect(&windowRect, WS_OVERLAPPEDWINDOW, FALSE);
+
+	m_handle = CreateWindow
 	(
-		WS_EX_OVERLAPPEDWINDOW | WS_EX_APPWINDOW, (LPCWSTR)m_wnd_class_atom,
-		std::to_wstring(window_name).c_str(), WS_OVERLAPPEDWINDOW | WS_VISIBLE, 0, 0, m_width, m_height,
+		s_wnd_class_exw.lpszClassName,
+		std::to_wstring(window_name).c_str(),
+		WS_OVERLAPPEDWINDOW, 
+		CW_USEDEFAULT,
+		CW_USEDEFAULT,
+		windowRect.right - windowRect.left,
+		windowRect.bottom - windowRect.top,
+		//0, 0, m_width, m_height,
 		nullptr, nullptr,
 		GetModuleHandleW(nullptr), this
 	);
 	ASSERT(m_handle);
 	ASSERT(IsWindow(m_handle));
+
+	// Make it visible
+	ShowWindow(m_handle, SW_MAXIMIZE);
 }
 
 void DXWindow::CreateSwapChain(const DXContext& dxContext)
