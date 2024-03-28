@@ -16,6 +16,8 @@ struct ID3D12DebugDevice2;
 struct ID3D12DebugCommandList1;
 struct ID3D12DebugCommandQueue;
 
+class DXResource;
+
 class DXReportContext
 {
 public:
@@ -66,6 +68,8 @@ public:
 
 	void SignalAndWait();
 	void Flush(uint32 flush_count);
+
+	void Transition(D3D12_RESOURCE_STATES new_resource_state, DXResource& resource) const;
 
 	ComPtr<ID3D12Device> GetDevice() const;
 	ComPtr<ID3D12GraphicsCommandList> GetCommandListGraphics() const;

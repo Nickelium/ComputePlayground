@@ -2,6 +2,7 @@
 #include "DXCommon.h"
 #include "DXContext.h"
 #include "DXWindowManager.h"
+#include "DXResource.h"
 
 LRESULT CALLBACK DXWindow::OnWindowMessage(HWND handle, UINT msg, WPARAM wParam, LPARAM lParam)
 {
@@ -130,46 +131,20 @@ void DXWindow::Init
 	GetBuffers(dx_context);
 }
 
-void DXWindow::BeginFrame(const DXContext& dxContext)
+void DXWindow::BeginFrame(const DXContext& dx_context)
 {
 	m_current_buffer_index = m_swap_chain->GetCurrentBackBufferIndex();
-
-	D3D12_RESOURCE_BARRIER barrier[1]{};
-	barrier[0] =
-	{
-		.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION,
-		.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE,
-		.Transition =
-		{
-			.pResource = m_buffers[m_current_buffer_index].Get(),
-			.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
-			.StateBefore = D3D12_RESOURCE_STATE_PRESENT,
-			.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET,
-		}
-	};
-	dxContext.GetCommandListGraphics()->ResourceBarrier(COUNT(barrier), barrier);
+	
+	dx_context.Transition(D3D12_RESOURCE_STATE_RENDER_TARGET, m_buffers[m_current_buffer_index]);
 
 	const float4 color{ 85.0f / 255.0f, 230.0f / 255.0f, 23.0f / 255.0f, 1.0f };
-	dxContext.GetCommandListGraphics()->ClearRenderTargetView(m_rtv_handles[m_current_buffer_index], color, 0, nullptr);
-	dxContext.GetCommandListGraphics()->OMSetRenderTargets(1, &m_rtv_handles[m_current_buffer_index], false, nullptr);
+	dx_context.GetCommandListGraphics()->ClearRenderTargetView(m_rtv_handles[m_current_buffer_index], color, 0, nullptr);
+	dx_context.GetCommandListGraphics()->OMSetRenderTargets(1, &m_rtv_handles[m_current_buffer_index], false, nullptr);
 }
 
-void DXWindow::EndFrame(const DXContext& dxContext)
+void DXWindow::EndFrame(const DXContext& dx_context)
 {
-	D3D12_RESOURCE_BARRIER barrier[1]{};
-	barrier[0] =
-	{
-		.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION,
-		.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE,
-		.Transition =
-		{
-			.pResource = m_buffers[m_current_buffer_index].Get(),
-			.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
-			.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET,
-			.StateAfter = D3D12_RESOURCE_STATE_PRESENT,
-		}
-	};
-	dxContext.GetCommandListGraphics()->ResourceBarrier(COUNT(barrier), barrier);
+	dx_context.Transition(D3D12_RESOURCE_STATE_PRESENT, m_buffers[m_current_buffer_index]);
 }
 
 void DXWindow::Present()
@@ -403,9 +378,9 @@ void DXWindow::GetBuffers(const DXContext& dxContext)
 	const D3D12_CPU_DESCRIPTOR_HANDLE rtvDescStart = m_rtv_desc_heap->GetCPUDescriptorHandleForHeapStart();
 	for (uint32 i = 0; i < GetBackBufferCount(); ++i)
 	{
-		m_swap_chain->GetBuffer(i, IID_PPV_ARGS(&m_buffers[i])) >> CHK;
+		m_swap_chain->GetBuffer(i, IID_PPV_ARGS(&m_buffers[i].m_resource)) >> CHK;
 		std::string str = "Backbuffer " + std::to_string(i);
-		NAME_DX_OBJECT(m_buffers[i], str.c_str());
+		NAME_DX_OBJECT(m_buffers[i].m_resource, str.c_str());
 
 		const D3D12_RENDER_TARGET_VIEW_DESC rtvDesc =
 		{
@@ -418,7 +393,8 @@ void DXWindow::GetBuffers(const DXContext& dxContext)
 				.PlaneSlice = 0,
 			},
 		};
-		dxContext.GetDevice()->CreateRenderTargetView(m_buffers[i].Get(), &rtvDesc, m_rtv_handles[i]);
+		dxContext.GetDevice()->CreateRenderTargetView(m_buffers[i].m_resource.Get(), &rtvDesc, m_rtv_handles[i]);
+		m_buffers[i].m_resource_state = D3D12_RESOURCE_STATE_COMMON;
 	}
 }
 
@@ -426,7 +402,7 @@ void DXWindow::ReleaseBuffers()
 {
 	for (uint32 i = 0; i < GetBackBufferCount(); ++i)
 	{
-		m_buffers[i] = nullptr;
+		m_buffers[i].m_resource = nullptr;
 	}
 }
 

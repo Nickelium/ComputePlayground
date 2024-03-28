@@ -21,6 +21,9 @@ struct WindowDesc
 	uint32 m_origin_y;
 };
 
+enum D3D12_RESOURCE_STATES;
+class DXResource;
+
 class DXWindow
 {
 public:
@@ -86,7 +89,8 @@ private:
 	WindowMode m_window_mode_request;
 
 	ComPtr<IDXGISwapChain4> m_swap_chain;
-	std::vector<ComPtr<ID3D12Resource2>> m_buffers;
+	std::vector<DXResource> m_buffers;
+	//std::vector<D3D12_RESOURCE_STATES> m_resource_states;
 
 	ComPtr<ID3D12DescriptorHeap> m_rtv_desc_heap;
 	std::vector<D3D12_CPU_DESCRIPTOR_HANDLE> m_rtv_handles;

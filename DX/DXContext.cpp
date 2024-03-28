@@ -2,6 +2,7 @@
 #include "DXContext.h"
 #include "DXCommon.h"
 #include "DXQuery.h"
+#include "DXResource.h"
 
 #if defined(_DEBUG)
 #include <dxgidebug.h>
@@ -271,6 +272,28 @@ void DXContext::Flush(uint32 flush_count)
 	}
 }
 
+void DXContext::Transition(D3D12_RESOURCE_STATES new_resource_state, DXResource& resource) const
+{
+	if (new_resource_state != resource.m_resource_state)
+	{
+		D3D12_RESOURCE_BARRIER barrier[1]{};
+		barrier[0] =
+		{
+			.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION,
+			.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE,
+			.Transition =
+			{
+				.pResource = resource.m_resource.Get(),
+				.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
+				.StateBefore = resource.m_resource_state,
+				.StateAfter = new_resource_state,
+			}
+		};
+		GetCommandListGraphics()->ResourceBarrier(COUNT(barrier), barrier);
+		resource.m_resource_state = new_resource_state;
+	}
+}
+
 ComPtr<ID3D12Device> DXContext::GetDevice() const
 {
 	return m_device;
@@ -336,9 +359,9 @@ void DXReportContext::ReportLDO() const
 
 static const std::map<D3D12_COMMAND_LIST_TYPE, std::string> g_command_list_type_map_string =
 {
-	{D3D12_COMMAND_LIST_TYPE_DIRECT, "Graphics"},
-	{D3D12_COMMAND_LIST_TYPE_COMPUTE, "Compute"},
-	{D3D12_COMMAND_LIST_TYPE_COPY, "Copy"}
+	{ D3D12_COMMAND_LIST_TYPE_DIRECT, "Graphics"},
+	{ D3D12_COMMAND_LIST_TYPE_COMPUTE, "Compute"},
+	{ D3D12_COMMAND_LIST_TYPE_COPY, "Copy"}
 };
 
 std::string GetCommandTypeToString(const D3D12_COMMAND_LIST_TYPE& command_type)
