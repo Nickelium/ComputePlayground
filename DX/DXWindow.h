@@ -46,14 +46,14 @@ public:
 
 	uint32 GetBackBufferCount() const;
 
-	bool ShouldClose();
+	bool ShouldClose() const;
 
 	bool ShouldResize();
 
 	uint32 GetWidth() const { return m_width; }
 	uint32 GetHeight() const { return m_height; }
 
-	DXGI_FORMAT GetFormat();
+	DXGI_FORMAT GetFormat() const;
 private:
 	void ApplyWindowStyle();
 	void ApplyWindowMode();

@@ -311,7 +311,7 @@ void DXWindow::ApplyWindowMode()
 	}
 }
 
-bool DXWindow::ShouldClose()
+bool DXWindow::ShouldClose() const
 {
 	return m_should_close;
 }
@@ -329,7 +329,7 @@ DXGI_FORMAT GetBackBufferFormat(bool hdr)
 	return hdr ? dxgi_format_hdr : dxgi_format_sdr;
 }
 
-DXGI_FORMAT DXWindow::GetFormat()
+DXGI_FORMAT DXWindow::GetFormat() const
 {
 	return GetBackBufferFormat(m_hdr);
 }
