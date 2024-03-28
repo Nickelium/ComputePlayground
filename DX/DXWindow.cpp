@@ -116,7 +116,7 @@ DXWindow::~DXWindow()
 
 void DXWindow::Init(const DXContext& dx_context, const std::string& window_name)
 {
-	m_window_mode = WindowMode::Normal;
+	m_window_mode = WindowMode::Maximize;
 	m_window_mode_request = m_window_mode;
 
 	SetResolutionToMonitor();
