@@ -46,7 +46,8 @@ LRESULT CALLBACK DXWindow::OnWindowMessage(HWND handle, UINT msg, WPARAM wParam,
 		}
 		else if (wParam == VK_F11)
 		{
-			pWindow->SetFullScreen(!pWindow->IsFullScreen());
+			// F11 also sends a WM_SIZE after
+			pWindow->ToggleWindowMode();
 		}
 		else if (wParam == VK_F1)
 		{
@@ -115,8 +116,12 @@ DXWindow::~DXWindow()
 
 void DXWindow::Init(const DXContext& dx_context, const std::string& window_name)
 {
+	m_window_mode = WindowMode::Normal;
+	m_window_mode_request = m_window_mode;
+
 	SetResolutionToMonitor();
 	CreateWindowHandle(window_name);
+	ApplyWindowMode();
 	CreateSwapChain(dx_context);
 
 	ComPtr<IDXGIFactory1> factory{};
@@ -212,6 +217,12 @@ void DXWindow::Update()
 		TranslateMessage(&msg);
 		DispatchMessageW(&msg);
 	}
+
+	if (m_window_mode_request != m_window_mode)
+	{
+		m_window_mode = m_window_mode_request;
+		ApplyWindowMode();
+	}
 }
 
 void DXWindow::Resize(const DXContext& dxContext)
@@ -232,47 +243,64 @@ void DXWindow::Resize(const DXContext& dxContext)
 	}
 }
 
+void DXWindow::ToggleWindowMode()
+{
+	m_window_mode_request = static_cast<WindowMode>((static_cast<int32>(m_window_mode_request) + 1) % (static_cast<int32>(WindowMode::Count)));
+}
+
 uint32_t DXWindow::GetBackBufferCount() const
 {
 	return g_backbuffer_count;
 }
 
-// TODO
 // There should be 3 modes, normal window, maximized window and borderless window
-//Normal window : WS_OVERLAPPED, shown with ShowWindow(hwnd, SW_SHOW)
-//
-//Maximized window : WS_OVERLAPPED, shown with ShowWindow(hwnd, SW_MAXMIZE) covers the whole screen, not including the taskbar
-//
-//Fullscreen : WS_POPUP flag, with width& height set to SM_CXSCREEN / SM_CYSCREEN, covers the whole screen, it goes over the task bar
-void DXWindow::SetFullScreen(bool enable)
+// Normal window : WS_OVERLAPPED, shown with ShowWindow(hwnd, SW_SHOW)
+// Maximized window : WS_OVERLAPPED, shown with ShowWindow(hwnd, SW_MAXMIZE) covers the whole screen, not including the taskbar
+// Borderless window : WS_POPUP flag, with width& height set to SM_CXSCREEN / SM_CYSCREEN, covers the whole screen, it goes over the task bar
+void DXWindow::ApplyWindowMode()
 {
-	DWORD style = WS_OVERLAPPEDWINDOW | WS_VISIBLE;
-	if (enable)
+	// Set styles
+	DWORD style {};
+	if (m_window_mode == WindowMode::Normal)
 	{
-		style = WS_POPUP | WS_VISIBLE;
+		style = WS_OVERLAPPEDWINDOW;
 	}
+	else if (m_window_mode == WindowMode::Maximize)
+	{
+		style = WS_OVERLAPPEDWINDOW;
+	}
+	else
+	{
+		ASSERT(m_window_mode == WindowMode::Borderless);
+		style = WS_POPUP;
+	}
+	style |= WS_VISIBLE;
 	SetWindowLongW(m_handle, GWL_STYLE, style);
 
-	if (enable)
+	// Set show window
+	if (m_window_mode == WindowMode::Normal)
 	{
+		ShowWindow(m_handle, SW_SHOW);
+	}
+	else if (m_window_mode == WindowMode::Maximize)
+	{
+		ShowWindow(m_handle, SW_MAXIMIZE);
+	}
+	else
+	{
+		ASSERT(m_window_mode == WindowMode::Borderless);
 		const HMONITOR monitorHandle = MonitorFromWindow(m_handle, MONITOR_DEFAULTTONEAREST);
 		MONITORINFO monitorInfo{};
 		monitorInfo.cbSize = sizeof(monitorInfo);
 		if (GetMonitorInfoW(monitorHandle, &monitorInfo))
 		{
 			SetWindowPos(m_handle, nullptr,
-				monitorInfo.rcMonitor.left,
-				monitorInfo.rcMonitor.top,
-				monitorInfo.rcMonitor.right - monitorInfo.rcMonitor.left,
-				monitorInfo.rcMonitor.bottom - monitorInfo.rcMonitor.top, SWP_NOZORDER);
+			             monitorInfo.rcMonitor.left,
+			             monitorInfo.rcMonitor.top,
+			             monitorInfo.rcMonitor.right - monitorInfo.rcMonitor.left,
+			             monitorInfo.rcMonitor.bottom - monitorInfo.rcMonitor.top, SWP_NOZORDER);
 		}
 	}
-	else
-	{
-		ShowWindow(m_handle, SW_MAXIMIZE);
-	}
-
-	m_full_screen = enable;
 }
 
 bool DXWindow::ShouldClose()
@@ -283,11 +311,6 @@ bool DXWindow::ShouldClose()
 bool DXWindow::ShouldResize()
 {
 	return m_should_resize;
-}
-
-bool DXWindow::IsFullScreen() const
-{
-	return m_full_screen;
 }
 
 void DXWindow::SetResolutionToMonitor()
@@ -325,9 +348,6 @@ void DXWindow::CreateWindowHandle(const std::string& window_name)
 	);
 	ASSERT(m_handle);
 	ASSERT(IsWindow(m_handle));
-
-	// Make it visible
-	ShowWindow(m_handle, SW_MAXIMIZE);
 }
 
 void DXWindow::CreateSwapChain(const DXContext& dxContext)

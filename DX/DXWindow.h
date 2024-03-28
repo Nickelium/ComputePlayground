@@ -17,6 +17,15 @@ public:
 	static void GlobalInit();
 	static void GlobalClose();
 
+	enum class WindowMode
+	{
+		Normal = 0,
+		Maximize,
+		Borderless,
+		Count
+		// We dont support exclusive fullscreen
+	};
+
 	DXWindow(const DXContext& dx_context, State* state, const std::string& window_name);
 	~DXWindow();
 	void Init(const DXContext& dx_context, const std::string& window_name);
@@ -33,15 +42,13 @@ public:
 
 	void Resize(const DXContext& dx_context);
 
-	uint32_t GetBackBufferCount() const;
+	void ToggleWindowMode();
 
-	void SetFullScreen(bool enable);
+	uint32_t GetBackBufferCount() const;
 
 	bool ShouldClose();
 
 	bool ShouldResize();
-
-	bool IsFullScreen() const;
 
 	uint32_t GetWidth() const { return m_width; }
 	uint32_t GetHeight() const { return m_height; }
@@ -53,6 +60,7 @@ private:
 	static std::wstring s_wnd_class_name;
 	static bool s_is_initialized;
 
+	void ApplyWindowMode();
 	void SetResolutionToMonitor();
 	void CreateWindowHandle(const std::string& window_name);
 	void CreateSwapChain(const DXContext& dx_context);
@@ -65,8 +73,9 @@ private:
 
 	bool m_should_close = false;
 	bool m_should_resize = false;
-	// This is not exclusive fullscreen, we dont support that
-	bool m_full_screen = false;
+
+	WindowMode m_window_mode;
+	WindowMode m_window_mode_request;
 
 	ComPtr<IDXGISwapChain4> m_swap_chain;
 	std::vector<ComPtr<ID3D12Resource2>> m_buffers;

@@ -42,14 +42,13 @@ namespace std
 }
 
 void operator>>(HRSourceLocation hrSourceLocation, CheckToken);
-
 #define DISABLE_OPTIMISATIONS() __pragma( optimize( "", off ) )
 #define ENABLE_OPTIMISATIONS() __pragma( optimize( "", on ) )
 #define DEBUG_BREAK() __debugbreak()
 // https://web.archive.org/web/20201129200055/http://cnicholson.net/2009/02/stupid-c-tricks-adventures-in-assert/
-#define UNUSED(x) do { (void)sizeof(x); } while(false)
+#define UNUSED(x)  do { (void)sizeof(x); } while(0)
 #if defined(_DEBUG)
-#define ASSERT(x) if(!(x)) __debugbreak()
+#define ASSERT(x) do { if (!(x)) { DEBUG_BREAK(); } } while (0)
 #else
 #define ASSERT(x) UNUSED(x)
 #endif
