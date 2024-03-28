@@ -1,6 +1,7 @@
 #include "DXWindow.h"
 #include "DXCommon.h"
 #include "DXContext.h"
+#include "DXWindowManager.h"
 
 LRESULT CALLBACK DXWindow::OnWindowMessage(HWND handle, UINT msg, WPARAM wParam, LPARAM lParam)
 {
@@ -67,50 +68,6 @@ LRESULT CALLBACK DXWindow::OnWindowMessage(HWND handle, UINT msg, WPARAM wParam,
 	return DefWindowProcW(handle, msg, wParam, lParam);
 }
 
-DXWindowManager::DXWindowManager()
-{
-	Init();
-}
-
-DXWindowManager::~DXWindowManager()
-{
-	Close();
-}
-
-LPCWSTR DXWindowManager::GetWindoClassExName() const
-{
-	return m_wnd_class_exw.lpszClassName;
-}
-
-void DXWindowManager::Init()
-{
-	m_wnd_class_name = { L"WndClass" };
-	m_wnd_class_exw =
-	{
-		.cbSize = sizeof(m_wnd_class_exw),
-		.style = CS_HREDRAW | CS_VREDRAW,
-		.lpfnWndProc = DXWindow::OnWindowMessage,
-		.cbClsExtra = 0,
-		.cbWndExtra = 0,
-		.hInstance = GetModuleHandle(nullptr),
-		.hIcon = LoadIconW(nullptr, IDI_APPLICATION),
-		.hCursor = LoadCursorW(nullptr, IDC_ARROW),
-		.hbrBackground = nullptr,
-		.lpszMenuName = nullptr,
-		.lpszClassName = m_wnd_class_name.c_str(),
-		.hIconSm = LoadIconW(nullptr, IDI_APPLICATION),
-	};
-	m_wnd_class_atom = RegisterClassExW(&m_wnd_class_exw);
-	ASSERT(m_wnd_class_atom);
-}
-
-void DXWindowManager::Close()
-{
-	if (m_wnd_class_atom)
-	{
-		ASSERT(UnregisterClassW((LPCWSTR)m_wnd_class_atom, GetModuleHandleW(nullptr)));
-	}
-}
 
 DXWindow::DXWindow(const DXContext& dx_context, const DXWindowManager& window_manager, State* state, const std::string& window_name)
 	:m_state(state)
@@ -388,7 +345,7 @@ void DXWindow::CreateWindowHandle(const DXWindowManager& window_manager, const s
 
 	m_handle = CreateWindow
 	(
-		window_manager.GetWindoClassExName(),
+		window_manager.GetWindowClassExName().c_str(),
 		std::to_wstring(window_name).c_str(),
 		m_style, 
 		m_windowed_origin_x,

@@ -3,6 +3,7 @@
 #include <dxgiformat.h>
 
 class DXContext;
+class DXWindowManager;
 
 struct IDXGISwapChain4;
 struct ID3D12Resource2;
@@ -10,22 +11,6 @@ struct ID3D12DescriptorHeap;
 struct D3D12_CPU_DESCRIPTOR_HANDLE;
 
 struct State;
-
-class DXWindowManager
-{
-public:
-	DXWindowManager();
-	~DXWindowManager();
-
-	LPCWSTR GetWindoClassExName() const;
-private:
-	void Init();
-	void Close();
-
-	ATOM m_wnd_class_atom;
-	WNDCLASSEXW m_wnd_class_exw;
-	std::wstring m_wnd_class_name;
-};
 
 class DXWindow
 {

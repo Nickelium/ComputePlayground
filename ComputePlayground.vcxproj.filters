@@ -54,6 +54,9 @@
     <ClCompile Include="core\MemoryReporting.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="DX\DXWindowManager.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="shaders\ComputeShader.hlsl" />
@@ -102,6 +105,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="core\MemoryReporting.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="DX\DXWindowManager.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

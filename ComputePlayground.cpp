@@ -2,6 +2,7 @@
 #include "DX/DXCommon.h"
 
 #include "DX/DXWindow.h"
+#include "DX/DXWindowManager.h"
 #include "DX/DXCommon.h"
 #include "DX/DXResource.h"
 #include "DX/DXCompiler.h"

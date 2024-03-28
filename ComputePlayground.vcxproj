@@ -118,6 +118,7 @@ xcopy /y /d $(ProjectDir)dependencies\DXC\bin\x64\dxil.dll $(OutDir)</Command>
     <ClCompile Include="DX\DXWindow.cpp" />
     <ClCompile Include="core\Factory.cpp" />
     <ClCompile Include="core\Logger.cpp" />
+    <ClCompile Include="DX\DXWindowManager.cpp" />
     <ClCompile Include="maths\LinearAlgebra.cpp" />
     <ClCompile Include="core\MemoryReporting.cpp" />
   </ItemGroup>
@@ -138,6 +139,7 @@ xcopy /y /d $(ProjectDir)dependencies\DXC\bin\x64\dxil.dll $(OutDir)</Command>
     <ClInclude Include="DX\DXQuery.h" />
     <ClInclude Include="DX\DXResource.h" />
     <ClInclude Include="DX\DXWindow.h" />
+    <ClInclude Include="DX\DXWindowManager.h" />
     <ClInclude Include="DX\IDXDebugLayer.h" />
     <ClInclude Include="core\Factory.h" />
     <ClInclude Include="core\Logger.h" />
