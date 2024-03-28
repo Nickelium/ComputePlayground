@@ -80,6 +80,7 @@ int main()
 		DXWindowManager window_manager;
 		{
 			DXWindow dx_window(dx_context, window_manager, &state, "Playground");
+			//DXWindow dx_window1(dx_context, window_manager, &state, "Playground1");
 			{
 				D3D12_DESCRIPTOR_HEAP_DESC desc_heap_desc =
 				{

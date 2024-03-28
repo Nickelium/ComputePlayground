@@ -1,6 +1,5 @@
 #include "DXWindow.h"
 #include "DXCommon.h"
-//#include "../GPUCapture.h"
 #include "DXContext.h"
 
 LRESULT CALLBACK DXWindow::OnWindowMessage(HWND handle, UINT msg, WPARAM wParam, LPARAM lParam)
@@ -26,7 +25,6 @@ LRESULT CALLBACK DXWindow::OnWindowMessage(HWND handle, UINT msg, WPARAM wParam,
 	{
 	case WM_SIZE:
 	{
-		// Handle minimize & maximize
 		uint32 reqWidth = LOWORD(lParam);
 		uint32 reqHeight = HIWORD(lParam);
 		if
@@ -36,6 +34,12 @@ LRESULT CALLBACK DXWindow::OnWindowMessage(HWND handle, UINT msg, WPARAM wParam,
 		)
 		{
 			pWindow->m_should_resize = true;
+		}
+
+		// Switch to maximize state
+		if (wParam & SIZE_MAXIMIZED)
+		{
+			pWindow->m_window_mode_request = WindowMode::Maximize;
 		}
 	}
 	break;
@@ -77,12 +81,6 @@ LPCWSTR DXWindowManager::GetWindoClassExName() const
 {
 	return m_wnd_class_exw.lpszClassName;
 }
-
-// Definition and initialization of static class variables
-//ATOM DXWindow::s_wnd_class_atom{};
-//WNDCLASSEXW DXWindow::s_wnd_class_exw{};
-// Keeps this variable around so s_wnd_class_exw refers to an existing string
-//std::wstring DXWindow::s_wnd_class_name{ L"WndClass"};
 
 void DXWindowManager::Init()
 {
@@ -127,19 +125,26 @@ DXWindow::~DXWindow()
 
 void DXWindow::Init(const DXContext& dx_context, const DXWindowManager& window_manager, const std::string& window_name)
 {
-	m_hdr = true;
+	m_hdr = false;
 
-	m_window_mode = WindowMode::Maximize;
+	m_window_mode = WindowMode::Normal;
 	m_window_mode_request = m_window_mode;
 
-	//SetResolutionToMonitor();
+	// TODO expose to the user
+	m_width = m_windowed_width = 500;
+	m_height = m_windowed_height =  500;
+	m_windowed_origin_x = (1920 >> 1) - (m_windowed_width >> 1);
+	m_windowed_origin_y = (1080 >> 1) - (m_windowed_height >> 1);
+
 	CreateWindowHandle(window_manager, window_name);
+	ApplyWindowStyle();
 	ApplyWindowMode();
 	CreateSwapChain(dx_context);
 
 	ComPtr<IDXGIFactory1> factory{};
 	m_swap_chain->GetParent(IID_PPV_ARGS(&factory)) >> CHK;
 	// Requires to GetParent factory to work
+
 	// Disable ALT ENTER to disable exclusive fullscreen
 	factory->MakeWindowAssociation(m_handle, DXGI_MWA_NO_ALT_ENTER) >> CHK;
 
@@ -209,7 +214,7 @@ void DXWindow::EndFrame(const DXContext& dxContext)
 
 void DXWindow::Present()
 {
-	// sync interval [0;4] where 0 is uncapped
+	// Sync interval [0;4] where 0 is uncapped
 	uint32 vsync_interval = 0;
 	uint32 present_flags = 0;
 	m_swap_chain->Present(vsync_interval, present_flags) >> CHK;
@@ -235,7 +240,20 @@ void DXWindow::Update()
 	if (m_window_mode_request != m_window_mode)
 	{
 		m_window_mode = m_window_mode_request;
+		ApplyWindowStyle();
 		ApplyWindowMode();
+	}
+
+	// Store windowed size after apply, to restore later on
+	if (m_window_mode_request == WindowMode::Normal)
+	{
+		m_windowed_width = m_width;
+		m_windowed_height = m_height;
+		RECT rect{};
+		bool result = GetWindowRect(m_handle, &rect);
+		ASSERT(result);
+		m_windowed_origin_x = rect.left;
+		m_windowed_origin_y = rect.top;
 	}
 }
 
@@ -250,7 +268,7 @@ void DXWindow::Resize(const DXContext& dxContext)
 		m_height = rt.bottom - rt.top;
 		DXGI_SWAP_CHAIN_DESC1 desc{};
 		m_swap_chain->GetDesc1(&desc);
-		m_swap_chain->ResizeBuffers(GetBackBufferCount(), m_width, m_height, desc.Format, desc.Flags) >> CHK;
+		m_swap_chain->ResizeBuffers(GetBackBufferCount(), GetWidth(), GetHeight(), desc.Format, desc.Flags) >> CHK;
 		m_should_resize = false;
 
 		GetBuffers(dxContext);
@@ -267,33 +285,48 @@ uint32 DXWindow::GetBackBufferCount() const
 	return g_backbuffer_count;
 }
 
+void DXWindow::ApplyWindowStyle()
+{
+	// Set styles
+	if (m_window_mode == WindowMode::Normal)
+	{
+		m_style = WS_OVERLAPPEDWINDOW;
+	}
+	else if (m_window_mode == WindowMode::Maximize)
+	{
+		m_style = WS_OVERLAPPEDWINDOW;
+	}
+	else
+	{
+		ASSERT(m_window_mode == WindowMode::Borderless);
+		m_style = WS_POPUP;
+	}
+	SetWindowLongW(m_handle, GWL_STYLE, m_style);
+}
+
 // There should be 3 modes, normal window, maximized window and borderless window
 // Normal window : WS_OVERLAPPED, shown with ShowWindow(hwnd, SW_SHOW)
 // Maximized window : WS_OVERLAPPED, shown with ShowWindow(hwnd, SW_MAXMIZE) covers the whole screen, not including the taskbar
 // Borderless window : WS_POPUP flag, with width& height set to SM_CXSCREEN / SM_CYSCREEN, covers the whole screen, it goes over the task bar
 void DXWindow::ApplyWindowMode()
 {
-	// Set styles
-	DWORD style {};
-	if (m_window_mode == WindowMode::Normal)
-	{
-		style = WS_OVERLAPPEDWINDOW;
-	}
-	else if (m_window_mode == WindowMode::Maximize)
-	{
-		style = WS_OVERLAPPEDWINDOW;
-	}
-	else
-	{
-		ASSERT(m_window_mode == WindowMode::Borderless);
-		style = WS_POPUP;
-	}
-	style |= WS_VISIBLE;
-	SetWindowLongW(m_handle, GWL_STYLE, style);
-
 	// Set show window
 	if (m_window_mode == WindowMode::Normal)
 	{
+		// Client rect matches with backbuffer size but window rect needs to be slightly bigger for borders
+		// Client rect != Window rect in windowed mode only
+		RECT window_rect{ 0, 0, static_cast<LONG>(m_windowed_width), static_cast<LONG>(m_windowed_height) };
+		// Pass in client rect and then make it into window rect
+		bool result = AdjustWindowRect(&window_rect, m_style, false);
+		ASSERT(result);
+		// Restore previous setting
+		SetWindowPos
+		(
+			m_handle, nullptr,
+			m_windowed_origin_x, m_windowed_origin_y,
+			window_rect.right - window_rect.left, window_rect.bottom - window_rect.top,
+			SWP_NOZORDER
+		);
 		ShowWindow(m_handle, SW_SHOW);
 	}
 	else if (m_window_mode == WindowMode::Maximize)
@@ -314,6 +347,10 @@ void DXWindow::ApplyWindowMode()
 			             monitorInfo.rcMonitor.right - monitorInfo.rcMonitor.left,
 			             monitorInfo.rcMonitor.bottom - monitorInfo.rcMonitor.top, SWP_NOZORDER);
 		}
+		// SetWindowLongW(!WS_VISIBLE) to avoid semi black / white frame
+		// No ShowWindow for borderless because it breaks
+		// But then needs an additional SetWindowLongW with WS_VISIBLE to work with sequence SetWindowLongW(!WS_VISIBLE) -> NoShowWindow
+		SetWindowLongW(m_handle, GWL_STYLE, m_style | WS_VISIBLE);
 	}
 }
 
@@ -329,6 +366,7 @@ bool DXWindow::ShouldResize()
 
 static const DXGI_FORMAT dxgi_format_sdr = DXGI_FORMAT_R8G8B8A8_UNORM;
 static const DXGI_FORMAT dxgi_format_hdr = DXGI_FORMAT_R10G10B10A2_UNORM;
+
 DXGI_FORMAT GetBackBufferFormat(bool hdr)
 {
 	return hdr ? dxgi_format_hdr : dxgi_format_sdr;
@@ -339,34 +377,24 @@ DXGI_FORMAT DXWindow::GetFormat()
 	return GetBackBufferFormat(m_hdr);
 }
 
-void DXWindow::SetResolutionToMonitor()
-{
-	POINT pt{};
-	const HMONITOR monitorHandle = MonitorFromPoint(pt, MONITOR_DEFAULTTONEAREST);
-	MONITORINFO monitorInfo{};
-	monitorInfo.cbSize = sizeof(monitorInfo);
-	const bool success = GetMonitorInfoW(monitorHandle, &monitorInfo);
-	ASSERT(success);
-	m_width = monitorInfo.rcMonitor.right - monitorInfo.rcMonitor.left;
-	m_height = monitorInfo.rcMonitor.bottom - monitorInfo.rcMonitor.top;
-	// TODO fix 2 GPU captures, second doesnt open PIX
-}
-
 void DXWindow::CreateWindowHandle(const DXWindowManager& window_manager, const std::string& window_name)
 {
-	RECT windowRect = { 0, 0, static_cast<long>(m_width), static_cast<long>(m_height)};
-	AdjustWindowRect(&windowRect, WS_OVERLAPPEDWINDOW, FALSE);
+	// Client rect matches with backbuffer size but window rect needs to be slightly bigger for borders
+	// Client rect != Window rect in windowed mode only
+	RECT window_rect{ 0, 0, static_cast<LONG>(m_windowed_width), static_cast<LONG>(m_windowed_height) };
+	// Pass in client rect and then make it into window rect
+	bool result = AdjustWindowRect(&window_rect, m_style, false);
+	ASSERT(result);
 
 	m_handle = CreateWindow
 	(
 		window_manager.GetWindoClassExName(),
 		std::to_wstring(window_name).c_str(),
-		WS_OVERLAPPEDWINDOW, 
-		CW_USEDEFAULT,
-		CW_USEDEFAULT,
-		windowRect.right - windowRect.left,
-		windowRect.bottom - windowRect.top,
-		//0, 0, m_width, m_height,
+		m_style, 
+		m_windowed_origin_x,
+		m_windowed_origin_y,
+		window_rect.right - window_rect.left,
+		window_rect.bottom - window_rect.top,
 		nullptr, nullptr,
 		GetModuleHandleW(nullptr), this
 	);
@@ -378,8 +406,8 @@ void DXWindow::CreateSwapChain(const DXContext& dxContext)
 {
 	const DXGI_SWAP_CHAIN_DESC1 swapChainDesc =
 	{
-		.Width = m_width,
-		.Height = m_height,
+		.Width = GetWidth(),
+		.Height = GetHeight(),
 		.Format = GetFormat(),
 		.Stereo = false,
 		.SampleDesc =

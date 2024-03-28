@@ -32,13 +32,13 @@ class DXWindow
 public:
 	static LRESULT CALLBACK OnWindowMessage(HWND handle, UINT msg, WPARAM w_param, LPARAM l_param);
 
+	// We dont support exclusive fullscreen
 	enum class WindowMode
 	{
 		Normal = 0,
 		Maximize,
 		Borderless,
 		Count
-		// We dont support exclusive fullscreen
 	};
 
 	DXWindow(const DXContext& dx_context, const DXWindowManager& window_manager, State* state, const std::string& window_name);
@@ -70,8 +70,8 @@ public:
 
 	DXGI_FORMAT GetFormat();
 private:
+	void ApplyWindowStyle();
 	void ApplyWindowMode();
-	void SetResolutionToMonitor();
 	void CreateWindowHandle(const DXWindowManager& window_manager, const std::string& window_name);
 	void CreateSwapChain(const DXContext& dx_context);
 
@@ -95,6 +95,11 @@ private:
 
 	uint32 m_width;
 	uint32 m_height;
+	uint32 m_windowed_origin_x;
+	uint32 m_windowed_origin_y;
+	uint32 m_windowed_width;
+	uint32 m_windowed_height;
+	uint32 m_style;
 
 	uint32 m_current_buffer_index = 0u;
 
