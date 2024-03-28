@@ -63,11 +63,69 @@ Resources CreateResources(const DXContext& dx_context, const DXCompiler& dx_comp
 	return resources;
 }
 
+void FillCommandList(DXContext& dx_context, DXWindow& dx_window, Resources& resource, D3D12_VERTEX_BUFFER_VIEW& vertex_buffer_view, uint32 vertex_count)
+{
+	// Fill CommandList
+	dx_window.BeginFrame(dx_context);
+	{
+		// Compute Work
+		{
+			dx_context.GetCommandListGraphics()->SetComputeRootSignature(resource.m_compute_root_signature.Get());
+			dx_context.GetCommandListGraphics()->SetPipelineState(resource.m_compute_pso.Get());
+			dx_context.GetCommandListGraphics()->SetComputeRootUnorderedAccessView(0, resource.m_uav.m_gpu_resource->GetGPUVirtualAddress());
+			dx_context.GetCommandListGraphics()->Dispatch(resource.m_dispatch_count, 1, 1);
+			D3D12_RESOURCE_BARRIER barriers[1]{};
+			barriers[0] =
+			{
+				.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION,
+				.Transition =
+				{
+					.pResource = resource.m_uav.m_gpu_resource.Get(),
+					.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
+					.StateBefore = D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
+					.StateAfter = D3D12_RESOURCE_STATE_COPY_SOURCE,
+				},
+			};
+			dx_context.GetCommandListGraphics()->ResourceBarrier(COUNT(barriers), &barriers[0]);
+			dx_context.GetCommandListGraphics()->CopyResource(resource.m_uav.m_read_back_resource.Get(), resource.m_uav.m_gpu_resource.Get());
+		}
+		// Draw Work
+		{
+			D3D12_VIEWPORT view_ports[] =
+			{
+				{
+					.TopLeftX = 0,
+					.TopLeftY = 0,
+					.Width = (float)dx_window.GetWidth(),
+					.Height = (float)dx_window.GetHeight(),
+					.MinDepth = 0,
+					.MaxDepth = 1,
+				}
+			};
+			D3D12_RECT scissor_rects[] =
+			{
+				{
+					.left = 0,
+					.top = 0,
+					.right = (long)dx_window.GetWidth(),
+					.bottom = (long)dx_window.GetHeight(),
+				}
+			};
+			dx_context.GetCommandListGraphics()->RSSetViewports(1, view_ports);
+			dx_context.GetCommandListGraphics()->RSSetScissorRects(1, scissor_rects);
+			dx_context.GetCommandListGraphics()->SetPipelineState(resource.m_gfx_pso.Get());
+			dx_context.GetCommandListGraphics()->SetGraphicsRootSignature(resource.m_gfx_root_signature.Get());
+			dx_context.GetCommandListGraphics()->IASetVertexBuffers(0, 1, &vertex_buffer_view);
+			dx_context.GetCommandListGraphics()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+			dx_context.GetCommandListGraphics()->DrawInstanced(vertex_count, 1, 0, 0);
+		}
+	}
+	dx_window.EndFrame(dx_context);
+}
+
 int main()
 {
 	MemoryTrackStart();
-	// Ignore windows resolution scale
-	SetProcessDPIAware();
 
 	DXReportContext dx_report_context{};
 	{
@@ -349,63 +407,7 @@ int main()
 						}
 
 						dx_context.InitCommandLists();
-						{
-							// Fill CommandList
-							dx_window.BeginFrame(dx_context);
-							// Compute Work
-							{
-								dx_context.GetCommandListGraphics()->SetComputeRootSignature(resource.m_compute_root_signature.Get());
-								dx_context.GetCommandListGraphics()->SetPipelineState(resource.m_compute_pso.Get());
-								dx_context.GetCommandListGraphics()->SetComputeRootUnorderedAccessView(0, resource.m_uav.m_gpu_resource->GetGPUVirtualAddress());
-								dx_context.GetCommandListGraphics()->Dispatch(resource.m_dispatch_count, 1, 1);
-								D3D12_RESOURCE_BARRIER barriers[1]{};
-								barriers[0] =
-								{
-									.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION,
-									.Transition =
-									{
-										.pResource = resource.m_uav.m_gpu_resource.Get(),
-										.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
-										.StateBefore = D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
-										.StateAfter = D3D12_RESOURCE_STATE_COPY_SOURCE,
-									},
-								};
-								dx_context.GetCommandListGraphics()->ResourceBarrier(COUNT(barriers), &barriers[0]);
-								dx_context.GetCommandListGraphics()->CopyResource(resource.m_uav.m_read_back_resource.Get(), resource.m_uav.m_gpu_resource.Get());
-							}
-							// Draw Work
-							{
-								D3D12_VIEWPORT view_ports[] =
-								{
-									{
-										.TopLeftX = 0,
-										.TopLeftY = 0,
-										.Width = (float)dx_window.GetWidth(),
-										.Height = (float)dx_window.GetHeight(),
-										.MinDepth = 0,
-										.MaxDepth = 1,
-									}
-								};
-								D3D12_RECT scissor_rects[] =
-								{
-									{
-										.left = 0,
-										.top = 0,
-										.right = (long)dx_window.GetWidth(),
-										.bottom = (long)dx_window.GetHeight(),
-									}
-								};
-								dx_context.GetCommandListGraphics()->RSSetViewports(1, view_ports);
-								dx_context.GetCommandListGraphics()->RSSetScissorRects(1, scissor_rects);
-								dx_context.GetCommandListGraphics()->SetPipelineState(resource.m_gfx_pso.Get());
-								dx_context.GetCommandListGraphics()->SetGraphicsRootSignature(resource.m_gfx_root_signature.Get());
-								dx_context.GetCommandListGraphics()->IASetVertexBuffers(0, 1, &vertex_buffer_view);
-								dx_context.GetCommandListGraphics()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-								dx_context.GetCommandListGraphics()->DrawInstanced(vertex_count, 1, 0, 0);
-							}
-							dx_window.EndFrame(dx_context);
-
-						}
+						FillCommandList(dx_context, dx_window, resource, vertex_buffer_view, vertex_count);
 						dx_context.ExecuteCommandListGraphics();
 						dx_window.Present();
 

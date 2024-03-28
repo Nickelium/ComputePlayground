@@ -244,6 +244,7 @@ static_assert(COUNT(g_dxgi_format_map_string) == g_dxgi_format_last_stored + 1);
 std::string GetDXGIFormatString(const DXGI_FORMAT& dxgi_format)
 {
 	ASSERT(dxgi_format <= g_dxgi_format_last_stored);
+	ASSERT(dxgi_format < COUNT(g_dxgi_format_map_string));
 	return g_dxgi_format_map_string[dxgi_format];
 }
 

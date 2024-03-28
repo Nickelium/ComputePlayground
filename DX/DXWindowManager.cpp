@@ -18,6 +18,9 @@ std::wstring DXWindowManager::GetWindowClassExName() const
 
 void DXWindowManager::Init()
 {
+	// Ignore windows resolution scale
+	SetProcessDPIAware();
+
 	m_wnd_class_name = { L"WndClass" };
 	m_wnd_class_exw =
 	{
