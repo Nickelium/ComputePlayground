@@ -21,8 +21,8 @@ struct Resources
 	ComPtr<IDxcBlob> m_compute_shader;
 	ComPtr<ID3D12PipelineState> m_compute_pso;
 	ComPtr<ID3D12RootSignature> m_compute_root_signature;
-	uint32_t m_group_size;
-	uint32_t m_dispatch_count;
+	uint32 m_group_size;
+	uint32 m_dispatch_count;
 
 	// TODO add inputlayout
 	ComPtr<IDxcBlob> m_vertex_shader;
@@ -77,9 +77,9 @@ int main()
 		DXContext dx_context{};
 		dx_report_context.SetDevice(dx_context.GetDevice());
 		DXCompiler dx_compiler("shaders");
-		DXWindow::GlobalInit();
+		DXWindowManager window_manager;
 		{
-			DXWindow dx_window(dx_context, &state, "Playground");
+			DXWindow dx_window(dx_context, window_manager, &state, "Playground");
 			{
 				D3D12_DESCRIPTOR_HEAP_DESC desc_heap_desc =
 				{
@@ -90,7 +90,7 @@ int main()
 				Resources resource = CreateResources(dx_context, dx_compiler);
 				ComPtr<ID3D12Resource2> vertex_buffer{};
 				D3D12_VERTEX_BUFFER_VIEW vertex_buffer_view{};
-				uint32_t vertex_count{};
+				uint32 vertex_count{};
 				{
 					struct Vertex
 					{
@@ -308,7 +308,7 @@ int main()
 						.NumRenderTargets = 1,
 						.RTVFormats =
 						{
-							DXGI_FORMAT_R8G8B8A8_UNORM,
+							dx_window.GetFormat(),
 						},
 						.DSVFormat = DXGI_FORMAT_UNKNOWN,
 						.SampleDesc =
@@ -431,7 +431,6 @@ int main()
 				dx_context.Flush(dx_window.GetBackBufferCount());
 			}
 		}
-		DXWindow::GlobalClose();
 	}
 	
 	return 0;

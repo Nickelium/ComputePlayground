@@ -68,7 +68,7 @@ std::string GetNewestCaptureName(const std::string& capture_relative_path, const
 	std::string capture_absolute_path =
 		capture_relative_path + capture_template_name + identifier + capture_extension;
 	// 2 to match renderdoc name capturing behaviour
-	uint32_t index = 2;
+	uint32 index = 2;
 	while (std::filesystem::exists(capture_absolute_path))
 	{
 		identifier = "_" + std::to_string(index);

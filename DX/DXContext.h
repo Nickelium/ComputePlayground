@@ -65,7 +65,7 @@ public:
 	void ExecuteCommandListCopy();
 
 	void SignalAndWait();
-	void Flush(const uint32_t flush_count);
+	void Flush(uint32 flush_count);
 
 	ComPtr<ID3D12Device> GetDevice() const;
 	ComPtr<ID3D12GraphicsCommandList> GetCommandListGraphics() const;

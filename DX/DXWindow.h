@@ -1,5 +1,6 @@
 #pragma once
 #include "../core/Common.h"
+#include <dxgiformat.h>
 
 class DXContext;
 
@@ -10,12 +11,26 @@ struct D3D12_CPU_DESCRIPTOR_HANDLE;
 
 struct State;
 
+class DXWindowManager
+{
+public:
+	DXWindowManager();
+	~DXWindowManager();
+
+	LPCWSTR GetWindoClassExName() const;
+private:
+	void Init();
+	void Close();
+
+	ATOM m_wnd_class_atom;
+	WNDCLASSEXW m_wnd_class_exw;
+	std::wstring m_wnd_class_name;
+};
+
 class DXWindow
 {
 public:
 	static LRESULT CALLBACK OnWindowMessage(HWND handle, UINT msg, WPARAM w_param, LPARAM l_param);
-	static void GlobalInit();
-	static void GlobalClose();
 
 	enum class WindowMode
 	{
@@ -26,9 +41,9 @@ public:
 		// We dont support exclusive fullscreen
 	};
 
-	DXWindow(const DXContext& dx_context, State* state, const std::string& window_name);
+	DXWindow(const DXContext& dx_context, const DXWindowManager& window_manager, State* state, const std::string& window_name);
 	~DXWindow();
-	void Init(const DXContext& dx_context, const std::string& window_name);
+	void Init(const DXContext& dx_context, const DXWindowManager& window_manager, const std::string& window_name);
 
 	void BeginFrame(const DXContext& dx_context);
 
@@ -44,25 +59,20 @@ public:
 
 	void ToggleWindowMode();
 
-	uint32_t GetBackBufferCount() const;
+	uint32 GetBackBufferCount() const;
 
 	bool ShouldClose();
 
 	bool ShouldResize();
 
-	uint32_t GetWidth() const { return m_width; }
-	uint32_t GetHeight() const { return m_height; }
+	uint32 GetWidth() const { return m_width; }
+	uint32 GetHeight() const { return m_height; }
 
+	DXGI_FORMAT GetFormat();
 private:
-	// Declaration of static class variables
-	static ATOM s_wnd_class_atom;
-	static WNDCLASSEXW s_wnd_class_exw;
-	static std::wstring s_wnd_class_name;
-	static bool s_is_initialized;
-
 	void ApplyWindowMode();
 	void SetResolutionToMonitor();
-	void CreateWindowHandle(const std::string& window_name);
+	void CreateWindowHandle(const DXWindowManager& window_manager, const std::string& window_name);
 	void CreateSwapChain(const DXContext& dx_context);
 
 	void GetBuffers(const DXContext& dx_context);
@@ -83,10 +93,12 @@ private:
 	ComPtr<ID3D12DescriptorHeap> m_rtv_desc_heap;
 	std::vector<D3D12_CPU_DESCRIPTOR_HANDLE> m_rtv_handles;
 
-	uint32_t m_width;
-	uint32_t m_height;
+	uint32 m_width;
+	uint32 m_height;
 
-	uint32_t m_current_buffer_index = 0u;
+	uint32 m_current_buffer_index = 0u;
 
 	State* m_state;
+
+	bool m_hdr;
 };

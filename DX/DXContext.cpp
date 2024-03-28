@@ -263,10 +263,10 @@ void DXContext::SignalAndWait()
 	WaitForSingleObject(m_fence_event, INFINITE);
 }
 
-void DXContext::Flush(const uint32_t flush_count)
+void DXContext::Flush(uint32 flush_count)
 {
 	// TODO proper flush
-	for (size_t i = 0; i < flush_count; i++)
+	for (uint32 i = 0; i < flush_count; ++i)
 	{
 		SignalAndWait();
 	}

@@ -27,8 +27,8 @@ LRESULT CALLBACK DXWindow::OnWindowMessage(HWND handle, UINT msg, WPARAM wParam,
 	case WM_SIZE:
 	{
 		// Handle minimize & maximize
-		const uint32_t reqWidth = LOWORD(lParam);
-		const uint32_t reqHeight = HIWORD(lParam);
+		uint32 reqWidth = LOWORD(lParam);
+		uint32 reqHeight = HIWORD(lParam);
 		if
 		(
 			lParam &&
@@ -63,18 +63,33 @@ LRESULT CALLBACK DXWindow::OnWindowMessage(HWND handle, UINT msg, WPARAM wParam,
 	return DefWindowProcW(handle, msg, wParam, lParam);
 }
 
-// Definition and initialization of static class variables
-ATOM DXWindow::s_wnd_class_atom{};
-WNDCLASSEXW DXWindow::s_wnd_class_exw{};
-// Keeps this variable around so s_wnd_class_exw refers to an existing string
-std::wstring DXWindow::s_wnd_class_name{ L"WndClass"};
-bool DXWindow::s_is_initialized = false;
-
-void DXWindow::GlobalInit()
+DXWindowManager::DXWindowManager()
 {
-	s_wnd_class_exw =
+	Init();
+}
+
+DXWindowManager::~DXWindowManager()
+{
+	Close();
+}
+
+LPCWSTR DXWindowManager::GetWindoClassExName() const
+{
+	return m_wnd_class_exw.lpszClassName;
+}
+
+// Definition and initialization of static class variables
+//ATOM DXWindow::s_wnd_class_atom{};
+//WNDCLASSEXW DXWindow::s_wnd_class_exw{};
+// Keeps this variable around so s_wnd_class_exw refers to an existing string
+//std::wstring DXWindow::s_wnd_class_name{ L"WndClass"};
+
+void DXWindowManager::Init()
+{
+	m_wnd_class_name = { L"WndClass" };
+	m_wnd_class_exw =
 	{
-		.cbSize = sizeof(s_wnd_class_exw),
+		.cbSize = sizeof(m_wnd_class_exw),
 		.style = CS_HREDRAW | CS_VREDRAW,
 		.lpfnWndProc = DXWindow::OnWindowMessage,
 		.cbClsExtra = 0,
@@ -84,29 +99,25 @@ void DXWindow::GlobalInit()
 		.hCursor = LoadCursorW(nullptr, IDC_ARROW),
 		.hbrBackground = nullptr,
 		.lpszMenuName = nullptr,
-		.lpszClassName = s_wnd_class_name.c_str(),
+		.lpszClassName = m_wnd_class_name.c_str(),
 		.hIconSm = LoadIconW(nullptr, IDI_APPLICATION),
 	};
-	s_wnd_class_atom = RegisterClassExW(&s_wnd_class_exw);
-	ASSERT(s_wnd_class_atom);
-
-	s_is_initialized = true;
+	m_wnd_class_atom = RegisterClassExW(&m_wnd_class_exw);
+	ASSERT(m_wnd_class_atom);
 }
 
-void DXWindow::GlobalClose()
+void DXWindowManager::Close()
 {
-	if (s_wnd_class_atom)
+	if (m_wnd_class_atom)
 	{
-		ASSERT(UnregisterClassW((LPCWSTR)s_wnd_class_atom, GetModuleHandleW(nullptr)));
+		ASSERT(UnregisterClassW((LPCWSTR)m_wnd_class_atom, GetModuleHandleW(nullptr)));
 	}
-
-	s_is_initialized = false;
 }
 
-DXWindow::DXWindow(const DXContext& dx_context, State* state, const std::string& window_name)
+DXWindow::DXWindow(const DXContext& dx_context, const DXWindowManager& window_manager, State* state, const std::string& window_name)
 	:m_state(state)
 {
-	Init(dx_context, window_name);
+	Init(dx_context, window_manager, window_name);
 }
 
 DXWindow::~DXWindow()
@@ -114,19 +125,22 @@ DXWindow::~DXWindow()
 	Close();
 }
 
-void DXWindow::Init(const DXContext& dx_context, const std::string& window_name)
+void DXWindow::Init(const DXContext& dx_context, const DXWindowManager& window_manager, const std::string& window_name)
 {
+	m_hdr = true;
+
 	m_window_mode = WindowMode::Maximize;
 	m_window_mode_request = m_window_mode;
 
-	SetResolutionToMonitor();
-	CreateWindowHandle(window_name);
+	//SetResolutionToMonitor();
+	CreateWindowHandle(window_manager, window_name);
 	ApplyWindowMode();
 	CreateSwapChain(dx_context);
 
 	ComPtr<IDXGIFactory1> factory{};
 	m_swap_chain->GetParent(IID_PPV_ARGS(&factory)) >> CHK;
 	// Requires to GetParent factory to work
+	// Disable ALT ENTER to disable exclusive fullscreen
 	factory->MakeWindowAssociation(m_handle, DXGI_MWA_NO_ALT_ENTER) >> CHK;
 
 	const D3D12_DESCRIPTOR_HEAP_DESC rtvDescHeapDesc =
@@ -140,8 +154,8 @@ void DXWindow::Init(const DXContext& dx_context, const std::string& window_name)
 
 	m_rtv_handles.resize(GetBackBufferCount());
 	const D3D12_CPU_DESCRIPTOR_HANDLE firstHandle = m_rtv_desc_heap->GetCPUDescriptorHandleForHeapStart();
-	const uint32_t incrementSize = dx_context.GetDevice()->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-	for (uint32_t i = 0; i < GetBackBufferCount(); ++i)
+	const uint32 incrementSize = dx_context.GetDevice()->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+	for (uint32 i = 0; i < GetBackBufferCount(); ++i)
 	{
 		D3D12_CPU_DESCRIPTOR_HANDLE currentHandle{};
 		currentHandle.ptr = firstHandle.ptr + i * incrementSize;
@@ -248,7 +262,7 @@ void DXWindow::ToggleWindowMode()
 	m_window_mode_request = static_cast<WindowMode>((static_cast<int32>(m_window_mode_request) + 1) % (static_cast<int32>(WindowMode::Count)));
 }
 
-uint32_t DXWindow::GetBackBufferCount() const
+uint32 DXWindow::GetBackBufferCount() const
 {
 	return g_backbuffer_count;
 }
@@ -313,6 +327,18 @@ bool DXWindow::ShouldResize()
 	return m_should_resize;
 }
 
+static const DXGI_FORMAT dxgi_format_sdr = DXGI_FORMAT_R8G8B8A8_UNORM;
+static const DXGI_FORMAT dxgi_format_hdr = DXGI_FORMAT_R10G10B10A2_UNORM;
+DXGI_FORMAT GetBackBufferFormat(bool hdr)
+{
+	return hdr ? dxgi_format_hdr : dxgi_format_sdr;
+}
+
+DXGI_FORMAT DXWindow::GetFormat()
+{
+	return GetBackBufferFormat(m_hdr);
+}
+
 void DXWindow::SetResolutionToMonitor()
 {
 	POINT pt{};
@@ -326,16 +352,14 @@ void DXWindow::SetResolutionToMonitor()
 	// TODO fix 2 GPU captures, second doesnt open PIX
 }
 
-void DXWindow::CreateWindowHandle(const std::string& window_name)
+void DXWindow::CreateWindowHandle(const DXWindowManager& window_manager, const std::string& window_name)
 {
-	ASSERT(s_is_initialized);
-
 	RECT windowRect = { 0, 0, static_cast<long>(m_width), static_cast<long>(m_height)};
 	AdjustWindowRect(&windowRect, WS_OVERLAPPEDWINDOW, FALSE);
 
 	m_handle = CreateWindow
 	(
-		s_wnd_class_exw.lpszClassName,
+		window_manager.GetWindoClassExName(),
 		std::to_wstring(window_name).c_str(),
 		WS_OVERLAPPEDWINDOW, 
 		CW_USEDEFAULT,
@@ -356,7 +380,7 @@ void DXWindow::CreateSwapChain(const DXContext& dxContext)
 	{
 		.Width = m_width,
 		.Height = m_height,
-		.Format = DXGI_FORMAT_R8G8B8A8_UNORM,
+		.Format = GetFormat(),
 		.Stereo = false,
 		.SampleDesc =
 		{
@@ -389,7 +413,7 @@ void DXWindow::GetBuffers(const DXContext& dxContext)
 	m_buffers.resize(GetBackBufferCount());
 
 	const D3D12_CPU_DESCRIPTOR_HANDLE rtvDescStart = m_rtv_desc_heap->GetCPUDescriptorHandleForHeapStart();
-	for (uint32_t i = 0; i < GetBackBufferCount(); ++i)
+	for (uint32 i = 0; i < GetBackBufferCount(); ++i)
 	{
 		m_swap_chain->GetBuffer(i, IID_PPV_ARGS(&m_buffers[i])) >> CHK;
 		std::string str = "Backbuffer " + std::to_string(i);
@@ -398,7 +422,7 @@ void DXWindow::GetBuffers(const DXContext& dxContext)
 		const D3D12_RENDER_TARGET_VIEW_DESC rtvDesc =
 		{
 			// SDR Format
-			.Format = DXGI_FORMAT_R8G8B8A8_UNORM,
+			.Format = GetFormat(),
 			.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D,
 			.Texture2D =
 			{
@@ -412,7 +436,7 @@ void DXWindow::GetBuffers(const DXContext& dxContext)
 
 void DXWindow::ReleaseBuffers()
 {
-	for (uint32_t i = 0; i < GetBackBufferCount(); ++i)
+	for (uint32 i = 0; i < GetBackBufferCount(); ++i)
 	{
 		m_buffers[i] = nullptr;
 	}
