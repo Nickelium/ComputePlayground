@@ -72,10 +72,4 @@ enum class GRAPHICS_DEBUGGER_TYPE
 	NONE,
 };
 
-// TODO split out this application logic
-struct State
-{
-	bool m_capture;
-};
-
 #include "Logger.h"

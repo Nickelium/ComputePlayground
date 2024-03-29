@@ -1,6 +1,6 @@
 #pragma once
 #include "../core/Common.h"
-#include "DXC/inc/dxcapi.h" // DXC compiler TODO remove include
+#include "DXC/inc/dxcapi.h" // DXC compiler
 
 struct IDxcUtils;
 struct IDxcBlob;

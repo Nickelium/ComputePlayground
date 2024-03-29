@@ -4,6 +4,8 @@
 #include "DXWindowManager.h"
 #include "DXResource.h"
 
+
+
 LRESULT CALLBACK DXWindow::OnWindowMessage(HWND handle, UINT msg, WPARAM wParam, LPARAM lParam)
 {
 	// Get DXWindow Object
@@ -46,19 +48,10 @@ LRESULT CALLBACK DXWindow::OnWindowMessage(HWND handle, UINT msg, WPARAM wParam,
 	}
 	break;
 	case WM_KEYDOWN:
-		if (wParam == VK_ESCAPE)
-		{
-			pWindow->m_should_close = true;
-		}
-		else if (wParam == VK_F11)
-		{
-			// F11 also sends a WM_SIZE after
-			pWindow->ToggleWindowMode();
-		}
-		else if (wParam == VK_F1)
-		{
-			pWindow->m_state->m_capture = true;
-		}
+		pWindow->input.SetKeyPressed(static_cast<int32>(wParam), true);
+		return 0;
+	case WM_KEYUP:
+		pWindow->input.SetKeyPressed(static_cast<int32>(wParam), false);
 		return 0;
 	case WM_CLOSE:
 		pWindow->m_should_close = true;
@@ -70,8 +63,7 @@ LRESULT CALLBACK DXWindow::OnWindowMessage(HWND handle, UINT msg, WPARAM wParam,
 }
 
 
-DXWindow::DXWindow(const DXContext& dx_context, const DXWindowManager& window_manager, State* state, const WindowDesc& window_desc)
-	:m_state(state)
+DXWindow::DXWindow(const DXContext& dx_context, const DXWindowManager& window_manager, const WindowDesc& window_desc)
 {
 	Init(dx_context, window_manager, window_desc);
 }

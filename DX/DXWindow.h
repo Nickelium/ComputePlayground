@@ -24,6 +24,26 @@ struct WindowDesc
 enum D3D12_RESOURCE_STATES;
 class DXResource;
 
+class Input 
+{
+public:
+	bool IsKeyPressed(int32 key)
+	{
+		ASSERT(key < s_number_of_keys);
+		return m_is_key_pressed[key];
+	}
+
+	void SetKeyPressed(int32 key, bool is_pressed)
+	{
+		ASSERT(key < s_number_of_keys);
+		m_is_key_pressed[key] = is_pressed;
+	}
+private:
+	static const int32 s_number_of_keys = 255;
+	bool m_is_key_pressed[s_number_of_keys];
+
+};
+
 class DXWindow
 {
 public:
@@ -38,7 +58,7 @@ public:
 		Count
 	};
 
-	DXWindow(const DXContext& dx_context, const DXWindowManager& window_manager, State* state, const WindowDesc& window_desc);
+	DXWindow(const DXContext& dx_context, const DXWindowManager& window_manager, const WindowDesc& window_desc);
 	~DXWindow();
 	void Init
 	(
@@ -70,6 +90,12 @@ public:
 	uint32 GetHeight() const { return m_height; }
 
 	DXGI_FORMAT GetFormat() const;
+
+	// TODO separate input from window class
+	Input input;
+	// TODO dont make this public
+	bool m_should_close = false;
+
 private:
 	void ApplyWindowStyle();
 	void ApplyWindowMode();
@@ -82,7 +108,6 @@ private:
 
 	HWND m_handle;
 
-	bool m_should_close = false;
 	bool m_should_resize = false;
 
 	WindowMode m_window_mode;
@@ -105,7 +130,6 @@ private:
 
 	uint32 m_current_buffer_index = 0u;
 
-	State* m_state;
-
 	bool m_hdr;
+
 };

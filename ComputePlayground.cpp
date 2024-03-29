@@ -413,17 +413,16 @@ int main()
 
 	DXReportContext dx_report_context{};
 	{
-		State state{};
 		// TODO PIX / renderdoc markers
-		//GPUCapture* gpu_capture = new PIXCapture();
-		GPUCapture* gpu_capture = new RenderDocCapture();
+		GPUCapture* gpu_capture = new PIXCapture();
+		//GPUCapture* gpu_capture = new RenderDocCapture();
 		DXContext dx_context{};
 		dx_report_context.SetDevice(dx_context.GetDevice());
 		DXCompiler dx_compiler("shaders");
 		DXWindowManager window_manager;
 		{
-			uint32 width = 600;
-			uint32 height = 500;
+			uint32 width = 1500;
+			uint32 height = 800;
 			WindowDesc window_desc =
 			{
 				.m_window_name = { "Playground" },
@@ -432,7 +431,7 @@ int main()
 				.m_origin_x = (1920 >> 1) - (width >> 1),
 				.m_origin_y = (1080 >> 1) - (height >> 1),
 			};
-			DXWindow dx_window(dx_context, window_manager, &state, window_desc);
+			DXWindow dx_window(dx_context, window_manager, window_desc);
 			{
 				Resources resource{};
 				CreateComputeResources(dx_context, dx_compiler, resource);
@@ -445,8 +444,34 @@ int main()
 				{
 					// Process window message
 					dx_window.Update();
+					
+					// Key input handling of application
+					static bool prev_F1_pressed = false;
+					bool capture = false;
+					bool current_F1_pressed = dx_window.input.IsKeyPressed(VK_F1);
+					if (current_F1_pressed && prev_F1_pressed != current_F1_pressed)
+					{
+						capture = true;
+					}
+					prev_F1_pressed = current_F1_pressed;
 
-					if (state.m_capture)
+					if (dx_window.input.IsKeyPressed(VK_ESCAPE))
+					{
+						dx_window.m_should_close = true;
+					}
+
+					// TODO support release button essentially needed
+					static bool prev_F11_pressed = false;
+					bool current_F11_pressed = dx_window.input.IsKeyPressed(VK_F11);
+					if (current_F11_pressed && prev_F11_pressed != current_F11_pressed)
+					{
+						// F11 also sends a WM_SIZE after
+						dx_window.ToggleWindowMode();
+					}
+					prev_F11_pressed = current_F11_pressed;
+
+
+					if (capture)
 					{
 						gpu_capture->StartCapture();
 					}
@@ -478,11 +503,11 @@ int main()
 						}
 						resource.m_uav.m_read_back_resource->Unmap(0, nullptr);
 					}
-					if (state.m_capture)
+					if (capture)
 					{
 						gpu_capture->EndCapture();
 						gpu_capture->OpenCapture();
-						state.m_capture = !state.m_capture;
+						//state.m_capture = !state.m_capture;
 					}
 
 				}
