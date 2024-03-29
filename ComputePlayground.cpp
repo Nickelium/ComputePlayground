@@ -415,8 +415,8 @@ int main()
 	{
 		State state{};
 		// TODO PIX / renderdoc markers
-		const GRAPHICS_DEBUGGER_TYPE gd_type{ GRAPHICS_DEBUGGER_TYPE::NONE};
-		GPUCapture gpu_capture(gd_type);
+		//GPUCapture* gpu_capture = new PIXCapture();
+		GPUCapture* gpu_capture = new RenderDocCapture();
 		DXContext dx_context{};
 		dx_report_context.SetDevice(dx_context.GetDevice());
 		DXCompiler dx_compiler("shaders");
@@ -448,8 +448,7 @@ int main()
 
 					if (state.m_capture)
 					{
-						gpu_capture.PIXCaptureAndOpen();
-						gpu_capture.RenderdocCaptureStart();
+						gpu_capture->StartCapture();
 					}
 					// rendering
 					{
@@ -481,7 +480,8 @@ int main()
 					}
 					if (state.m_capture)
 					{
-						gpu_capture.RenderdocCaptureEnd();
+						gpu_capture->EndCapture();
+						gpu_capture->OpenCapture();
 						state.m_capture = !state.m_capture;
 					}
 
@@ -489,6 +489,7 @@ int main()
 				dx_context.Flush(dx_window.GetBackBufferCount());
 			}
 		}
+		delete gpu_capture;
 	}
 	
 	return 0;

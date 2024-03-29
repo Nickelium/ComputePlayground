@@ -1,29 +1,48 @@
 #pragma once
 #include "Common.h"
-#include "../DX/IDXDebugLayer.h"
 
-struct IDXGIDebug1;
-struct ID3D12Debug5;
-struct RENDERDOC_API_1_6_0;
-
-// TODO split out renderdoc and pix
 class GPUCapture
 {
 public:
-	GPUCapture(const GRAPHICS_DEBUGGER_TYPE gd_type);
-	~GPUCapture();
+	GPUCapture() {};
+	virtual ~GPUCapture() {}
 
-	void PIXCaptureAndOpen();
-	void RenderdocCaptureStart();
-	void RenderdocCaptureEnd();
+	virtual void StartCapture() = 0;
+	virtual void EndCapture() = 0;
+	virtual void OpenCapture() = 0;
+};
+
+class PIXCapture : public GPUCapture
+{
+public:
+	PIXCapture();
+	virtual ~PIXCapture();
+	virtual void StartCapture();
+	virtual void EndCapture();
+	virtual void OpenCapture();
 private:
 	void Init();
 	void Close();
 
 	HMODULE m_pix_module;
+	std::string m_pix_absolute_path;
+};
+
+struct RENDERDOC_API_1_6_0;
+
+class RenderDocCapture : public GPUCapture
+{
+public:
+	RenderDocCapture();
+	virtual ~RenderDocCapture();
+	virtual void StartCapture();
+	virtual void EndCapture();
+	virtual void OpenCapture();
+private:
+	void Init();
+	void Close();
 
 	HMODULE m_renderdoc_module;
 	RENDERDOC_API_1_6_0* m_renderdoc_api;
-
-	GRAPHICS_DEBUGGER_TYPE m_graphics_debugger_type;
+	std::string m_renderdoc_absolute_path;
 };

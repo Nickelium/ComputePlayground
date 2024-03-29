@@ -1,9 +1,111 @@
 #include "GPUCapture.h"
 #include "../DX/DXCommon.h"
+#include <filesystem>
 
+std::string GetNewestCaptureName(const std::string& capture_relative_path, const std::string& capture_template_name, const std::string& capture_extension)
+{
+	std::string identifier = "";
+	std::string capture_absolute_path =
+		capture_relative_path + capture_template_name + identifier + capture_extension;
+	// 2 to match renderdoc name capturing behaviour
+	uint32 index = 2;
+	while (std::filesystem::exists(capture_absolute_path))
+	{
+		identifier = "_" + std::to_string(index);
+		capture_absolute_path =
+			capture_relative_path + capture_template_name + identifier + capture_extension;
+		++index;
+	}
+	return capture_absolute_path;
+}
+
+#pragma region PIX
 #define USE_PIX
 #include <pix3.h>
 #include "renderdoc/inc/renderdoc_app.h"
+
+bool LoadPIX(HMODULE* pix_module_out)
+{
+	// Note: WinPixEventRuntime != WinPixGpuCapturer
+	// To GPU capture we need both
+	// To actually open the capture, the user need to install PIX themselves
+
+	HMODULE pix_module = 0;
+
+	TCHAR current_directory[MAX_PATH + 1] = { 0 };
+	const DWORD number_characters_written = ::GetCurrentDirectory(MAX_PATH, current_directory);
+	ASSERT(number_characters_written != 0 && "Failed current directory, call GetLastError");
+	std::string current_directory_string = std::to_string(current_directory);
+	const std::string pix_dll_name = "WinPixGpuCapturer.dll";
+	const std::string pix_dll_relative_path = "\\dependencies\\pix\\bin\\";
+	std::string pix_dll_absolute_path = current_directory_string;
+	pix_dll_absolute_path += pix_dll_relative_path;
+	pix_dll_absolute_path += pix_dll_name;
+
+	std::wstring pix_dll_absolute_path_wstring = std::to_wstring(pix_dll_absolute_path);
+	pix_module = LoadLibraryExW(pix_dll_absolute_path_wstring.c_str(), NULL, LOAD_LIBRARY_SEARCH_DEFAULT_DIRS);
+	ASSERT(pix_module && "Missing PIX dependencies");
+	*pix_module_out = pix_module;
+
+	return true;
+}
+
+PIXCapture::PIXCapture()
+	: m_pix_module(0u)
+{
+	Init();
+}
+
+PIXCapture::~PIXCapture()
+{
+	Close();
+}
+
+void PIXCapture::StartCapture()
+{
+	if (m_pix_module)
+	{
+		const std::string& pix_relative_path = ".\\captures\\";
+		const std::string& pix_template_name = "pix_capture";
+		const std::string& pix_extension = ".wpix";
+		m_pix_absolute_path = GetNewestCaptureName(pix_relative_path, pix_template_name, pix_extension);
+		const std::wstring& pix_absolute_path_wstring = std::to_wstring(m_pix_absolute_path);
+		PIXGpuCaptureNextFrames(pix_absolute_path_wstring.c_str(), 1) >> CHK;
+	}
+}
+
+void PIXCapture::EndCapture()
+{
+
+}
+
+void PIXCapture::OpenCapture()
+{
+	const std::wstring& pix_absolute_path_wstring = std::to_wstring(m_pix_absolute_path);
+	ShellExecute(0, 0, pix_absolute_path_wstring.c_str(), 0, 0, SW_SHOW);
+}
+
+void PIXCapture::Init()
+{
+	bool success = LoadPIX(&m_pix_module);
+	if (!success)
+	{
+		LogError("PIX not installed {}\n", GetLastError());
+	}
+}
+
+void PIXCapture::Close()
+{
+	if (m_pix_module)
+	{
+		const bool success = FreeLibrary(m_pix_module);
+		ASSERT(success);
+	}
+}
+#pragma endregion
+
+#pragma region RENDERDOC
+#include <regex>
 
 bool LoadRenderdoc(HMODULE* renderdoc_module_out, RENDERDOC_API_1_6_0** renderdoc_api_out)
 {
@@ -35,59 +137,6 @@ bool LoadRenderdoc(HMODULE* renderdoc_module_out, RENDERDOC_API_1_6_0** renderdo
 	return true;
 }
 
-bool LoadPIX(HMODULE* pix_module_out)
-{
-	// Note: WinPixEventRuntime != WinPixGpuCapturer
-	// To GPU capture we need both
-	// To actually open the capture, the user need to install PIX themselves
-
-	HMODULE pix_module = 0;
-
-	TCHAR current_directory[MAX_PATH + 1] = { 0 };
-	const DWORD number_characters_written = ::GetCurrentDirectory(MAX_PATH, current_directory);
-	ASSERT(number_characters_written != 0 && "Failed current directory, call GetLastError");
-	std::string current_directory_string = std::to_string(current_directory);
-	const std::string pix_dll_name = "WinPixGpuCapturer.dll";
-	const std::string pix_dll_relative_path = "\\dependencies\\pix\\bin\\";
-	std::string pix_dll_absolute_path = current_directory_string;
-	pix_dll_absolute_path += pix_dll_relative_path;
-	pix_dll_absolute_path += pix_dll_name;
-
-	std::wstring pix_dll_absolute_path_wstring = std::to_wstring(pix_dll_absolute_path);
-	pix_module = LoadLibraryExW(pix_dll_absolute_path_wstring.c_str(), NULL, LOAD_LIBRARY_SEARCH_DEFAULT_DIRS);
-	ASSERT(pix_module && "Missing PIX dependencies");
-	*pix_module_out = pix_module;
-
-	return true;
-}
-
-#include <filesystem>
-std::string GetNewestCaptureName(const std::string& capture_relative_path, const std::string& capture_template_name, const std::string& capture_extension)
-{
-	std::string identifier = "";
-	std::string capture_absolute_path =
-		capture_relative_path + capture_template_name + identifier + capture_extension;
-	// 2 to match renderdoc name capturing behaviour
-	uint32 index = 2;
-	while (std::filesystem::exists(capture_absolute_path))
-	{
-		identifier = "_" + std::to_string(index);
-		capture_absolute_path =
-			capture_relative_path + capture_template_name + identifier + capture_extension;
-		++index;
-	}
-	return capture_absolute_path;
-}
-
-void GPUCapture::RenderdocCaptureStart()
-{
-	if (m_renderdoc_api)
-	{
-		m_renderdoc_api->StartFrameCapture(nullptr, nullptr);
-	}
-}
-
-#include <regex>
 std::vector<std::string> GetAllFileNames(const std::string& path)
 {
 	std::vector<std::string> file_names;
@@ -120,11 +169,26 @@ std::vector<int32_t> GetRegexIndexOfFileNames(const std::vector<std::string>& fi
 	return index_array;
 }
 
-void GPUCapture::RenderdocCaptureEnd()
+RenderDocCapture::RenderDocCapture() : m_renderdoc_module(0u)
 {
-	if (!m_renderdoc_api)
-		return;
+	Init();
+}
 
+RenderDocCapture::~RenderDocCapture()
+{
+	Close();
+}
+
+void RenderDocCapture::StartCapture()
+{
+	if (m_renderdoc_api)
+	{
+		m_renderdoc_api->StartFrameCapture(nullptr, nullptr);
+	}
+}
+
+void RenderDocCapture::EndCapture()
+{
 	const std::string path = ".\\captures\\";
 	const std::vector<std::string> file_names = GetAllFileNames(path);
 	const std::string regex_string(R"(rdc_(\d+)_capture.*)");
@@ -145,65 +209,31 @@ void GPUCapture::RenderdocCaptureEnd()
 	const std::string& renderdoc_relative_path = ".\\captures\\";
 	const std::string& renderdoc_template_name = name_template + "_capture";
 	const std::string& renderdoc_extension = ".rdc";
-	const std::string& renderdoc_absolute_path = GetNewestCaptureName(renderdoc_relative_path, renderdoc_template_name, renderdoc_extension);
+	m_renderdoc_absolute_path = GetNewestCaptureName(renderdoc_relative_path, renderdoc_template_name, renderdoc_extension);
 
-	m_renderdoc_api->EndFrameCapture(nullptr, nullptr);
-	//  scope out these function calls
-	const std::wstring& renderdoc_absolute_path_wstring = std::to_wstring(renderdoc_absolute_path);
+	if (m_renderdoc_api)
+	{
+		m_renderdoc_api->EndFrameCapture(nullptr, nullptr);
+	}
+}
+
+void RenderDocCapture::OpenCapture()
+{
+	const std::wstring& renderdoc_absolute_path_wstring = std::to_wstring(m_renderdoc_absolute_path);
 	ShellExecute(0, 0, renderdoc_absolute_path_wstring.c_str(), 0, 0, SW_SHOW);
 }
 
-GPUCapture::GPUCapture(const GRAPHICS_DEBUGGER_TYPE type) :
-	m_pix_module(0u),
-	m_renderdoc_module(0u),
-	m_renderdoc_api(nullptr),
-	m_graphics_debugger_type(type)
+void RenderDocCapture::Init()
 {
-	Init();
-}
-
-GPUCapture::~GPUCapture()
-{
-	Close();
-}
-
-void GPUCapture::Init()
-{
-	_set_error_mode(_OUT_TO_STDERR);
-	switch (m_graphics_debugger_type)
+	bool success = LoadRenderdoc(&m_renderdoc_module, &m_renderdoc_api);
+	if (!success)
 	{
-	case GRAPHICS_DEBUGGER_TYPE::PIX:
-	{
-		bool success = LoadPIX(&m_pix_module);
-		if (!success)
-		{
-			LogError("PIX not installed {}\n", GetLastError());
-		}
-		break;
-	}
-	case GRAPHICS_DEBUGGER_TYPE::RENDERDOC:
-	{
-		const bool success = LoadRenderdoc(&m_renderdoc_module, &m_renderdoc_api);
-		if (!success)
-		{
-			LogError("RenderDoc not installed {}\n", GetLastError());
-		}
-		break;
-	}
-	default:
-	{
-		break;
-	}
+		LogError("RenderDoc not installed {}\n", GetLastError());
 	}
 }
 
-void GPUCapture::Close()
+void RenderDocCapture::Close()
 {
-	if (m_pix_module)
-	{
-		const bool success = FreeLibrary(m_pix_module);
-		ASSERT(success);
-	}
 	if (m_renderdoc_module)
 	{
 		const bool success = FreeLibrary(m_renderdoc_module);
@@ -211,18 +241,4 @@ void GPUCapture::Close()
 	}
 }
 
-void GPUCapture::PIXCaptureAndOpen()
-{
-#if defined(_DEBUG)
-	if (m_pix_module)
-	{
-		const std::string& pix_relative_path = ".\\captures\\";
-		const std::string& pix_template_name = "pix_capture";
-		const std::string& pix_extension = ".wpix";
-		const std::string& pix_absolute_path = GetNewestCaptureName(pix_relative_path, pix_template_name, pix_extension);
-		const std::wstring& pix_absolute_path_wstring = std::to_wstring(pix_absolute_path);
-		PIXGpuCaptureNextFrames(pix_absolute_path_wstring.c_str(), 1) >> CHK;
-		ShellExecute(0, 0, pix_absolute_path_wstring.c_str(), 0, 0, SW_SHOW);
-	}
-#endif
-}
+#pragma endregion
