@@ -454,7 +454,7 @@ int main()
 						capture = true;
 					}
 					prev_F1_pressed = current_F1_pressed;
-
+					
 					if (dx_window.input.IsKeyPressed(VK_ESCAPE))
 					{
 						dx_window.m_should_close = true;

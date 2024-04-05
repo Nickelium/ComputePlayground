@@ -4,10 +4,11 @@
 #include "DXWindowManager.h"
 #include "DXResource.h"
 
-
-
+// Global across all windows
 LRESULT CALLBACK DXWindow::OnWindowMessage(HWND handle, UINT msg, WPARAM wParam, LPARAM lParam)
 {
+	// TODO pass callback instead because each window might do different things
+
 	// Get DXWindow Object
 	DXWindow* pWindow{};
 	// First message send
