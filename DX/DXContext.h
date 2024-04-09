@@ -82,8 +82,8 @@ private:
 
 	ComPtr<IDXGIFactory7> m_factory;
 	ComPtr<IDXGIAdapter4> m_adapter; // GPU
-	ComPtr<IDXGIOutput6> m_output; // Monitor
 	ComPtr<ID3D12Device9> m_device;
+	bool m_use_warp;
 
 	// Graphics + Compute + Copy
 	ComPtr<ID3D12CommandQueue> m_queue_graphics;

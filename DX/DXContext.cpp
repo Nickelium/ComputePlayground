@@ -10,7 +10,8 @@
 
 DXContext::DXContext() :
 	m_fence_cpu(0u), 
-	m_fence_event(0)
+	m_fence_event(0),
+	m_use_warp(false)
 #if defined(_DEBUG)
 	,
 	m_callback_handle(0)
@@ -101,6 +102,11 @@ void DXContext::Init()
 	DXGI_ADAPTER_DESC1 adapter_desc{};
 	m_adapter->GetDesc1(&adapter_desc) >> CHK;
 
+	if (m_use_warp)
+	{
+		m_factory->EnumWarpAdapter(IID_PPV_ARGS(&m_adapter)) >> CHK;
+	}
+
 	// node_index 0 because single GPU
 	const uint32 node_index{0};
 	// Local means non-system main memory, non CPU RAM, aka VRAM
@@ -108,12 +114,6 @@ void DXContext::Init()
 	DXGI_QUERY_VIDEO_MEMORY_INFO video_memory_info{};
 	m_adapter->QueryVideoMemoryInfo(node_index, memory_segment_group, &video_memory_info) >> CHK;
 	//video_memory_info.Budget >> 30;
-
-	ComPtr<IDXGIOutput> output{};
-	m_adapter->EnumOutputs(0, output.GetAddressOf()) >> CHK;
-	output->QueryInterface(IID_PPV_ARGS(&m_output)) >> CHK;
-	DXGI_OUTPUT_DESC1 output_desc{};
-	m_output->GetDesc1(&output_desc);
 
 	D3D_FEATURE_LEVEL max_feature_level = GetMaxFeatureLevel(m_adapter);
 	D3D12CreateDevice(m_adapter.Get(), max_feature_level, IID_PPV_ARGS(&m_device)) >> CHK;
@@ -168,7 +168,6 @@ void DXContext::Init()
 
 	NAME_DXGI_OBJECT(m_factory, "Factory");
 	NAME_DXGI_OBJECT(m_adapter, "Adapter");
-	NAME_DXGI_OBJECT(m_output, "Output");
 
 	NAME_DX_OBJECT(m_device, "Device");
 	NAME_DX_OBJECT(m_queue_graphics, "Queue graphics");
