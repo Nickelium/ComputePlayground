@@ -11,7 +11,7 @@
 DXContext::DXContext() :
 	m_fence_cpu(0u), 
 	m_fence_event(0),
-	m_use_warp(false)
+	m_use_warp(true)
 #if defined(_DEBUG)
 	,
 	m_callback_handle(0)

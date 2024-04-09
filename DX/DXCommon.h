@@ -5,7 +5,7 @@
 #include <dxgi1_6.h> // DXGI
 
 // Agility SDK needs to be included in main.cpp
-#define AGILITY_SDK_DECLARE() extern "C" { __declspec(dllexport) extern const UINT D3D12SDKVersion = 611; } \
+#define AGILITY_SDK_DECLARE() extern "C" { __declspec(dllexport) extern const UINT D3D12SDKVersion = 613; } \
 extern "C" { __declspec(dllexport) extern const char* D3D12SDKPath = ".\\D3D12\\"; }
 
 static const uint32 g_backbuffer_count = 3u;

@@ -289,18 +289,18 @@ D3D12_RAYTRACING_TIER GetRaytracingTier(ComPtr<ID3D12Device> device)
 	return options.RaytracingTier;
 }
 
-uint64 GetWaveLaneCountMin(ComPtr<ID3D12Device> device)
+uint64 GetWaveLaneCount(ComPtr<ID3D12Device> device)
 {
-	D3D12_FEATURE_DATA_D3D12_OPTIONS1  options{};
+	D3D12_FEATURE_DATA_D3D12_OPTIONS1 options{};
 	device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS1, &options, sizeof(options)) >> CHK;
 	return options.WaveLaneCountMin;
 }
 
-uint64 GetWaveLaneCountMax(ComPtr<ID3D12Device> device)
+bool GetWorkGraphSupport(ComPtr<ID3D12Device> device)
 {
-	D3D12_FEATURE_DATA_D3D12_OPTIONS1  options{};
-	device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS1, &options, sizeof(options)) >> CHK;
-	return options.WaveLaneCountMax;
+	D3D12_FEATURE_DATA_D3D12_OPTIONS21 options{};
+	device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS21, &options, sizeof(options)) >> CHK;
+	return options.WorkGraphsTier != D3D12_WORK_GRAPHS_TIER_NOT_SUPPORTED;
 }
 
 D3D12_VARIABLE_SHADING_RATE_TIER GetVariableShadingRateTier(ComPtr<ID3D12Device> device)
@@ -345,8 +345,8 @@ std::string DumpDX12Capabilities(ComPtr<ID3D12Device> device)
 	pair_data.push_back({ "MeshShaderTier", std::format("{0}", (uint32)GetMeshShaderTier(device)) });
 	pair_data.push_back({ "SamplerFeedbackTier", std::format("{0}", (uint32)GetSamplerFeedbackTier(device)) });
 	pair_data.push_back({ "EnhancedBarrier", std::format("{0}", GetEnhancedBarrierSupported(device)) });
-	pair_data.push_back({ "WaveLaneCountMin", std::format("{0}", GetWaveLaneCountMin(device)) });
-	pair_data.push_back({ "WaveLaneCountMax", std::format("{0}", GetWaveLaneCountMax(device)) });
+	pair_data.push_back({ "WaveLaneCount", std::format("{0}", GetWaveLaneCount(device)) });
+	pair_data.push_back({ "WorkGraph", std::format("{0}", GetWorkGraphSupport(device)) });
 
 	std::string ret{};
 	for (auto& P : pair_data)
