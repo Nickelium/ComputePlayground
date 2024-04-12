@@ -1,5 +1,4 @@
 #include "DXCompiler.h"
-#include "DXC/inc/dxcapi.h" // DXC compiler
 #include "DXContext.h"
 #include "DXQuery.h"
 
@@ -52,7 +51,9 @@ void DXCompiler::Compile(ComPtr<ID3D12Device> device, ComPtr<IDxcBlob>* outShade
 	compile_arguments.push_back("-T"); // Target profile 
 	std::string shader_type_model_string = GetShaderTypeString(shaderType);
 
+	// Technically this needs to be supported by the DXC and not the device
 	const D3D_SHADER_MODEL shader_model = GetMaxShaderModel(device);
+
 	const std::string& shader_model_string = GetShaderModelString(shader_model);
 	shader_type_model_string += "_" + shader_model_string;
 

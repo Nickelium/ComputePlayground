@@ -39,8 +39,6 @@ void CreateComputeResources(const DXContext& dx_context, const DXCompiler& dx_co
 	resource.m_dispatch_count = 1;
 
 	dx_compiler.Compile(dx_context.GetDevice(), &resource.m_compute_shader, "ComputeShader.hlsl", ShaderType::COMPUTE_SHADER);
-	dx_compiler.Compile(dx_context.GetDevice(), &resource.m_vertex_shader, "VertexShader.hlsl", ShaderType::VERTEX_SHADER);
-	dx_compiler.Compile(dx_context.GetDevice(), &resource.m_pixel_shader, "PixelShader.hlsl", ShaderType::PIXEL_SHADER);
 
 	resource.m_uav.m_desc.Width = resource.m_group_size * resource.m_dispatch_count * sizeof(float32) * 4;
 	resource.m_uav.m_readback_desc.Width = resource.m_uav.m_desc.Width;
@@ -74,6 +72,9 @@ void CreateGraphicsResources
 	uint32& vertex_count
 )
 {
+	dx_compiler.Compile(dx_context.GetDevice(), &resource.m_vertex_shader, "VertexShader.hlsl", ShaderType::VERTEX_SHADER);
+	dx_compiler.Compile(dx_context.GetDevice(), &resource.m_pixel_shader, "PixelShader.hlsl", ShaderType::PIXEL_SHADER);
+
 	D3D12_DESCRIPTOR_HEAP_DESC desc_heap_desc =
 	{
 		.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,
