@@ -155,7 +155,7 @@ void DXWindow::Init
 	m_swap_chain->GetParent(IID_PPV_ARGS(&factory)) >> CHK;
 	// Requires to GetParent factory to work
 
-	// Disable ALT ENTER to disable exclusive fullscreen
+	// Disable ALT ENTER to disable exclusive fullscreen, we handle switching ourselves
 	factory->MakeWindowAssociation(m_handle, DXGI_MWA_NO_ALT_ENTER) >> CHK;
 
 	const D3D12_DESCRIPTOR_HEAP_DESC rtvDescHeapDesc =
@@ -449,7 +449,7 @@ void DXWindow::CreateSwapChain(const DXContext& dxContext)
 		.Width = GetWidth(),
 		.Height = GetHeight(),
 		.Format = GetFormat(),
-		.Stereo = false,
+		.Stereo = false, // No VR rendering
 		.SampleDesc =
 		{
 			.Count = 1,
@@ -461,7 +461,7 @@ void DXWindow::CreateSwapChain(const DXContext& dxContext)
 		// FLIP_DISCARD (can discard backbuffer after present) or FLIP_SEQ (keeps backbuffer alive after present) in DX12
 		.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD,
 		.AlphaMode = DXGI_ALPHA_MODE_IGNORE,
-		.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH | DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING,
+		.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING,
 	};
 	Microsoft::WRL::ComPtr<IDXGISwapChain1> swapChain{};
 	Microsoft::WRL::ComPtr<IDXGIFactory5> factory3{};

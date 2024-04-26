@@ -121,27 +121,70 @@ void DXContext::Init()
 	D3D_FEATURE_LEVEL max_feature_level = GetMaxFeatureLevel(m_adapter);
 	D3D12CreateDevice(m_adapter.Get(), max_feature_level, IID_PPV_ARGS(&m_device)) >> CHK;
 
-	const D3D12_COMMAND_QUEUE_DESC graphics_queue_desc =
+#if defined(_DEBUG)
 	{
-		.Type = D3D12_COMMAND_LIST_TYPE_DIRECT,
-		.Priority = D3D12_COMMAND_QUEUE_PRIORITY_HIGH,
-		.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE,
-	};
-	m_device->CreateCommandQueue(&graphics_queue_desc, IID_PPV_ARGS(&m_queue_graphics)) >> CHK;
-	const D3D12_COMMAND_QUEUE_DESC compute_queue_desc =
+		Microsoft::WRL::ComPtr<ID3D12InfoQueue1> info_queue{};
+		HRESULT result = m_device.As(&info_queue);
+		// Query fails if debug layer disabled
+		if (result == S_OK)
+		{
+			info_queue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_CORRUPTION, true) >> CHK;
+			info_queue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_WARNING, true) >> CHK;
+			info_queue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, true) >> CHK;
+			info_queue->RegisterMessageCallback(CallbackD3D12, D3D12_MESSAGE_CALLBACK_FLAG_NONE, nullptr, &m_callback_handle) >> CHK;
+		
+			// D3D12_MESSAGE_CATEGORY allow_category_list[] = {};
+			// D3D12_MESSAGE_SEVERITY allow_severity_list[] = {};
+			// D3D12_MESSAGE_ID allow_id_list[] = {};
+
+			// D3D12_MESSAGE_CATEGORY deny_category_list[] = {};
+			D3D12_MESSAGE_SEVERITY deny_severity_list[] = 
+			{
+				D3D12_MESSAGE_SEVERITY_INFO, 
+				//D3D12_MESSAGE_SEVERITY_MESSAGE 
+			};
+			// D3D12_MESSAGE_ID deny_id_list[] = {};
+
+			D3D12_INFO_QUEUE_FILTER filter{};
+			filter.AllowList =
+			{
+				.NumCategories = 0,
+				.pCategoryList = nullptr,
+				.NumSeverities = 0,
+				.pSeverityList = nullptr,
+				.NumIDs = 0,
+				.pIDList = nullptr,
+			};
+			filter.DenyList =
+			{
+				.NumCategories = 0,
+				.pCategoryList = nullptr,
+				.NumSeverities = COUNT(deny_severity_list),
+				.pSeverityList = deny_severity_list,
+				.NumIDs = 0,
+				.pIDList = nullptr,
+			};
+			info_queue->PushStorageFilter(&filter) >> CHK;
+		}
+	}
+#endif
+
+
+	auto CreateCommandQueue = [](Microsoft::WRL::ComPtr<ID3D12Device> device, D3D12_COMMAND_LIST_TYPE command_queue_type, Microsoft::WRL::ComPtr<ID3D12CommandQueue>& out_command_queue)
 	{
-		.Type = D3D12_COMMAND_LIST_TYPE_COMPUTE,
-		.Priority = D3D12_COMMAND_QUEUE_PRIORITY_HIGH,
-		.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE,
+		const D3D12_COMMAND_QUEUE_DESC queue_desc =
+		{
+			.Type = command_queue_type,
+			.Priority = D3D12_COMMAND_QUEUE_PRIORITY_HIGH,
+			.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE,
+			.NodeMask = 0,
+		};
+		device->CreateCommandQueue(&queue_desc, IID_PPV_ARGS(&out_command_queue)) >> CHK;
 	};
-	m_device->CreateCommandQueue(&compute_queue_desc, IID_PPV_ARGS(&m_queue_compute)) >> CHK;
-	const D3D12_COMMAND_QUEUE_DESC copy_queue_desc =
-	{
-		.Type = D3D12_COMMAND_LIST_TYPE_COPY,
-		.Priority = D3D12_COMMAND_QUEUE_PRIORITY_HIGH,
-		.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE,
-	};
-	m_device->CreateCommandQueue(&copy_queue_desc, IID_PPV_ARGS(&m_queue_copy)) >> CHK;
+
+	CreateCommandQueue(m_device, D3D12_COMMAND_LIST_TYPE_DIRECT, m_queue_graphics);
+	CreateCommandQueue(m_device, D3D12_COMMAND_LIST_TYPE_COMPUTE, m_queue_compute);
+	CreateCommandQueue(m_device, D3D12_COMMAND_LIST_TYPE_COPY, m_queue_copy);
 
 	m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_command_allocator_graphics)) >> CHK;
 	m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_command_allocator_graphics.Get(), nullptr, IID_PPV_ARGS(&m_command_list_graphics)) >> CHK;
@@ -192,17 +235,6 @@ void DXContext::Init()
 	m_is_copy_command_list_open = false;
 
 #if defined(_DEBUG)
-	Microsoft::WRL::ComPtr<ID3D12InfoQueue1> info_queue{};
-	HRESULT result = m_device.As(&info_queue);
-	// Query fails if debug layer disabled
-	if (result == S_OK)
-	{
-		info_queue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_CORRUPTION, true) >> CHK;
-		info_queue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_WARNING, true) >> CHK;
-		info_queue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, true) >> CHK;
-		info_queue->RegisterMessageCallback(CallbackD3D12, D3D12_MESSAGE_CALLBACK_FLAG_NONE, nullptr, &m_callback_handle) >> CHK;
-	}
-
 	LogTrace(DumpDX12Capabilities(m_device));
 #endif
 }
