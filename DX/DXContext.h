@@ -83,6 +83,13 @@ struct CommandList
 	bool m_is_open = false;
 };
 
+struct Fence
+{
+	Microsoft::WRL::ComPtr<ID3D12Fence> m_gpu;
+	uint64 m_cpu;
+	HANDLE m_event;
+};
+
 class DXContext
 {
 public:
@@ -145,6 +152,12 @@ public:
 		CommandList& out_command_list
 	);
 
+	void CreateFence(Fence& out_fence);
+
+	void Signal(const CommandQueue& command_queue, Fence& fence);
+	void Wait(const Fence& fence);
+
+
 private:
 	void Init();
 
@@ -169,9 +182,8 @@ private:
 	CommandList m_command_list_copy;
 	CommandAllocator m_command_allocator_copy;
 
-	Microsoft::WRL::ComPtr<ID3D12Fence> m_fence_gpu;
-	uint64_t m_fence_cpu;
-	HANDLE m_fence_event;
+	Fence m_fence;
+	Fence m_device_removed_fence;
 
 #if defined(_DEBUG)
 	DWORD m_callback_handle;

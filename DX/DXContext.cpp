@@ -9,8 +9,6 @@
 #endif
 
 DXContext::DXContext() :
-	m_fence_cpu(0u), 
-	m_fence_event(0),
 	m_use_warp(true)
 #if defined(_DEBUG)
 	,
@@ -64,11 +62,11 @@ namespace
 
 void OnDeviceRemoved(PVOID context, BOOLEAN)
 {
-	ID3D12Device* removedDevice = (ID3D12Device*)context;
-	HRESULT removedReason = removedDevice->GetDeviceRemovedReason();
-	std::string removed_reason_string = RemapHResult(removedReason);
-	// Perform app-specific device removed operation, such as logging or inspecting DRED output
-	ASSERT(removedReason == S_OK);
+	ID3D12Device* removed_device = static_cast<ID3D12Device*>(context);
+	HRESULT removed_reason = removed_device->GetDeviceRemovedReason();
+	std::string removed_reason_string = RemapHResult(removed_reason );
+	ASSERT(removed_reason == S_OK);
+	LogTrace(removed_reason_string);
 }
 
 void DXContext::Init()
@@ -183,23 +181,25 @@ void DXContext::Init()
 
 	CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_COPY, m_command_allocator_copy);
 	CreateCommandList(D3D12_COMMAND_LIST_TYPE_COPY, m_command_allocator_copy, m_command_list_copy);
+	
+	CreateFence(m_fence);
 
-	m_device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_fence_gpu)) >> CHK;
-	m_fence_event = CreateEvent(nullptr, FALSE, FALSE, nullptr);
+	CreateFence(m_device_removed_fence);
+	// On device removal all fences will be set to uint64_max
+	m_device_removed_fence.m_gpu->SetEventOnCompletion(UINT64_MAX, m_device_removed_fence.m_event);
 
-	HANDLE deviceRemovedEvent = CreateEventW(NULL, FALSE, FALSE, NULL);
-	ASSERT(deviceRemovedEvent != NULL);
-	m_fence_gpu->SetEventOnCompletion(UINT64_MAX, deviceRemovedEvent);
-
-	HANDLE waitHandle;
-	RegisterWaitForSingleObject(
-		&waitHandle,
-		deviceRemovedEvent,
+	// Callback on event triggered
+	// None blocking operation from this thread
+	HANDLE wait_handle{};
+	bool result = RegisterWaitForSingleObject(
+		&wait_handle,
+		m_device_removed_fence.m_event,
 		OnDeviceRemoved,
 		m_device.Get(), // Pass the device as our context
 		INFINITE, // No timeout
 		0 // No flags
 	);
+	ASSERT(result);
 
 	NAME_DXGI_OBJECT(m_factory, "Factory");
 	NAME_DXGI_OBJECT(m_adapter, "Adapter");
@@ -214,7 +214,8 @@ void DXContext::Init()
 	NAME_DX_OBJECT(m_queue_copy.m_queue, "Command allocator copy");
 	NAME_DX_OBJECT(m_command_allocator_copy.m_allocator, "Command allocator copy");
 	NAME_DX_OBJECT(m_command_list_copy.m_list, "Command list copy");
-	NAME_DX_OBJECT(m_fence_gpu, "FenceGPU");
+	NAME_DX_OBJECT(m_fence.m_gpu, "Fence");
+	NAME_DX_OBJECT(m_device_removed_fence.m_gpu, "Device removed fence");
 
 #if defined(_DEBUG)
 	LogTrace(DumpDX12Capabilities(m_device));
@@ -272,14 +273,25 @@ void DXContext::ExecuteCommandListCopy()
 	SignalAndWait();
 }
 
-void DXContext::SignalAndWait()
+void DXContext::Signal(const CommandQueue& command_queue, Fence& fence)
 {
-	++m_fence_cpu;
-	m_queue_graphics.m_queue->Signal(m_fence_gpu.Get(), m_fence_cpu) >> CHK;
-	m_fence_gpu->SetEventOnCompletion(m_fence_cpu, m_fence_event) >> CHK;
-	WaitForSingleObject(m_fence_event, INFINITE);
+	++fence.m_cpu;
+	command_queue.m_queue->Signal(fence.m_gpu.Get(), fence.m_cpu) >> CHK;
 }
 
+void DXContext::Wait(const Fence& fence)
+{
+	fence.m_gpu->SetEventOnCompletion(fence.m_cpu, fence.m_event) >> CHK;
+	WaitForSingleObject(fence.m_event, INFINITE);
+}
+
+void DXContext::SignalAndWait()
+{
+	Signal(m_queue_graphics, m_fence);
+	Wait(m_fence);
+}
+
+// Wait all GPU operations completed
 void DXContext::Flush(uint32 flush_count)
 {
 	for (uint32 i = 0; i < flush_count; ++i)
@@ -442,6 +454,13 @@ void DXContext::CreateCommandList
 	out_command_list.m_is_open = false;
 }
 
+void DXContext::CreateFence(Fence& out_fence)
+{
+	out_fence.m_cpu = 0u;
+	m_device->CreateFence(out_fence.m_cpu /* Initial fence value */, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&out_fence.m_gpu)) >> CHK;
+	out_fence.m_event = CreateEvent(nullptr, false, false, nullptr);
+	ASSERT(out_fence.m_event != nullptr);
+}
 DXReportContext::~DXReportContext()
 {
 	ReportLDO();

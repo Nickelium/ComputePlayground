@@ -166,7 +166,7 @@ void DXWindow::Init
 		m_rtv_handles[i] = dx_context.GetDescriptorHandle(m_rtv_desc_heap, i);
 	}
 	
-	GetBuffers(dx_context);
+	GetBuffers();
 
 	for (uint32 i = 0; i < m_buffers.size(); ++i)
 	{
@@ -235,7 +235,7 @@ void DXWindow::Update()
 	}
 }
 
-void DXWindow::Resize(const DXContext& dxContext)
+void DXWindow::Resize()
 {
 	RECT rt{};
 	if (GetClientRect(m_handle, &rt))
@@ -249,7 +249,7 @@ void DXWindow::Resize(const DXContext& dxContext)
 		m_swap_chain->ResizeBuffers(GetBackBufferCount(), GetWidth(), GetHeight(), desc.Format, desc.Flags) >> CHK;
 		m_should_resize = false;
 
-		GetBuffers(dxContext);
+		GetBuffers();
 	}
 }
 
@@ -470,7 +470,7 @@ void DXWindow::CreateSwapChain(const DXContext& dxContext)
 	NAME_DXGI_OBJECT(m_swap_chain, "SwapChain");
 }
 
-void DXWindow::GetBuffers(const DXContext& dxContext)
+void DXWindow::GetBuffers()
 {
 	// Get backbuffer resources
 	m_buffers.resize(GetBackBufferCount());

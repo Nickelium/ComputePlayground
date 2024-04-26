@@ -102,7 +102,7 @@ public:
 
 	void Update();
 
-	void Resize(const DXContext& dx_context);
+	void Resize();
 
 	void SetWindowModeRequest(WindowMode window_mode);
 	WindowMode GetWindowModeRequest() const;
@@ -135,7 +135,7 @@ private:
 	void CreateWindowHandle(const DXWindowManager& window_manager, const std::string& window_name);
 	void CreateSwapChain(const DXContext& dx_context);
 
-	void GetBuffers(const DXContext& dx_context);
+	void GetBuffers();
 
 	void ReleaseBuffers();
 

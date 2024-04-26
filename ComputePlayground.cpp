@@ -489,7 +489,7 @@ int main()
 						if (dx_window.ShouldResize())
 						{
 							dx_context.Flush(dx_window.GetBackBufferCount());
-							dx_window.Resize(dx_context);
+							dx_window.Resize();
 						}
 
 						dx_context.InitCommandLists();
