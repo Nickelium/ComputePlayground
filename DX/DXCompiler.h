@@ -20,14 +20,14 @@ class DXCompiler
 {
 public:
 	DXCompiler(const std::string& directory);
-	void Compile(ComPtr<ID3D12Device> device, ComPtr<IDxcBlob>* out_shader_blob, const std::string& shader_path, const ShaderType shader_type) const;
+	void Compile(Microsoft::WRL::ComPtr<ID3D12Device> device, Microsoft::WRL::ComPtr<IDxcBlob>* out_shader_blob, const std::string& shader_path, const ShaderType shader_type) const;
 private:
 	void Init(const std::string& directory);
 	
 	bool m_debug;
 	std::string m_directory;
 
-	ComPtr<IDxcUtils> m_utils;
-	ComPtr<IDxcCompiler3> m_compiler;
-	ComPtr<IDxcIncludeHandler> m_include_handler;
+	Microsoft::WRL::ComPtr<IDxcUtils> m_utils;
+	Microsoft::WRL::ComPtr<IDxcCompiler3> m_compiler;
+	Microsoft::WRL::ComPtr<IDxcIncludeHandler> m_include_handler;
 };

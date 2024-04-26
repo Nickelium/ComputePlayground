@@ -20,17 +20,17 @@ struct Resources
 {
 	// Compute
 	UAV m_uav;
-	ComPtr<IDxcBlob> m_compute_shader;
-	ComPtr<ID3D12PipelineState> m_compute_pso;
-	ComPtr<ID3D12RootSignature> m_compute_root_signature;
+	Microsoft::WRL::ComPtr<IDxcBlob> m_compute_shader;
+	Microsoft::WRL::ComPtr<ID3D12PipelineState> m_compute_pso;
+	Microsoft::WRL::ComPtr<ID3D12RootSignature> m_compute_root_signature;
 	uint32 m_group_size;
 	uint32 m_dispatch_count;
 
 	// Graphics
-	ComPtr<IDxcBlob> m_vertex_shader;
-	ComPtr<IDxcBlob> m_pixel_shader;
-	ComPtr<ID3D12PipelineState> m_gfx_pso;
-	ComPtr<ID3D12RootSignature> m_gfx_root_signature;
+	Microsoft::WRL::ComPtr<IDxcBlob> m_vertex_shader;
+	Microsoft::WRL::ComPtr<IDxcBlob> m_pixel_shader;
+	Microsoft::WRL::ComPtr<ID3D12PipelineState> m_gfx_pso;
+	Microsoft::WRL::ComPtr<ID3D12RootSignature> m_gfx_root_signature;
 };
 
 void CreateComputeResources(const DXContext& dx_context, const DXCompiler& dx_compiler, Resources& resource)
@@ -407,10 +407,13 @@ void FillCommandList
 	GraphicsWork(dx_context, dx_window, resource, vertex_buffer_view, vertex_count);
 	dx_window.EndFrame(dx_context);
 }
-
+void RunTest();
 int main()
 {
-	MemoryTrackStart();
+	MemoryTrack();
+
+	//RunTest();
+	//return 0;
 
 	DXReportContext dx_report_context{};
 	{
@@ -467,7 +470,11 @@ int main()
 					if (current_F11_pressed && prev_F11_pressed != current_F11_pressed)
 					{
 						// F11 also sends a WM_SIZE after
-						dx_window.ToggleWindowMode();
+						WindowMode current_window_mode = dx_window.GetWindowModeRequest();
+						WindowMode next_window_mode = static_cast<WindowMode>((static_cast<int32>(current_window_mode) + 1) % (static_cast<int32>(WindowMode::Count)));
+
+						dx_window.SetWindowModeRequest(next_window_mode);
+						//dx_window.ToggleWindowMode();
 					}
 					prev_F11_pressed = current_F11_pressed;
 
@@ -519,4 +526,36 @@ int main()
 	}
 	
 	return 0;
+}
+
+
+class Application
+{
+public:
+	void Init();
+	void Close();
+	void Run();
+private:
+};
+
+LRESULT testCallback(HWND handle, UINT msg, WPARAM wParam, LPARAM lParam)
+{
+	return DefWindowProc(handle, msg, wParam, lParam);
+}
+void RunTest()
+{
+	WindowDesc window_desc
+	{
+		.m_callback = testCallback,
+		.m_window_name = "TEST",
+		.m_width = 500,
+		.m_height = 500,
+		.m_origin_x = 200,
+		.m_origin_y = 200,
+	};
+	CreateWindowNew(window_desc);
+	while (true)
+	{
+		;
+	}
 }

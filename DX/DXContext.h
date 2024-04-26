@@ -25,18 +25,18 @@ public:
 	~DXReportContext();
 
 	// Keeps device alive to report then free
-	void SetDevice(ComPtr<ID3D12Device> device);
+	void SetDevice(Microsoft::WRL::ComPtr<ID3D12Device> device);
 private:
 	// ReportLiveDeviceObjects, ref count 1 is normal since debug_device is the last one
 	void ReportLDO() const;
-	ComPtr<ID3D12DebugDevice2> m_debug_device;
+	Microsoft::WRL::ComPtr<ID3D12DebugDevice2> m_debug_device;
 };
 
 // Structure for a single thread to submit
 class DXCommand
 {
 public:
-	DXCommand(ComPtr<ID3D12Device> device, const D3D12_COMMAND_LIST_TYPE& command_type);
+	DXCommand(Microsoft::WRL::ComPtr<ID3D12Device> device, const D3D12_COMMAND_LIST_TYPE& command_type);
 	~DXCommand();
 
 	void BeginFrame();
@@ -45,11 +45,11 @@ private:
 	// Command type
 	D3D12_COMMAND_LIST_TYPE m_command_type;
 
-	ComPtr<ID3D12CommandQueue> m_command_queue;
+	Microsoft::WRL::ComPtr<ID3D12CommandQueue> m_command_queue;
 	// Number of command list == number of threads, can reuse commandlist after submission
-	ComPtr<ID3D12GraphicsCommandList6> m_command_list;
+	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList6> m_command_list;
 	// Number of command allocator == number of threads x backbuffer count
-	ComPtr<ID3D12CommandAllocator> m_command_allocators[g_backbuffer_count];
+	Microsoft::WRL::ComPtr<ID3D12CommandAllocator> m_command_allocators[g_backbuffer_count];
 
 	uint32 m_frame_index{ 0 };
 };
@@ -71,40 +71,41 @@ public:
 
 	void Transition(D3D12_RESOURCE_STATES new_resource_state, DXResource& resource) const;
 
-	ComPtr<ID3D12Device> GetDevice() const;
-	ComPtr<ID3D12GraphicsCommandList> GetCommandListGraphics() const;
-	ComPtr<ID3D12GraphicsCommandList> GetCommandListCompute() const;
-	ComPtr<ID3D12GraphicsCommandList> GetCommandListCopy() const;
-	ComPtr<IDXGIFactory> GetFactory() const;
-	ComPtr<ID3D12CommandQueue> GetCommandQueue() const;
+	// Note we use the full namespace Microsoft::WRL to help 10xEditor autocompletion
+	Microsoft::WRL::ComPtr<ID3D12Device> GetDevice() const;
+	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> GetCommandListGraphics() const;
+	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> GetCommandListCompute() const;
+	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> GetCommandListCopy() const;
+	Microsoft::WRL::ComPtr<IDXGIFactory> GetFactory() const;
+	Microsoft::WRL::ComPtr<ID3D12CommandQueue> GetCommandQueue() const;
 private:
 	void Init();
 
-	ComPtr<IDXGIFactory7> m_factory;
-	ComPtr<IDXGIAdapter4> m_adapter; // GPU
-	ComPtr<ID3D12Device9> m_device;
+	Microsoft::WRL::ComPtr<IDXGIFactory7> m_factory;
+	Microsoft::WRL::ComPtr<IDXGIAdapter4> m_adapter; // GPU
+	Microsoft::WRL::ComPtr<ID3D12Device9> m_device;
 	bool m_use_warp;
 
 	// Graphics + Compute + Copy
-	ComPtr<ID3D12CommandQueue> m_queue_graphics;
+	Microsoft::WRL::ComPtr<ID3D12CommandQueue> m_queue_graphics;
 	// Compute + Copy
-	ComPtr<ID3D12CommandQueue> m_queue_compute;
+	Microsoft::WRL::ComPtr<ID3D12CommandQueue> m_queue_compute;
 	// Copy
-	ComPtr<ID3D12CommandQueue> m_queue_copy;
+	Microsoft::WRL::ComPtr<ID3D12CommandQueue> m_queue_copy;
 	
 	bool m_is_graphics_command_list_open = false;
-	ComPtr<ID3D12GraphicsCommandList6> m_command_list_graphics;
-	ComPtr<ID3D12CommandAllocator> m_command_allocator_graphics;
+	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList6> m_command_list_graphics;
+	Microsoft::WRL::ComPtr<ID3D12CommandAllocator> m_command_allocator_graphics;
 
 	bool m_is_compute_command_list_open = false;
-	ComPtr<ID3D12GraphicsCommandList6> m_command_list_compute;
-	ComPtr<ID3D12CommandAllocator> m_command_allocator_compute;
+	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList6> m_command_list_compute;
+	Microsoft::WRL::ComPtr<ID3D12CommandAllocator> m_command_allocator_compute;
 
 	bool m_is_copy_command_list_open = false;
-	ComPtr<ID3D12GraphicsCommandList6> m_command_list_copy;
-	ComPtr<ID3D12CommandAllocator> m_command_allocator_copy;
+	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList6> m_command_list_copy;
+	Microsoft::WRL::ComPtr<ID3D12CommandAllocator> m_command_allocator_copy;
 
-	ComPtr<ID3D12Fence> m_fence_gpu;
+	Microsoft::WRL::ComPtr<ID3D12Fence> m_fence_gpu;
 	uint64_t m_fence_cpu;
 	HANDLE m_fence_event;
 

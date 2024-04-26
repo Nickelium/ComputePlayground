@@ -23,8 +23,8 @@ DXContext::DXContext() :
 DXContext::~DXContext()
 {
 #if defined(_DEBUG)
-	ComPtr<ID3D12InfoQueue1> info_queue{};
-	HRESULT result = m_device->QueryInterface(IID_PPV_ARGS(&info_queue));
+	Microsoft::WRL::ComPtr<ID3D12InfoQueue1> info_queue{};
+	HRESULT result = m_device.As(&info_queue);
 	// Query fails if debug layer disabled
 	if (result == S_OK)
 	{
@@ -39,8 +39,6 @@ DXContext::~DXContext()
 	}
 #endif
 }
-
-
 
 namespace
 {
@@ -77,14 +75,14 @@ void DXContext::Init()
 {
 #if defined(_DEBUG)
 	{
-		ComPtr<IDXGIDebug1> dxgi_debug{};
+		Microsoft::WRL::ComPtr<IDXGIDebug1> dxgi_debug{};
 		// Requires windows "Graphics Tool" optional feature
 		DXGIGetDebugInterface1(0, IID_PPV_ARGS(&dxgi_debug)) >> CHK;
 		dxgi_debug->EnableLeakTrackingForThread();
 	}
 
 	{
-		ComPtr<ID3D12Debug5> d3d12_debug{};
+		Microsoft::WRL::ComPtr<ID3D12Debug5> d3d12_debug{};
 		D3D12GetDebugInterface(IID_PPV_ARGS(&d3d12_debug)) >> CHK;
 		d3d12_debug->EnableDebugLayer();
 		d3d12_debug->SetEnableGPUBasedValidation(true);
@@ -98,14 +96,19 @@ void DXContext::Init()
 	dxgi_factory_flag |= DXGI_CREATE_FACTORY_DEBUG;
 #endif
 	CreateDXGIFactory2(dxgi_factory_flag, IID_PPV_ARGS(&m_factory)) >> CHK;
-	m_factory->EnumAdapterByGpuPreference(0, DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE, IID_PPV_ARGS(&m_adapter)) >> CHK;
-	DXGI_ADAPTER_DESC1 adapter_desc{};
-	m_adapter->GetDesc1(&adapter_desc) >> CHK;
 
 	if (m_use_warp)
 	{
 		m_factory->EnumWarpAdapter(IID_PPV_ARGS(&m_adapter)) >> CHK;
 	}
+	else
+	{
+		m_factory->EnumAdapterByGpuPreference(0, DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE, IID_PPV_ARGS(&m_adapter)) >> CHK;
+	}
+
+	DXGI_ADAPTER_DESC2 adapter_desc;
+	m_adapter->GetDesc2(&adapter_desc) >> CHK;
+	LogTrace(std::to_string(adapter_desc.Description));
 
 	// node_index 0 because single GPU
 	const uint32 node_index{0};
@@ -117,7 +120,7 @@ void DXContext::Init()
 
 	D3D_FEATURE_LEVEL max_feature_level = GetMaxFeatureLevel(m_adapter);
 	D3D12CreateDevice(m_adapter.Get(), max_feature_level, IID_PPV_ARGS(&m_device)) >> CHK;
-	
+
 	const D3D12_COMMAND_QUEUE_DESC graphics_queue_desc =
 	{
 		.Type = D3D12_COMMAND_LIST_TYPE_DIRECT,
@@ -189,8 +192,8 @@ void DXContext::Init()
 	m_is_copy_command_list_open = false;
 
 #if defined(_DEBUG)
-	ComPtr<ID3D12InfoQueue1> info_queue{};
-	HRESULT result = m_device->QueryInterface(IID_PPV_ARGS(&info_queue));
+	Microsoft::WRL::ComPtr<ID3D12InfoQueue1> info_queue{};
+	HRESULT result = m_device.As(&info_queue);
 	// Query fails if debug layer disabled
 	if (result == S_OK)
 	{
@@ -293,32 +296,32 @@ void DXContext::Transition(D3D12_RESOURCE_STATES new_resource_state, DXResource&
 	}
 }
 
-ComPtr<ID3D12Device> DXContext::GetDevice() const
+Microsoft::WRL::ComPtr<ID3D12Device> DXContext::GetDevice() const
 {
 	return m_device;
 }
 
-ComPtr<ID3D12GraphicsCommandList> DXContext::GetCommandListGraphics() const
+Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> DXContext::GetCommandListGraphics() const
 {
 	return m_command_list_graphics;
 }
 
-ComPtr<ID3D12GraphicsCommandList> DXContext::GetCommandListCompute() const
+Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> DXContext::GetCommandListCompute() const
 {
 	return m_command_list_compute;
 }
 
-ComPtr<ID3D12GraphicsCommandList> DXContext::GetCommandListCopy() const
+Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> DXContext::GetCommandListCopy() const
 {
 	return m_command_list_copy;
 }
 
-ComPtr<IDXGIFactory> DXContext::GetFactory() const
+Microsoft::WRL::ComPtr<IDXGIFactory> DXContext::GetFactory() const
 {
 	return m_factory;
 }
 
-ComPtr<ID3D12CommandQueue> DXContext::GetCommandQueue() const
+Microsoft::WRL::ComPtr<ID3D12CommandQueue> DXContext::GetCommandQueue() const
 {
 	return m_queue_graphics;
 }
@@ -328,10 +331,10 @@ DXReportContext::~DXReportContext()
 	ReportLDO();
 }
 
-void DXReportContext::SetDevice(ComPtr<ID3D12Device> device)
+void DXReportContext::SetDevice(Microsoft::WRL::ComPtr<ID3D12Device> device)
 {
 	// Query fails if debug layer disabled
-	HRESULT result = device->QueryInterface(IID_PPV_ARGS(&m_debug_device));
+	HRESULT result = device.As(&m_debug_device);
 	UNUSED(result);
 }
 
@@ -345,7 +348,7 @@ void DXReportContext::ReportLDO() const
 	}
 
 	{
-		ComPtr<IDXGIDebug1> dxgi_debug{};
+		Microsoft::WRL::ComPtr<IDXGIDebug1> dxgi_debug{};
 		// Requires windows "Graphics Tool" optional feature
 		DXGIGetDebugInterface1(0, IID_PPV_ARGS(&dxgi_debug)) >> CHK;
 		OutputDebugStringW(std::to_wstring("Report Live DXGI Objects:\n").c_str());
@@ -374,7 +377,7 @@ std::string GetCommandTypeToString(const D3D12_COMMAND_LIST_TYPE& command_type)
 	return "";
 }
 
-DXCommand::DXCommand(ComPtr<ID3D12Device> device, const D3D12_COMMAND_LIST_TYPE& command_type)
+DXCommand::DXCommand(Microsoft::WRL::ComPtr<ID3D12Device> device, const D3D12_COMMAND_LIST_TYPE& command_type)
 	: m_command_type(command_type)
 {
 	const D3D12_COMMAND_QUEUE_DESC queue_desc =
@@ -406,7 +409,7 @@ DXCommand::~DXCommand()
 
 void DXCommand::BeginFrame()
 {
-	ComPtr<ID3D12CommandAllocator> command_allocator = m_command_allocators[m_frame_index];
+	Microsoft::WRL::ComPtr<ID3D12CommandAllocator> command_allocator = m_command_allocators[m_frame_index];
 	// Wait GPU using command allocator
 	// Free command allocator
 	command_allocator->Reset() >> CHK;

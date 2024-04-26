@@ -12,13 +12,47 @@ struct D3D12_CPU_DESCRIPTOR_HANDLE;
 
 struct State;
 
+
+////////////
+// NEW WINDOW SECTION
+
+/// 
+
+using WindowProc = LRESULT(*)(HWND handle, UINT msg, WPARAM wParam, LPARAM lParam);
 struct WindowDesc
 {
+	WindowProc m_callback;
 	std::string m_window_name;
 	uint32 m_width;
 	uint32 m_height;
 	uint32 m_origin_x;
 	uint32 m_origin_y;
+};
+
+struct WindowInfo
+{
+	HWND m_handle{0};
+	RECT m_client_area{0, 0, 1000, 1000};
+	RECT m_fullscreen_area;
+	POINT m_top_left{0, 0};
+	DWORD m_style{WS_VISIBLE};
+	bool m_is_fullscreen{ false };
+	bool m_is_closed{ false };
+
+	//ATOM m_wnd_class_atom;
+	//WNDCLASSEXW m_wnd_class_exw;
+	//std::wstring m_wnd_class_name;
+};
+
+WindowInfo CreateWindowNew(const WindowDesc& window_desc);
+
+// We dont support exclusive fullscreen
+enum class WindowMode
+{
+	Normal = 0,
+	Maximize,
+	Borderless,
+	Count
 };
 
 enum D3D12_RESOURCE_STATES;
@@ -49,15 +83,6 @@ class DXWindow
 public:
 	static LRESULT CALLBACK OnWindowMessage(HWND handle, UINT msg, WPARAM w_param, LPARAM l_param);
 
-	// We dont support exclusive fullscreen
-	enum class WindowMode
-	{
-		Normal = 0,
-		Maximize,
-		Borderless,
-		Count
-	};
-
 	DXWindow(const DXContext& dx_context, const DXWindowManager& window_manager, const WindowDesc& window_desc);
 	~DXWindow();
 	void Init
@@ -78,7 +103,8 @@ public:
 
 	void Resize(const DXContext& dx_context);
 
-	void ToggleWindowMode();
+	void SetWindowModeRequest(WindowMode window_mode);
+	WindowMode GetWindowModeRequest() const;
 
 	uint32 GetBackBufferCount() const;
 
@@ -90,6 +116,12 @@ public:
 	uint32 GetHeight() const { return m_height; }
 
 	DXGI_FORMAT GetFormat() const;
+
+	void SetTitle();
+	std::string GetTitle();
+	void Resize(const DXContext& dx_context, uint32 width, uint32 height);
+	bool IsClosed();
+
 
 	// TODO separate input from window class
 	Input input;
@@ -113,11 +145,11 @@ private:
 	WindowMode m_window_mode;
 	WindowMode m_window_mode_request;
 
-	ComPtr<IDXGISwapChain4> m_swap_chain;
+	Microsoft::WRL::ComPtr<IDXGISwapChain4> m_swap_chain;
 	std::vector<DXResource> m_buffers;
 	//std::vector<D3D12_RESOURCE_STATES> m_resource_states;
 
-	ComPtr<ID3D12DescriptorHeap> m_rtv_desc_heap;
+	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> m_rtv_desc_heap;
 	std::vector<D3D12_CPU_DESCRIPTOR_HANDLE> m_rtv_handles;
 
 	uint32 m_width;
@@ -131,5 +163,4 @@ private:
 	uint32 m_current_buffer_index = 0u;
 
 	bool m_hdr;
-
 };

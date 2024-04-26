@@ -3,9 +3,65 @@
 #include "DXContext.h"
 #include "DXWindowManager.h"
 #include "DXResource.h"
+#define NOMINMAX
+#define WIN32_LEAN_AND_MEAN
+#include <Windows.h>
+
+//DXWindow* DXWindowManager::CreateDXWindow(const WindowDesc& window_desc)
+//{
+//	std::wstring wnd_class_name = std::to_wstring(window_desc.m_window_name);
+//	WNDCLASSEXW wnd_class_exw =
+//	{
+//		.cbSize = sizeof(m_wnd_class_exw),
+//		.style = CS_HREDRAW | CS_VREDRAW,
+//		.lpfnWndProc = window_desc.m_callback,
+//		.cbClsExtra = 0,
+//		.cbWndExtra = 0,
+//		.hInstance = GetModuleHandle(nullptr),
+//		.hIcon = LoadIconW(nullptr, IDI_APPLICATION),
+//		.hCursor = LoadCursorW(nullptr, IDC_ARROW),
+//		.hbrBackground = nullptr,
+//		.lpszMenuName = nullptr,
+//		.lpszClassName = wnd_class_name.c_str(),
+//		.hIconSm = LoadIconW(nullptr, IDI_APPLICATION),
+//	};
+//	ATOM wnd_class_atom = RegisterClassExW(&m_wnd_class_exw);
+//	ASSERT(wnd_class_atom);
+//
+//	WindowInfo* window_info = new WindowInfo();
+//
+//	// Client rect matches with backbuffer size but window rect needs to be slightly bigger for borders
+//	// Client rect != Window rect in windowed mode only
+//	RECT window_rect{ window_info->m_non_fullscreen_area };
+//	// Pass in client rect and then make it into window rect
+//	DWORD style{ window_info->m_style };
+//	style |= WS_OVERLAPPEDWINDOW;
+//	bool result = AdjustWindowRect(&window_rect, style, false);
+//	ASSERT(result);
+//
+//	HWND handle = CreateWindow
+//	(
+//		wnd_class_name.c_str(),
+//		std::to_wstring(window_desc.m_window_name).c_str(),
+//		style,
+//		window_desc.m_origin_x,
+//		window_desc.m_origin_y,
+//		window_desc.m_width,
+//		window_desc.m_height,
+//		nullptr, nullptr,
+//		GetModuleHandleW(nullptr), this
+//	);
+//	ASSERT(handle);
+//	ASSERT(IsWindow(handle));
+//
+//	window_info->m_wnd_class_atom = wnd_class_atom;
+//	window_info->m_handle = handle;
+//
+//	return nullptr;
+//}
 
 // Global across all windows
-LRESULT CALLBACK DXWindow::OnWindowMessage(HWND handle, UINT msg, WPARAM wParam, LPARAM lParam)
+LRESULT DXWindow::OnWindowMessage(HWND handle, UINT msg, WPARAM wParam, LPARAM lParam)
 {
 	// TODO pass callback instead because each window might do different things
 
@@ -95,7 +151,7 @@ void DXWindow::Init
 	ApplyWindowMode();
 	CreateSwapChain(dx_context);
 
-	ComPtr<IDXGIFactory1> factory{};
+	Microsoft::WRL::ComPtr<IDXGIFactory1> factory{};
 	m_swap_chain->GetParent(IID_PPV_ARGS(&factory)) >> CHK;
 	// Requires to GetParent factory to work
 
@@ -203,9 +259,14 @@ void DXWindow::Resize(const DXContext& dxContext)
 	}
 }
 
-void DXWindow::ToggleWindowMode()
+void DXWindow::SetWindowModeRequest(WindowMode window_mode)
 {
-	m_window_mode_request = static_cast<WindowMode>((static_cast<int32>(m_window_mode_request) + 1) % (static_cast<int32>(WindowMode::Count)));
+	m_window_mode_request = window_mode;
+}
+
+WindowMode DXWindow::GetWindowModeRequest() const
+{
+	return m_window_mode_request;
 }
 
 uint32 DXWindow::GetBackBufferCount() const
@@ -300,6 +361,57 @@ DXGI_FORMAT GetBackBufferFormat(bool hdr)
 	return hdr ? dxgi_format_hdr : dxgi_format_sdr;
 }
 
+WindowInfo CreateWindowNew(const WindowDesc& window_desc)
+{
+	std::wstring wnd_class_name = std::to_wstring(window_desc.m_window_name);
+	WNDCLASSEX wnd_class_exw =
+	{
+		.cbSize = sizeof(WNDCLASSEX),
+		.style = CS_HREDRAW | CS_VREDRAW,
+		// Note callback must handle WM_CREATE eg. through DefWinProc
+		.lpfnWndProc = window_desc.m_callback,
+		.cbClsExtra = 0,
+		.cbWndExtra = 0,
+		.hInstance = GetModuleHandle(nullptr),
+		.hIcon = LoadIconW(nullptr, IDI_APPLICATION),
+		.hCursor = LoadCursorW(nullptr, IDC_ARROW),
+		.hbrBackground = nullptr,
+		.lpszMenuName = nullptr,
+		.lpszClassName = wnd_class_name.c_str(),
+		.hIconSm = LoadIconW(nullptr, IDI_APPLICATION),
+	};
+	ATOM wnd_class_atom = RegisterClassEx(&wnd_class_exw);
+	ASSERT(wnd_class_atom);
+
+	WindowInfo window_info{};
+
+	RECT window_rect{ window_info.m_client_area };
+	window_info.m_style |= WS_OVERLAPPEDWINDOW;
+	bool result = AdjustWindowRect(&window_rect, window_info.m_style, false);
+	ASSERT(result);
+	auto er = GetLastError();
+	window_info.m_handle = CreateWindowExW
+	(
+		0,
+		wnd_class_name.c_str(),
+		wnd_class_name.c_str(),
+		window_info.m_style,
+		window_desc.m_origin_x,
+		window_desc.m_origin_y,
+		window_desc.m_width,
+		window_desc.m_height,
+		nullptr, nullptr,
+		GetModuleHandleW(nullptr), nullptr
+	);
+	er = GetLastError();
+	ASSERT(window_info.m_handle);
+	ASSERT(IsWindow(window_info.m_handle));
+
+	//window_info->m_wnd_class_atom = wnd_class_atom;
+	// TODO
+	return window_info;
+}
+
 DXGI_FORMAT DXWindow::GetFormat() const
 {
 	return GetBackBufferFormat(m_hdr);
@@ -351,16 +463,16 @@ void DXWindow::CreateSwapChain(const DXContext& dxContext)
 		.AlphaMode = DXGI_ALPHA_MODE_IGNORE,
 		.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH | DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING,
 	};
-	ComPtr<IDXGISwapChain1> swapChain{};
-	ComPtr<IDXGIFactory5> factory3{};
-	dxContext.GetFactory()->QueryInterface(IID_PPV_ARGS(&factory3)) >> CHK;
+	Microsoft::WRL::ComPtr<IDXGISwapChain1> swapChain{};
+	Microsoft::WRL::ComPtr<IDXGIFactory5> factory3{};
+	dxContext.GetFactory().As(&factory3) >> CHK;
 	factory3->CreateSwapChainForHwnd
 	(
 		dxContext.GetCommandQueue().Get(), m_handle,
 		&swapChainDesc, nullptr, nullptr,
 		&swapChain
 	) >> CHK;
-	swapChain->QueryInterface(IID_PPV_ARGS(&m_swap_chain)) >> CHK;
+	swapChain.As(&m_swap_chain) >> CHK;
 	NAME_DXGI_OBJECT(m_swap_chain, "SwapChain");
 }
 

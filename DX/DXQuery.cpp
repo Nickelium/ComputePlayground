@@ -25,7 +25,7 @@ static const std::map<D3D_FEATURE_LEVEL, std::string> g_feature_levels_map_strin
 
 static const D3D_FEATURE_LEVEL min_feature_level = g_feature_levels[0];
 
-D3D_FEATURE_LEVEL GetMaxFeatureLevel(ComPtr<ID3D12Device> device)
+D3D_FEATURE_LEVEL GetMaxFeatureLevel(Microsoft::WRL::ComPtr<ID3D12Device> device)
 {
 	const D3D12_FEATURE feature{ D3D12_FEATURE_FEATURE_LEVELS };
 	D3D12_FEATURE_DATA_FEATURE_LEVELS feature_data =
@@ -37,10 +37,10 @@ D3D_FEATURE_LEVEL GetMaxFeatureLevel(ComPtr<ID3D12Device> device)
 	return feature_data.MaxSupportedFeatureLevel;
 }
 
-D3D_FEATURE_LEVEL GetMaxFeatureLevel(ComPtr<IDXGIAdapter> adapter)
+D3D_FEATURE_LEVEL GetMaxFeatureLevel(Microsoft::WRL::ComPtr<IDXGIAdapter> adapter)
 {
 	// Require to support atleast bare d3d12
-	ComPtr<ID3D12Device9> device{};
+	Microsoft::WRL::ComPtr<ID3D12Device9> device{};
 	D3D12CreateDevice(adapter.Get(), min_feature_level, IID_PPV_ARGS(&device)) >> CHK;
 	return GetMaxFeatureLevel(device);
 }
@@ -87,7 +87,7 @@ static const std::map< D3D_SHADER_MODEL, std::string> g_shader_model_map_string 
 	{D3D_SHADER_MODEL_6_8, "6_8"},
 };
 
-D3D_SHADER_MODEL GetMaxShaderModel(ComPtr<ID3D12Device> device)
+D3D_SHADER_MODEL GetMaxShaderModel(Microsoft::WRL::ComPtr<ID3D12Device> device)
 {
 	for (int32 i = (COUNT(g_shader_models) - 1); i >= 0; --i)
 	{
@@ -248,21 +248,28 @@ std::string GetDXGIFormatString(const DXGI_FORMAT& dxgi_format)
 	return g_dxgi_format_map_string[dxgi_format];
 }
 
-D3D12_RESOURCE_BINDING_TIER GetResourceBindingTier(ComPtr<ID3D12Device> device)
+bool GetSupportDynamicResourceBinding(Microsoft::WRL::ComPtr<ID3D12Device> device)
+{
+	return 
+		GetResourceBindingTier(device) >= D3D12_RESOURCE_BINDING_TIER_3 && 
+		GetMaxShaderModel(device) >= D3D_SHADER_MODEL_6_6;
+}
+
+D3D12_RESOURCE_BINDING_TIER GetResourceBindingTier(Microsoft::WRL::ComPtr<ID3D12Device> device)
 {
 	D3D12_FEATURE_DATA_D3D12_OPTIONS options{};
 	device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS, &options, sizeof(options)) >> CHK;
 	return options.ResourceBindingTier;
 }
 
-D3D12_RESOURCE_HEAP_TIER GetResourceHeapTier(ComPtr<ID3D12Device> device)
+D3D12_RESOURCE_HEAP_TIER GetResourceHeapTier(Microsoft::WRL::ComPtr<ID3D12Device> device)
 {
 	D3D12_FEATURE_DATA_D3D12_OPTIONS options{};
 	device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS, &options, sizeof(options)) >> CHK;
 	return options.ResourceHeapTier;
 }
 
-bool IsDXGIFormatSupported(ComPtr<ID3D12Device> device, const DXGI_FORMAT& format)
+bool IsDXGIFormatSupported(Microsoft::WRL::ComPtr<ID3D12Device> device, const DXGI_FORMAT& format)
 {
 	D3D12_FEATURE_DATA_FORMAT_SUPPORT options
 	{
@@ -272,7 +279,7 @@ bool IsDXGIFormatSupported(ComPtr<ID3D12Device> device, const DXGI_FORMAT& forma
 	return result == S_OK;
 }
 
-D3D_ROOT_SIGNATURE_VERSION GetMaxRootSignature(ComPtr<ID3D12Device> device)
+D3D_ROOT_SIGNATURE_VERSION GetMaxRootSignature(Microsoft::WRL::ComPtr<ID3D12Device> device)
 {
 	D3D12_FEATURE_DATA_ROOT_SIGNATURE  options 
 	{ 
@@ -282,60 +289,61 @@ D3D_ROOT_SIGNATURE_VERSION GetMaxRootSignature(ComPtr<ID3D12Device> device)
 	return options.HighestVersion;
 }
 
-D3D12_RAYTRACING_TIER GetRaytracingTier(ComPtr<ID3D12Device> device)
+D3D12_RAYTRACING_TIER GetRaytracingTier(Microsoft::WRL::ComPtr<ID3D12Device> device)
 {
 	D3D12_FEATURE_DATA_D3D12_OPTIONS5 options{};
 	device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS5, &options, sizeof(options)) >> CHK;
 	return options.RaytracingTier;
 }
 
-uint64 GetWaveLaneCount(ComPtr<ID3D12Device> device)
+uint64 GetWaveLaneCount(Microsoft::WRL::ComPtr<ID3D12Device> device)
 {
 	D3D12_FEATURE_DATA_D3D12_OPTIONS1 options{};
 	device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS1, &options, sizeof(options)) >> CHK;
 	return options.WaveLaneCountMin;
 }
 
-bool GetWorkGraphSupport(ComPtr<ID3D12Device> device)
+bool GetWorkGraphSupport(Microsoft::WRL::ComPtr<ID3D12Device> device)
 {
 	D3D12_FEATURE_DATA_D3D12_OPTIONS21 options{};
 	device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS21, &options, sizeof(options)) >> CHK;
 	return options.WorkGraphsTier != D3D12_WORK_GRAPHS_TIER_NOT_SUPPORTED;
 }
 
-D3D12_VARIABLE_SHADING_RATE_TIER GetVariableShadingRateTier(ComPtr<ID3D12Device> device)
+D3D12_VARIABLE_SHADING_RATE_TIER GetVariableShadingRateTier(Microsoft::WRL::ComPtr<ID3D12Device> device)
 {
 	D3D12_FEATURE_DATA_D3D12_OPTIONS6 options{};
 	device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS6, &options, sizeof(options)) >> CHK;
 	return options.VariableShadingRateTier;
 }
 
-D3D12_MESH_SHADER_TIER GetMeshShaderTier(ComPtr<ID3D12Device> device)
+D3D12_MESH_SHADER_TIER GetMeshShaderTier(Microsoft::WRL::ComPtr<ID3D12Device> device)
 {
 	D3D12_FEATURE_DATA_D3D12_OPTIONS7 options{};
 	device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS7, &options, sizeof(options)) >> CHK;
 	return options.MeshShaderTier;
 }
 
-D3D12_SAMPLER_FEEDBACK_TIER GetSamplerFeedbackTier(ComPtr<ID3D12Device> device)
+D3D12_SAMPLER_FEEDBACK_TIER GetSamplerFeedbackTier(Microsoft::WRL::ComPtr<ID3D12Device> device)
 {
 	D3D12_FEATURE_DATA_D3D12_OPTIONS7 options{};
 	device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS7, &options, sizeof(options)) >> CHK;
 	return options.SamplerFeedbackTier;
 }
 
-bool GetEnhancedBarrierSupported(ComPtr<ID3D12Device> device)
+bool GetEnhancedBarrierSupported(Microsoft::WRL::ComPtr<ID3D12Device> device)
 {
 	D3D12_FEATURE_DATA_D3D12_OPTIONS12 options{};
 	device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS12, &options, sizeof(options)) >> CHK;
 	return options.EnhancedBarriersSupported;
 }
 
-std::string DumpDX12Capabilities(ComPtr<ID3D12Device> device)
+std::string DumpDX12Capabilities(Microsoft::WRL::ComPtr<ID3D12Device> device)
 {
 	std::vector<std::pair<std::string, std::string>> pair_data{};
 
 	pair_data.push_back({ "ResourceBindingTier", std::format("{0}", (uint32)GetResourceBindingTier(device)) });
+	pair_data.push_back({ "SupportDynamicResourceBinding", std::format("{0}", GetSupportDynamicResourceBinding(device))} );
 	pair_data.push_back({ "ResourceHeapTier", std::format("{0}", (uint32)GetResourceHeapTier(device)) });
 	pair_data.push_back({ "MaxSupportedFeatureLevel", std::format("{0}", GetFeatureLevelString(GetMaxFeatureLevel(device))) });
 	pair_data.push_back({ "HighestShaderModel", std::format("{0}", GetShaderModelString(GetMaxShaderModel(device))) });

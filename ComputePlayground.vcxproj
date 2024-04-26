@@ -119,7 +119,6 @@ xcopy /y /d $(ProjectDir)dependencies\warp\d3d10warp.dll $(OutDir)</Command>
     <ClCompile Include="DX\DXQuery.cpp" />
     <ClCompile Include="DX\DXResource.cpp" />
     <ClCompile Include="DX\DXWindow.cpp" />
-    <ClCompile Include="core\Factory.cpp" />
     <ClCompile Include="core\Logger.cpp" />
     <ClCompile Include="DX\DXWindowManager.cpp" />
     <ClCompile Include="maths\LinearAlgebra.cpp" />
@@ -143,8 +142,6 @@ xcopy /y /d $(ProjectDir)dependencies\warp\d3d10warp.dll $(OutDir)</Command>
     <ClInclude Include="DX\DXResource.h" />
     <ClInclude Include="DX\DXWindow.h" />
     <ClInclude Include="DX\DXWindowManager.h" />
-    <ClInclude Include="DX\IDXDebugLayer.h" />
-    <ClInclude Include="core\Factory.h" />
     <ClInclude Include="core\Logger.h" />
     <ClInclude Include="maths\LinearAlgebra.h" />
     <ClInclude Include="core\MemoryReporting.h" />
