@@ -1,13 +1,14 @@
 #pragma once
 #include "../core/Common.h"
 #include <dxgiformat.h>
+#include "DXContext.h"
 
 class DXContext;
 class DXWindowManager;
 
 struct IDXGISwapChain4;
 struct ID3D12Resource2;
-struct ID3D12DescriptorHeap;
+struct DescriptorHeap;
 struct D3D12_CPU_DESCRIPTOR_HANDLE;
 
 struct State;
@@ -147,9 +148,8 @@ private:
 
 	Microsoft::WRL::ComPtr<IDXGISwapChain4> m_swap_chain;
 	std::vector<DXResource> m_buffers;
-	//std::vector<D3D12_RESOURCE_STATES> m_resource_states;
 
-	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> m_rtv_desc_heap;
+	DescriptorHeap m_rtv_desc_heap;
 	std::vector<D3D12_CPU_DESCRIPTOR_HANDLE> m_rtv_handles;
 
 	uint32 m_width;

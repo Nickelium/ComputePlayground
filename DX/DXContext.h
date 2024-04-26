@@ -16,6 +16,8 @@ struct ID3D12DebugDevice2;
 struct ID3D12DebugCommandList1;
 struct ID3D12DebugCommandQueue;
 
+struct ID3D12DescriptorHeap;
+
 class DXResource;
 
 class DXReportContext
@@ -54,6 +56,32 @@ private:
 	uint32 m_frame_index{ 0 };
 };
 
+struct DescriptorHeap
+{
+	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> m_heap;
+	D3D12_DESCRIPTOR_HEAP_TYPE m_heap_type;
+	uint32 m_number_descriptors;
+	uint32 m_increment_size;
+};
+
+struct CommandQueue
+{
+	Microsoft::WRL::ComPtr<ID3D12CommandQueue> m_queue;
+	D3D12_COMMAND_LIST_TYPE m_type;
+};
+
+struct CommandAllocator
+{
+	Microsoft::WRL::ComPtr<ID3D12CommandAllocator> m_allocator;
+	D3D12_COMMAND_LIST_TYPE m_type;
+};
+
+struct CommandList
+{
+	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList6> m_list;
+	D3D12_COMMAND_LIST_TYPE m_type;
+	bool m_is_open = false;
+};
 
 class DXContext
 {
@@ -74,10 +102,49 @@ public:
 	// Note we use the full namespace Microsoft::WRL to help 10xEditor autocompletion
 	Microsoft::WRL::ComPtr<ID3D12Device> GetDevice() const;
 	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> GetCommandListGraphics() const;
-	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> GetCommandListCompute() const;
+	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList>GetCommandListCompute() const;
 	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> GetCommandListCopy() const;
 	Microsoft::WRL::ComPtr<IDXGIFactory> GetFactory() const;
-	Microsoft::WRL::ComPtr<ID3D12CommandQueue> GetCommandQueue() const;
+	CommandQueue GetCommandQueue() const;
+
+	void CreateDescriptorHeap
+	(
+		D3D12_DESCRIPTOR_HEAP_TYPE descriptor_heap_type, uint32 number_descriptors,
+		DescriptorHeap& out_descriptor_heap
+	) const;
+
+	D3D12_CPU_DESCRIPTOR_HANDLE GetDescriptorHandle
+	(
+		const DescriptorHeap& descriptor_heap, 
+		uint32 i
+	) const;
+
+	void CreateRTV
+	(
+		const DXResource& resource, 
+		DXGI_FORMAT dxgi_format,
+		D3D12_CPU_DESCRIPTOR_HANDLE descriptor_handle
+	) const;
+
+	void CreateCommandQueue 
+	(
+		D3D12_COMMAND_LIST_TYPE command_queue_type, 
+		CommandQueue& out_command_queue
+	);
+
+	void CreateCommandAllocator
+	(
+		D3D12_COMMAND_LIST_TYPE command_allocator_type, 
+		CommandAllocator& out_command_allocator
+	);
+
+	void CreateCommandList
+	(
+		D3D12_COMMAND_LIST_TYPE command_list_type,
+		const CommandAllocator& command_allocator,
+		CommandList& out_command_list
+	);
+
 private:
 	void Init();
 
@@ -87,23 +154,20 @@ private:
 	bool m_use_warp;
 
 	// Graphics + Compute + Copy
-	Microsoft::WRL::ComPtr<ID3D12CommandQueue> m_queue_graphics;
+	CommandQueue m_queue_graphics;
 	// Compute + Copy
-	Microsoft::WRL::ComPtr<ID3D12CommandQueue> m_queue_compute;
+	CommandQueue m_queue_compute;
 	// Copy
-	Microsoft::WRL::ComPtr<ID3D12CommandQueue> m_queue_copy;
+	CommandQueue m_queue_copy;
 	
-	bool m_is_graphics_command_list_open = false;
-	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList6> m_command_list_graphics;
-	Microsoft::WRL::ComPtr<ID3D12CommandAllocator> m_command_allocator_graphics;
+	CommandList m_command_list_graphics;
+	CommandAllocator m_command_allocator_graphics;
 
-	bool m_is_compute_command_list_open = false;
-	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList6> m_command_list_compute;
-	Microsoft::WRL::ComPtr<ID3D12CommandAllocator> m_command_allocator_compute;
+	CommandList m_command_list_compute;
+	CommandAllocator m_command_allocator_compute;
 
-	bool m_is_copy_command_list_open = false;
-	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList6> m_command_list_copy;
-	Microsoft::WRL::ComPtr<ID3D12CommandAllocator> m_command_allocator_copy;
+	CommandList m_command_list_copy;
+	CommandAllocator m_command_allocator_copy;
 
 	Microsoft::WRL::ComPtr<ID3D12Fence> m_fence_gpu;
 	uint64_t m_fence_cpu;

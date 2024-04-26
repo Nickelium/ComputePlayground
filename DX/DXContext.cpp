@@ -169,31 +169,20 @@ void DXContext::Init()
 	}
 #endif
 
+	CreateCommandQueue(D3D12_COMMAND_LIST_TYPE_DIRECT, m_queue_graphics);
+	CreateCommandQueue(D3D12_COMMAND_LIST_TYPE_COMPUTE, m_queue_compute);
+	CreateCommandQueue(D3D12_COMMAND_LIST_TYPE_COPY, m_queue_copy);
 
-	auto CreateCommandQueue = [](Microsoft::WRL::ComPtr<ID3D12Device> device, D3D12_COMMAND_LIST_TYPE command_queue_type, Microsoft::WRL::ComPtr<ID3D12CommandQueue>& out_command_queue)
-	{
-		const D3D12_COMMAND_QUEUE_DESC queue_desc =
-		{
-			.Type = command_queue_type,
-			.Priority = D3D12_COMMAND_QUEUE_PRIORITY_HIGH,
-			.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE,
-			.NodeMask = 0,
-		};
-		device->CreateCommandQueue(&queue_desc, IID_PPV_ARGS(&out_command_queue)) >> CHK;
-	};
+	// CommandAllocator has to wait that all commands in the command list has been executed by the GPU before reuse
+	// CommandList can be reused right away
+	CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, m_command_allocator_graphics);
+	CreateCommandList(D3D12_COMMAND_LIST_TYPE_DIRECT, m_command_allocator_graphics, m_command_list_graphics);
 
-	CreateCommandQueue(m_device, D3D12_COMMAND_LIST_TYPE_DIRECT, m_queue_graphics);
-	CreateCommandQueue(m_device, D3D12_COMMAND_LIST_TYPE_COMPUTE, m_queue_compute);
-	CreateCommandQueue(m_device, D3D12_COMMAND_LIST_TYPE_COPY, m_queue_copy);
+	CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_COMPUTE, m_command_allocator_compute);
+	CreateCommandList(D3D12_COMMAND_LIST_TYPE_COMPUTE, m_command_allocator_compute, m_command_list_compute);
 
-	m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_command_allocator_graphics)) >> CHK;
-	m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_command_allocator_graphics.Get(), nullptr, IID_PPV_ARGS(&m_command_list_graphics)) >> CHK;
-	
-	m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_COMPUTE, IID_PPV_ARGS(&m_command_allocator_compute)) >> CHK;
-	m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_COMPUTE, m_command_allocator_compute.Get(), nullptr, IID_PPV_ARGS(&m_command_list_compute)) >> CHK;
-
-	m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_COPY, IID_PPV_ARGS(&m_command_allocator_copy)) >> CHK;
-	m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_COPY, m_command_allocator_copy.Get(), nullptr, IID_PPV_ARGS(&m_command_list_copy)) >> CHK;
+	CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_COPY, m_command_allocator_copy);
+	CreateCommandList(D3D12_COMMAND_LIST_TYPE_COPY, m_command_allocator_copy, m_command_list_copy);
 
 	m_device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_fence_gpu)) >> CHK;
 	m_fence_event = CreateEvent(nullptr, FALSE, FALSE, nullptr);
@@ -216,23 +205,16 @@ void DXContext::Init()
 	NAME_DXGI_OBJECT(m_adapter, "Adapter");
 
 	NAME_DX_OBJECT(m_device, "Device");
-	NAME_DX_OBJECT(m_queue_graphics, "Queue graphics");
-	NAME_DX_OBJECT(m_command_allocator_graphics, "Command allocator graphics");
-	NAME_DX_OBJECT(m_command_list_graphics, "Command list graphics");
-	NAME_DX_OBJECT(m_queue_compute, "Queue compute");
-	NAME_DX_OBJECT(m_command_allocator_compute, "Command allocator compute");
-	NAME_DX_OBJECT(m_command_list_compute, "Command list compute");
-	NAME_DX_OBJECT(m_queue_copy, "Command allocator copy");
-	NAME_DX_OBJECT(m_command_allocator_copy, "Command allocator copy");
-	NAME_DX_OBJECT(m_command_list_copy, "Command list copy");
+	NAME_DX_OBJECT(m_queue_graphics.m_queue, "Queue graphics");
+	NAME_DX_OBJECT(m_command_allocator_graphics.m_allocator, "Command allocator graphics");
+	NAME_DX_OBJECT(m_command_list_graphics.m_list, "Command list graphics");
+	NAME_DX_OBJECT(m_queue_compute.m_queue, "Queue compute");
+	NAME_DX_OBJECT(m_command_allocator_compute.m_allocator, "Command allocator compute");
+	NAME_DX_OBJECT(m_command_list_compute.m_list, "Command list compute");
+	NAME_DX_OBJECT(m_queue_copy.m_queue, "Command allocator copy");
+	NAME_DX_OBJECT(m_command_allocator_copy.m_allocator, "Command allocator copy");
+	NAME_DX_OBJECT(m_command_list_copy.m_list, "Command list copy");
 	NAME_DX_OBJECT(m_fence_gpu, "FenceGPU");
-
-	m_command_list_graphics->Close() >> CHK;
-	m_is_graphics_command_list_open = false;
-	m_command_list_compute->Close() >> CHK;
-	m_is_compute_command_list_open = false;
-	m_command_list_copy->Close() >> CHK;
-	m_is_copy_command_list_open = false;
 
 #if defined(_DEBUG)
 	LogTrace(DumpDX12Capabilities(m_device));
@@ -241,59 +223,59 @@ void DXContext::Init()
 
 void DXContext::InitCommandLists()
 {
-	if (!m_is_graphics_command_list_open)
+	if (!m_command_list_graphics.m_is_open)
 	{
-		m_command_allocator_graphics->Reset() >> CHK;
-		m_command_list_graphics->Reset(m_command_allocator_graphics.Get(), nullptr) >> CHK;
-		m_is_graphics_command_list_open = true;
+		m_command_allocator_graphics.m_allocator->Reset() >> CHK;
+		m_command_list_graphics.m_list->Reset(m_command_allocator_graphics.m_allocator.Get(), nullptr) >> CHK;
+		m_command_list_graphics.m_is_open = true;
 	}
 
-	if (!m_is_compute_command_list_open)
+	if (!m_command_list_compute.m_is_open)
 	{
-		m_command_allocator_compute->Reset() >> CHK;
-		m_command_list_compute->Reset(m_command_allocator_compute.Get(), nullptr) >> CHK;
-		m_is_compute_command_list_open = true;
+		m_command_allocator_compute.m_allocator->Reset() >> CHK;
+		m_command_list_compute.m_list->Reset(m_command_allocator_compute.m_allocator.Get(), nullptr) >> CHK;
+		m_command_list_compute.m_is_open = true;
 	}
 
-	if (!m_is_copy_command_list_open)
+	if (!m_command_list_copy.m_is_open)
 	{
-		m_command_allocator_copy->Reset() >> CHK;
-		m_command_list_copy->Reset(m_command_allocator_copy.Get(), nullptr) >> CHK;
-		m_is_copy_command_list_open = true;
+		m_command_allocator_copy.m_allocator->Reset() >> CHK;
+		m_command_list_copy.m_list->Reset(m_command_allocator_copy.m_allocator.Get(), nullptr) >> CHK;
+		m_command_list_copy.m_is_open = true;
 	}
 }
 
 void DXContext::ExecuteCommandListGraphics()
 {
-	m_command_list_graphics->Close() >> CHK;
-	m_is_graphics_command_list_open = false;
-	ID3D12CommandList* command_lists[] = { m_command_list_graphics.Get() };
-	m_queue_graphics->ExecuteCommandLists(COUNT(command_lists), command_lists);
+	m_command_list_graphics.m_list->Close() >> CHK;
+	m_command_list_graphics.m_is_open = false;
+	ID3D12CommandList* command_lists[] = { m_command_list_graphics.m_list.Get() };
+	m_queue_graphics.m_queue->ExecuteCommandLists(COUNT(command_lists), command_lists);
 	SignalAndWait();
 }
 
 void DXContext::ExecuteCommandListCompute()
 {
-	m_command_list_compute->Close() >> CHK;
-	m_is_compute_command_list_open = false;
-	ID3D12CommandList* command_lists[] = { m_command_list_compute.Get() };
-	m_queue_compute->ExecuteCommandLists(COUNT(command_lists), command_lists);
+	m_command_list_compute.m_list->Close() >> CHK;
+	m_command_list_compute.m_is_open = false;
+	ID3D12CommandList* command_lists[] = { m_command_list_compute.m_list.Get() };
+	m_queue_compute.m_queue->ExecuteCommandLists(COUNT(command_lists), command_lists);
 	SignalAndWait();
 }
 
 void DXContext::ExecuteCommandListCopy()
 {
-	m_command_list_copy->Close() >> CHK;
-	m_is_copy_command_list_open = false;
-	ID3D12CommandList* command_lists[] = { m_command_list_copy.Get() };
-	m_queue_copy->ExecuteCommandLists(COUNT(command_lists), command_lists);
+	m_command_list_copy.m_list->Close() >> CHK;
+	m_command_list_copy.m_is_open = false;
+	ID3D12CommandList* command_lists[] = { m_command_list_copy.m_list.Get() };
+	m_queue_copy.m_queue->ExecuteCommandLists(COUNT(command_lists), command_lists);
 	SignalAndWait();
 }
 
 void DXContext::SignalAndWait()
 {
 	++m_fence_cpu;
-	m_queue_graphics->Signal(m_fence_gpu.Get(), m_fence_cpu) >> CHK;
+	m_queue_graphics.m_queue->Signal(m_fence_gpu.Get(), m_fence_cpu) >> CHK;
 	m_fence_gpu->SetEventOnCompletion(m_fence_cpu, m_fence_event) >> CHK;
 	WaitForSingleObject(m_fence_event, INFINITE);
 }
@@ -335,17 +317,17 @@ Microsoft::WRL::ComPtr<ID3D12Device> DXContext::GetDevice() const
 
 Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> DXContext::GetCommandListGraphics() const
 {
-	return m_command_list_graphics;
+	return m_command_list_graphics.m_list;
 }
 
 Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> DXContext::GetCommandListCompute() const
 {
-	return m_command_list_compute;
+	return m_command_list_compute.m_list;
 }
 
 Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> DXContext::GetCommandListCopy() const
 {
-	return m_command_list_copy;
+	return m_command_list_copy.m_list;
 }
 
 Microsoft::WRL::ComPtr<IDXGIFactory> DXContext::GetFactory() const
@@ -353,9 +335,111 @@ Microsoft::WRL::ComPtr<IDXGIFactory> DXContext::GetFactory() const
 	return m_factory;
 }
 
-Microsoft::WRL::ComPtr<ID3D12CommandQueue> DXContext::GetCommandQueue() const
+CommandQueue DXContext::GetCommandQueue() const
 {
 	return m_queue_graphics;
+}
+
+D3D12_DESCRIPTOR_HEAP_FLAGS GetShaderVisibile(D3D12_DESCRIPTOR_HEAP_TYPE descriptor_heap_type)
+{
+	// Only CBV / SRV / UAV can be accessed directly in shaders
+	// RTV / DSR cant
+	// Samplers technically can though?
+	return 
+		descriptor_heap_type == D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV ?
+		D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE : D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+}
+
+void DXContext::CreateDescriptorHeap 
+(
+	D3D12_DESCRIPTOR_HEAP_TYPE descriptor_heap_type, uint32 number_descriptors,
+	DescriptorHeap& out_descriptor_heap
+) const
+{
+	const D3D12_DESCRIPTOR_HEAP_DESC descriptor_heap_desc =
+	{
+		.Type = descriptor_heap_type,
+		.NumDescriptors = number_descriptors,
+		.Flags = GetShaderVisibile(descriptor_heap_type),
+		.NodeMask = 0,
+	};
+	m_device->CreateDescriptorHeap(&descriptor_heap_desc, IID_PPV_ARGS(&out_descriptor_heap.m_heap)) >> CHK;
+	out_descriptor_heap.m_heap_type = descriptor_heap_type;
+	out_descriptor_heap.m_number_descriptors = number_descriptors;
+	out_descriptor_heap.m_increment_size = m_device->GetDescriptorHandleIncrementSize(out_descriptor_heap.m_heap_type);
+
+	NAME_DX_OBJECT(out_descriptor_heap.m_heap, "Descriptor Heap");
+}
+
+D3D12_CPU_DESCRIPTOR_HANDLE DXContext::GetDescriptorHandle
+(
+	const DescriptorHeap& descriptor_heap, 
+	uint32 i
+) const
+{
+	// Basically pointer to heap
+	D3D12_CPU_DESCRIPTOR_HANDLE first_descriptor = descriptor_heap.m_heap->GetCPUDescriptorHandleForHeapStart();
+	D3D12_CPU_DESCRIPTOR_HANDLE descriptor_handle{};
+	descriptor_handle.ptr = first_descriptor.ptr + i * descriptor_heap.m_increment_size;
+	return descriptor_handle;
+}
+
+void DXContext::CreateRTV
+(
+	const DXResource& resource, 
+	DXGI_FORMAT dxgi_format,
+	D3D12_CPU_DESCRIPTOR_HANDLE descriptor_handle
+) const
+{
+	D3D12_RENDER_TARGET_VIEW_DESC rtv_desc
+	{
+		.Format = dxgi_format,
+		.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D,
+		.Texture2D =
+		{
+			.MipSlice = 0,
+			.PlaneSlice = 0,
+		},
+	};
+	m_device->CreateRenderTargetView(resource.m_resource.Get(), &rtv_desc, descriptor_handle);
+}
+
+void DXContext::CreateCommandQueue 
+(
+	D3D12_COMMAND_LIST_TYPE command_queue_type, 
+	CommandQueue& out_command_queue)
+{
+	const D3D12_COMMAND_QUEUE_DESC queue_desc =
+	{
+		.Type = command_queue_type,
+		.Priority = D3D12_COMMAND_QUEUE_PRIORITY_HIGH,
+		.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE,
+		.NodeMask = 0,
+	};
+	out_command_queue.m_type = command_queue_type;
+	m_device->CreateCommandQueue(&queue_desc, IID_PPV_ARGS(&out_command_queue.m_queue)) >> CHK;
+}
+
+void DXContext::CreateCommandAllocator
+(
+	D3D12_COMMAND_LIST_TYPE command_allocator_type,
+	CommandAllocator& out_command_allocator
+)
+{
+	out_command_allocator.m_type = command_allocator_type;
+	m_device->CreateCommandAllocator(out_command_allocator.m_type, IID_PPV_ARGS(&out_command_allocator.m_allocator)) >> CHK;
+}
+
+void DXContext::CreateCommandList
+(
+	D3D12_COMMAND_LIST_TYPE command_list_type, 
+	const CommandAllocator& command_allocator,
+	CommandList& out_command_list
+)
+{
+	m_device->CreateCommandList(0, command_list_type, command_allocator.m_allocator.Get(), nullptr, IID_PPV_ARGS(&out_command_list.m_list)) >> CHK;
+	out_command_list.m_list->Close() >> CHK;
+	out_command_list.m_is_open = false;
 }
 
 DXReportContext::~DXReportContext()

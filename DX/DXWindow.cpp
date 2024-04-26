@@ -158,26 +158,20 @@ void DXWindow::Init
 	// Disable ALT ENTER to disable exclusive fullscreen, we handle switching ourselves
 	factory->MakeWindowAssociation(m_handle, DXGI_MWA_NO_ALT_ENTER) >> CHK;
 
-	const D3D12_DESCRIPTOR_HEAP_DESC rtvDescHeapDesc =
-	{
-		.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV,
-		.NumDescriptors = GetBackBufferCount(),
-		.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE,
-		.NodeMask = 0,
-	};
-	dx_context.GetDevice()->CreateDescriptorHeap(&rtvDescHeapDesc, IID_PPV_ARGS(&m_rtv_desc_heap)) >> CHK;
+	dx_context.CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_RTV, GetBackBufferCount(), m_rtv_desc_heap);
 
 	m_rtv_handles.resize(GetBackBufferCount());
-	const D3D12_CPU_DESCRIPTOR_HANDLE firstHandle = m_rtv_desc_heap->GetCPUDescriptorHandleForHeapStart();
-	const uint32 incrementSize = dx_context.GetDevice()->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
-	for (uint32 i = 0; i < GetBackBufferCount(); ++i)
+	for (uint32 i = 0; i < m_rtv_handles.size(); ++i)
 	{
-		D3D12_CPU_DESCRIPTOR_HANDLE currentHandle{};
-		currentHandle.ptr = firstHandle.ptr + i * incrementSize;
-		m_rtv_handles[i] = currentHandle;
+		m_rtv_handles[i] = dx_context.GetDescriptorHandle(m_rtv_desc_heap, i);
 	}
-
+	
 	GetBuffers(dx_context);
+
+	for (uint32 i = 0; i < m_buffers.size(); ++i)
+	{
+		dx_context.CreateRTV(m_buffers[i], GetFormat(), m_rtv_handles[i]);
+	}
 }
 
 void DXWindow::BeginFrame(const DXContext& dx_context)
@@ -468,7 +462,7 @@ void DXWindow::CreateSwapChain(const DXContext& dxContext)
 	dxContext.GetFactory().As(&factory3) >> CHK;
 	factory3->CreateSwapChainForHwnd
 	(
-		dxContext.GetCommandQueue().Get(), m_handle,
+		dxContext.GetCommandQueue().m_queue.Get(), m_handle,
 		&swapChainDesc, nullptr, nullptr,
 		&swapChain
 	) >> CHK;
@@ -478,28 +472,13 @@ void DXWindow::CreateSwapChain(const DXContext& dxContext)
 
 void DXWindow::GetBuffers(const DXContext& dxContext)
 {
+	// Get backbuffer resources
 	m_buffers.resize(GetBackBufferCount());
-
-	const D3D12_CPU_DESCRIPTOR_HANDLE rtvDescStart = m_rtv_desc_heap->GetCPUDescriptorHandleForHeapStart();
 	for (uint32 i = 0; i < GetBackBufferCount(); ++i)
 	{
 		m_swap_chain->GetBuffer(i, IID_PPV_ARGS(&m_buffers[i].m_resource)) >> CHK;
 		std::string str = "Backbuffer " + std::to_string(i);
 		NAME_DX_OBJECT(m_buffers[i].m_resource, str.c_str());
-
-		const D3D12_RENDER_TARGET_VIEW_DESC rtvDesc =
-		{
-			// SDR Format
-			.Format = GetFormat(),
-			.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D,
-			.Texture2D =
-			{
-				.MipSlice = 0,
-				.PlaneSlice = 0,
-			},
-		};
-		dxContext.GetDevice()->CreateRenderTargetView(m_buffers[i].m_resource.Get(), &rtvDesc, m_rtv_handles[i]);
-		m_buffers[i].m_resource_state = D3D12_RESOURCE_STATE_COMMON;
 	}
 }
 

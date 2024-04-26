@@ -6,7 +6,7 @@
 class DXResource
 {
 public:
-	D3D12_RESOURCE_STATES m_resource_state;
+	D3D12_RESOURCE_STATES m_resource_state = D3D12_RESOURCE_STATE_COMMON;
 	Microsoft::WRL::ComPtr<ID3D12Resource> m_resource;
 private:
 };
