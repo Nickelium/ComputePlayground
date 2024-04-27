@@ -171,10 +171,12 @@ void DXContext::Init()
 	CreateCommandQueue(D3D12_COMMAND_LIST_TYPE_COMPUTE, m_queue_compute);
 	CreateCommandQueue(D3D12_COMMAND_LIST_TYPE_COPY, m_queue_copy);
 
+	m_command_allocator_graphics.resize(g_backbuffer_count);
 	// CommandAllocator has to wait that all commands in the command list has been executed by the GPU before reuse
 	// CommandList can be reused right away
-	CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, m_command_allocator_graphics);
-	CreateCommandList(D3D12_COMMAND_LIST_TYPE_DIRECT, m_command_allocator_graphics, m_command_list_graphics);
+	for (uint32 i = 0; i < m_command_allocator_graphics.size(); ++i)
+		CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, m_command_allocator_graphics[i]);
+	CreateCommandList(D3D12_COMMAND_LIST_TYPE_DIRECT, m_command_allocator_graphics[0], m_command_list_graphics);
 
 	CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_COMPUTE, m_command_allocator_compute);
 	CreateCommandList(D3D12_COMMAND_LIST_TYPE_COMPUTE, m_command_allocator_compute, m_command_list_compute);
@@ -206,7 +208,11 @@ void DXContext::Init()
 
 	NAME_DX_OBJECT(m_device, "Device");
 	NAME_DX_OBJECT(m_queue_graphics.m_queue, "Queue graphics");
-	NAME_DX_OBJECT(m_command_allocator_graphics.m_allocator, "Command allocator graphics");
+	for (uint32 i = 0; i < m_command_allocator_graphics.size(); ++i)
+	{
+		std::string str = "Command allocator graphics " + std::to_string(i);
+		NAME_DX_OBJECT(m_command_allocator_graphics[i].m_allocator, "Command allocator graphics");
+	}
 	NAME_DX_OBJECT(m_command_list_graphics.m_list, "Command list graphics");
 	NAME_DX_OBJECT(m_queue_compute.m_queue, "Queue compute");
 	NAME_DX_OBJECT(m_command_allocator_compute.m_allocator, "Command allocator compute");
@@ -222,12 +228,18 @@ void DXContext::Init()
 #endif
 }
 
+// Declaration
+extern uint32 g_current_buffer_index;
+
 void DXContext::InitCommandLists()
 {
+	Wait(m_fence, g_current_buffer_index);
+	CommandAllocator& command_allocator = m_command_allocator_graphics[g_current_buffer_index];
+	
 	if (!m_command_list_graphics.m_is_open)
 	{
-		m_command_allocator_graphics.m_allocator->Reset() >> CHK;
-		m_command_list_graphics.m_list->Reset(m_command_allocator_graphics.m_allocator.Get(), nullptr) >> CHK;
+		command_allocator.m_allocator->Reset() >> CHK;
+		m_command_list_graphics.m_list->Reset(command_allocator.m_allocator.Get(), nullptr) >> CHK;
 		m_command_list_graphics.m_is_open = true;
 	}
 
@@ -252,7 +264,6 @@ void DXContext::ExecuteCommandListGraphics()
 	m_command_list_graphics.m_is_open = false;
 	ID3D12CommandList* command_lists[] = { m_command_list_graphics.m_list.Get() };
 	m_queue_graphics.m_queue->ExecuteCommandLists(COUNT(command_lists), command_lists);
-	SignalAndWait();
 }
 
 void DXContext::ExecuteCommandListCompute()
@@ -261,7 +272,6 @@ void DXContext::ExecuteCommandListCompute()
 	m_command_list_compute.m_is_open = false;
 	ID3D12CommandList* command_lists[] = { m_command_list_compute.m_list.Get() };
 	m_queue_compute.m_queue->ExecuteCommandLists(COUNT(command_lists), command_lists);
-	SignalAndWait();
 }
 
 void DXContext::ExecuteCommandListCopy()
@@ -270,25 +280,25 @@ void DXContext::ExecuteCommandListCopy()
 	m_command_list_copy.m_is_open = false;
 	ID3D12CommandList* command_lists[] = { m_command_list_copy.m_list.Get() };
 	m_queue_copy.m_queue->ExecuteCommandLists(COUNT(command_lists), command_lists);
-	SignalAndWait();
 }
 
-void DXContext::Signal(const CommandQueue& command_queue, Fence& fence)
+void DXContext::Signal(const CommandQueue& command_queue, Fence& fence, uint32 index)
 {
-	++fence.m_cpu;
-	command_queue.m_queue->Signal(fence.m_gpu.Get(), fence.m_cpu) >> CHK;
+	++fence.m_value;
+	fence.m_cpus[index] = fence.m_value;
+	command_queue.m_queue->Signal(fence.m_gpu.Get(), fence.m_value) >> CHK;
 }
 
-void DXContext::Wait(const Fence& fence)
+void DXContext::Wait(const Fence& fence, uint32 index)
 {
-	fence.m_gpu->SetEventOnCompletion(fence.m_cpu, fence.m_event) >> CHK;
+	fence.m_gpu->SetEventOnCompletion(fence.m_cpus[index], fence.m_event) >> CHK;
 	WaitForSingleObject(fence.m_event, INFINITE);
 }
 
 void DXContext::SignalAndWait()
 {
-	Signal(m_queue_graphics, m_fence);
-	Wait(m_fence);
+	Signal(m_queue_graphics, m_fence, g_current_buffer_index);
+	Wait(m_fence, g_current_buffer_index);
 }
 
 // Wait all GPU operations completed
@@ -456,8 +466,10 @@ void DXContext::CreateCommandList
 
 void DXContext::CreateFence(Fence& out_fence)
 {
-	out_fence.m_cpu = 0u;
-	m_device->CreateFence(out_fence.m_cpu /* Initial fence value */, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&out_fence.m_gpu)) >> CHK;
+	uint64 initial_value = 0u;
+	out_fence.m_value = initial_value;
+	memset(&out_fence.m_cpus, initial_value , sizeof(out_fence.m_cpus));
+	m_device->CreateFence(initial_value  /* Initial fence value */, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&out_fence.m_gpu)) >> CHK;
 	out_fence.m_event = CreateEvent(nullptr, false, false, nullptr);
 	ASSERT(out_fence.m_event != nullptr);
 }

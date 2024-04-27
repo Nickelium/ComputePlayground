@@ -163,6 +163,7 @@ void CreateGraphicsResources
 		// Copy queue has some constraints regarding copy state and barriers
 		// Compute has synchronization issue
 		dx_context.ExecuteCommandListGraphics();
+		dx_context.Flush(1);
 
 		vertex_buffer_view =
 		{
@@ -489,13 +490,13 @@ int main()
 						if (dx_window.ShouldResize())
 						{
 							dx_context.Flush(dx_window.GetBackBufferCount());
-							dx_window.Resize();
+							dx_window.Resize(dx_context);
 						}
 
 						dx_context.InitCommandLists();
 						FillCommandList(dx_context, dx_window, resource, vertex_buffer_view, vertex_count);
 						dx_context.ExecuteCommandListGraphics();
-						dx_window.Present();
+						dx_window.Present(dx_context);
 
 						float32* data = nullptr;
 						const D3D12_RANGE range = { 0, resource.m_uav.m_readback_desc.Width };
@@ -515,7 +516,6 @@ int main()
 					{
 						gpu_capture->EndCapture();
 						gpu_capture->OpenCapture();
-						//state.m_capture = !state.m_capture;
 					}
 
 				}

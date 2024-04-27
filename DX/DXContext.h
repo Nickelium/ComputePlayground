@@ -86,7 +86,8 @@ struct CommandList
 struct Fence
 {
 	Microsoft::WRL::ComPtr<ID3D12Fence> m_gpu;
-	uint64 m_cpu;
+	uint64 m_cpus[g_backbuffer_count];
+	uint64 m_value;
 	HANDLE m_event;
 };
 
@@ -154,8 +155,8 @@ public:
 
 	void CreateFence(Fence& out_fence);
 
-	void Signal(const CommandQueue& command_queue, Fence& fence);
-	void Wait(const Fence& fence);
+	void Signal(const CommandQueue& command_queue, Fence& fence, uint32 index);
+	void Wait(const Fence& fence, uint32 index);
 
 
 private:
@@ -165,24 +166,26 @@ private:
 	Microsoft::WRL::ComPtr<IDXGIAdapter4> m_adapter; // GPU
 	Microsoft::WRL::ComPtr<ID3D12Device9> m_device;
 	bool m_use_warp;
-
+public:
 	// Graphics + Compute + Copy
 	CommandQueue m_queue_graphics;
+private:
 	// Compute + Copy
 	CommandQueue m_queue_compute;
 	// Copy
 	CommandQueue m_queue_copy;
 	
 	CommandList m_command_list_graphics;
-	CommandAllocator m_command_allocator_graphics;
+	std::vector<CommandAllocator> m_command_allocator_graphics;
 
 	CommandList m_command_list_compute;
 	CommandAllocator m_command_allocator_compute;
 
 	CommandList m_command_list_copy;
 	CommandAllocator m_command_allocator_copy;
-
+public:
 	Fence m_fence;
+private:
 	Fence m_device_removed_fence;
 
 #if defined(_DEBUG)

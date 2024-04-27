@@ -96,13 +96,13 @@ public:
 
 	void EndFrame(const DXContext& dx_context);
 
-	void Present();
+	void Present(DXContext& dx_context);
 
 	void Close();
 
 	void Update();
 
-	void Resize();
+	void Resize(const DXContext& dx_context);
 
 	void SetWindowModeRequest(WindowMode window_mode);
 	WindowMode GetWindowModeRequest() const;
@@ -120,7 +120,6 @@ public:
 
 	void SetTitle();
 	std::string GetTitle();
-	void Resize(const DXContext& dx_context, uint32 width, uint32 height);
 	bool IsClosed();
 
 
@@ -160,7 +159,9 @@ private:
 	uint32 m_windowed_height;
 	uint32 m_style;
 
-	uint32 m_current_buffer_index = 0u;
 
 	bool m_hdr;
 };
+
+// Declaration
+extern uint32 g_current_buffer_index;

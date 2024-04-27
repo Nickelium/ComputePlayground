@@ -119,6 +119,8 @@ LRESULT DXWindow::OnWindowMessage(HWND handle, UINT msg, WPARAM wParam, LPARAM l
 	return DefWindowProcW(handle, msg, wParam, lParam);
 }
 
+// Definition
+uint32 g_current_buffer_index = 0u;
 
 DXWindow::DXWindow(const DXContext& dx_context, const DXWindowManager& window_manager, const WindowDesc& window_desc)
 {
@@ -176,26 +178,27 @@ void DXWindow::Init
 
 void DXWindow::BeginFrame(const DXContext& dx_context)
 {
-	m_current_buffer_index = m_swap_chain->GetCurrentBackBufferIndex();
-	
-	dx_context.Transition(D3D12_RESOURCE_STATE_RENDER_TARGET, m_buffers[m_current_buffer_index]);
+	dx_context.Transition(D3D12_RESOURCE_STATE_RENDER_TARGET, m_buffers[g_current_buffer_index]);
 
 	const float4 color{ 85.0f / 255.0f, 230.0f / 255.0f, 23.0f / 255.0f, 1.0f };
-	dx_context.GetCommandListGraphics()->ClearRenderTargetView(m_rtv_handles[m_current_buffer_index], color, 0, nullptr);
-	dx_context.GetCommandListGraphics()->OMSetRenderTargets(1, &m_rtv_handles[m_current_buffer_index], false, nullptr);
+	dx_context.GetCommandListGraphics()->ClearRenderTargetView(m_rtv_handles[g_current_buffer_index], color, 0, nullptr);
+	dx_context.GetCommandListGraphics()->OMSetRenderTargets(1, &m_rtv_handles[g_current_buffer_index], false, nullptr);
 }
 
 void DXWindow::EndFrame(const DXContext& dx_context)
 {
-	dx_context.Transition(D3D12_RESOURCE_STATE_PRESENT, m_buffers[m_current_buffer_index]);
+	dx_context.Transition(D3D12_RESOURCE_STATE_PRESENT, m_buffers[g_current_buffer_index]);
 }
 
-void DXWindow::Present()
+void DXWindow::Present(DXContext& dx_context)
 {
 	// Sync interval [0;4] where 0 is uncapped
 	uint32 vsync_interval = 0;
 	uint32 present_flags = 0;
 	m_swap_chain->Present(vsync_interval, present_flags) >> CHK;
+	dx_context.Signal(dx_context.m_queue_graphics, dx_context.m_fence, g_current_buffer_index);
+
+	g_current_buffer_index = m_swap_chain->GetCurrentBackBufferIndex();
 }
 
 void DXWindow::Close()
@@ -235,7 +238,7 @@ void DXWindow::Update()
 	}
 }
 
-void DXWindow::Resize()
+void DXWindow::Resize(const DXContext& dx_context)
 {
 	RECT rt{};
 	if (GetClientRect(m_handle, &rt))
@@ -250,6 +253,12 @@ void DXWindow::Resize()
 		m_should_resize = false;
 
 		GetBuffers();
+		// Recreate RTVs
+		// Dont need to recreate descriptors nor descriptor heap
+		for (uint32 i = 0; i < m_buffers.size(); ++i)
+		{
+			dx_context.CreateRTV(m_buffers[i], GetFormat(), m_rtv_handles[i]);
+		}
 	}
 }
 
