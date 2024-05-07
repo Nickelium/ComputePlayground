@@ -529,6 +529,95 @@ int main()
 }
 
 
+void RunWorkGraph(DXContext& dx_context)
+{
+
+	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> cmd_list = dx_context.GetCommandListGraphics();
+	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList10> cmd_list10{};
+	cmd_list.As(&cmd_list10) >> CHK;
+	Microsoft::WRL::ComPtr<ID3D12Device> device = dx_context.GetDevice();
+	Microsoft::WRL::ComPtr<ID3D12Device5> device5{};
+	device.As(&device5) >> CHK;
+	
+	Microsoft::WRL::ComPtr<ID3D12StateObject> state_object{};
+	D3D12_DXIL_LIBRARY_DESC sub_object_library =
+	{
+		.DXILLibrary = nullptr, // TODO
+		.NumExports = 0,
+		.pExports = nullptr,
+	};
+	std::string work_graph_name{ "WorkGraph" };
+	std::wstring work_graph_wname = std::to_wstring(work_graph_name);
+	D3D12_WORK_GRAPH_DESC sub_object_work_graph
+	{
+		.ProgramName = work_graph_wname.c_str(),
+		.Flags = D3D12_WORK_GRAPH_FLAG_INCLUDE_ALL_AVAILABLE_NODES,
+		.NumEntrypoints = 0,
+		.pEntrypoints = nullptr,
+		.NumExplicitlyDefinedNodes = 0,
+		.pExplicitlyDefinedNodes = nullptr,
+	};
+	std::vector<D3D12_STATE_SUBOBJECT> state_subobjects =
+	{
+		{
+			.Type = D3D12_STATE_SUBOBJECT_TYPE_DXIL_LIBRARY,
+			.pDesc = &sub_object_library,
+		},
+		{
+			.Type = D3D12_STATE_SUBOBJECT_TYPE_WORK_GRAPH,
+			.pDesc = &sub_object_work_graph,
+		},
+	};
+
+	D3D12_STATE_OBJECT_DESC state_object_desc =
+	{
+		.Type = D3D12_STATE_OBJECT_TYPE_EXECUTABLE,
+		.NumSubobjects = 1,
+		.pSubobjects = state_subobjects.data()
+	};
+	device5->CreateStateObject(&state_object_desc, IID_PPV_ARGS(&state_object)) >> CHK;
+
+	Microsoft::WRL::ComPtr<ID3D12Resource> work_graph_resource;
+	D3D12_GPU_VIRTUAL_ADDRESS_RANGE work_graph_backing_memory = {};
+	D3D12_PROGRAM_IDENTIFIER work_graph_id = {};
+	D3D12_WORK_GRAPH_MEMORY_REQUIREMENTS work_graph_mem_req= {};
+
+	Microsoft::WRL::ComPtr<ID3D12RootSignature> root_signature{};
+	
+	D3D12_SET_PROGRAM_DESC program_desc =
+	{
+		.Type = D3D12_PROGRAM_TYPE_WORK_GRAPH,
+		.WorkGraph =
+		{
+			.ProgramIdentifier = 0, // TODO
+			.Flags = D3D12_SET_WORK_GRAPH_FLAG_INITIALIZE,
+			.BackingMemory = 0, // TODO
+			.NodeLocalRootArgumentsTable = 0,
+		},
+	};
+	cmd_list10->SetProgram(&program_desc);
+
+	struct Record
+	{
+		uint32 index_record;
+	};
+	std::vector<Record> records{};
+	records.push_back(Record{0});
+	D3D12_DISPATCH_GRAPH_DESC wg_desc =
+	{
+		.Mode = D3D12_DISPATCH_MODE_NODE_CPU_INPUT,
+		.NodeCPUInput =
+		{
+			.EntrypointIndex = 0,
+			.NumRecords = (uint32)records.size(),
+			.pRecords = records.data(),
+			.RecordStrideInBytes = sizeof(Record)
+		},
+	};
+	cmd_list10->DispatchGraph(&wg_desc); 
+	//cmd_list14->dispatch
+}
+
 class Application
 {
 public:
