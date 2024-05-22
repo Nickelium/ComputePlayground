@@ -357,6 +357,8 @@ void ComputeWork
 	dx_context.GetCommandListGraphics()->CopyResource(resource.m_uav.m_read_back_resource.Get(), resource.m_uav.m_gpu_resource.Get());
 }
 
+#include "d3dx12.h"
+
 void GraphicsWork
 (
 	DXContext& dx_context, DXWindow& dx_window, Resources& resource, 	
@@ -409,6 +411,7 @@ void FillCommandList
 	dx_window.EndFrame(dx_context);
 }
 void RunTest();
+void RunWorkGraph(DXContext& dx_context);
 int main()
 {
 	MemoryTrack();
@@ -419,10 +422,14 @@ int main()
 	DXReportContext dx_report_context{};
 	{
 		// TODO PIX / renderdoc markers
-		GPUCapture* gpu_capture = new PIXCapture();
+		//GPUCapture* gpu_capture = new PIXCapture();
+		GPUCapture * gpu_capture = nullptr;
 		//GPUCapture* gpu_capture = new RenderDocCapture();
 		DXContext dx_context{};
 		dx_report_context.SetDevice(dx_context.GetDevice());
+		RunWorkGraph(dx_context);
+		return 0;
+
 		DXCompiler dx_compiler("shaders");
 		DXWindowManager window_manager;
 		{
@@ -533,16 +540,27 @@ void RunWorkGraph(DXContext& dx_context)
 {
 
 	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> cmd_list = dx_context.GetCommandListGraphics();
+	dx_context.InitCommandLists();
 	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList10> cmd_list10{};
 	cmd_list.As(&cmd_list10) >> CHK;
 	Microsoft::WRL::ComPtr<ID3D12Device> device = dx_context.GetDevice();
 	Microsoft::WRL::ComPtr<ID3D12Device5> device5{};
 	device.As(&device5) >> CHK;
+
+
+	Microsoft::WRL::ComPtr<IDxcBlob> outShaderBlob{};
+	DXCompiler dx_compiler("shaders");
+	dx_compiler.Compile(dx_context.GetDevice(), &outShaderBlob, "WorkGraphShader.hlsl", ShaderType::LIB_SHADER);
 	
 	Microsoft::WRL::ComPtr<ID3D12StateObject> state_object{};
+	D3D12_SHADER_BYTECODE byte_code
+	{
+		.pShaderBytecode = outShaderBlob->GetBufferPointer(),
+		.BytecodeLength = outShaderBlob->GetBufferSize()
+	};
 	D3D12_DXIL_LIBRARY_DESC sub_object_library =
 	{
-		.DXILLibrary = nullptr, // TODO
+		.DXILLibrary = byte_code,
 		.NumExports = 0,
 		.pExports = nullptr,
 	};
@@ -572,37 +590,97 @@ void RunWorkGraph(DXContext& dx_context)
 	D3D12_STATE_OBJECT_DESC state_object_desc =
 	{
 		.Type = D3D12_STATE_OBJECT_TYPE_EXECUTABLE,
-		.NumSubobjects = 1,
+		.NumSubobjects = (uint32)state_subobjects.size(),
 		.pSubobjects = state_subobjects.data()
 	};
-	device5->CreateStateObject(&state_object_desc, IID_PPV_ARGS(&state_object)) >> CHK;
 
-	Microsoft::WRL::ComPtr<ID3D12Resource> work_graph_resource;
-	D3D12_GPU_VIRTUAL_ADDRESS_RANGE work_graph_backing_memory = {};
-	D3D12_PROGRAM_IDENTIFIER work_graph_id = {};
-	D3D12_WORK_GRAPH_MEMORY_REQUIREMENTS work_graph_mem_req= {};
+	Microsoft::WRL::ComPtr<ID3D12Device14> device14{};
+	device.As(&device14) >> CHK;
+	device14->CreateStateObject(&state_object_desc, IID_PPV_ARGS(&state_object)) >> CHK;
 
+	CD3DX12_SHADER_BYTECODE libCode(byte_code);
 	Microsoft::WRL::ComPtr<ID3D12RootSignature> root_signature{};
+	//device14->CreateRootSignatureFromSubobjectInLibrary(0, libCode.pShaderBytecode, libCode.BytecodeLength, L"globalRS", IID_PPV_ARGS(&root_signature)) >> CHK;
 	
+	// Are these subtypes?
+	Microsoft::WRL::ComPtr<ID3D12StateObjectProperties1> spWGProp1;
+	state_object.As(&spWGProp1) >> CHK;
+	D3D12_PROGRAM_IDENTIFIER program_identifier{};
+	program_identifier = spWGProp1->GetProgramIdentifier(work_graph_wname.c_str());
+
+	Microsoft::WRL::ComPtr<ID3D12WorkGraphProperties> spWGProps;
+	state_object.As(&spWGProps) >> CHK;
+	UINT WorkGraphIndex = spWGProps->GetWorkGraphIndex(work_graph_wname.c_str());
+	D3D12_WORK_GRAPH_MEMORY_REQUIREMENTS MemReqs{};
+	spWGProps->GetWorkGraphMemoryRequirements(WorkGraphIndex, &MemReqs);
+	D3D12_GPU_VIRTUAL_ADDRESS_RANGE BackingMemory{};
+	BackingMemory.SizeInBytes = MemReqs.MaxSizeInBytes;
+
+	Microsoft::WRL::ComPtr<ID3D12Resource> spBackingMemory{};
+	D3D12_HEAP_PROPERTIES heap_properties
+	{
+		.Type = D3D12_HEAP_TYPE_DEFAULT,
+		.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN,
+		.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN,
+		.CreationNodeMask = 0,
+		.VisibleNodeMask = 0
+	};
+	D3D12_RESOURCE_DESC resource_desc
+	{
+		.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER,
+		.Alignment = 0,
+		.Width = MemReqs.MaxSizeInBytes,
+		.Height = 1,
+		.DepthOrArraySize = 1,
+		.MipLevels = 1,
+		.Format = DXGI_FORMAT_UNKNOWN,
+		.SampleDesc =
+		{
+			.Count = 1,
+			.Quality = 0,
+		},
+		.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR,
+		.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS,
+	};
+	device14->CreateCommittedResource
+	(
+		&heap_properties, D3D12_HEAP_FLAG_NONE,
+		&resource_desc,
+		D3D12_RESOURCE_STATE_COMMON,
+		nullptr, IID_PPV_ARGS(&spBackingMemory)) >> CHK;
+	BackingMemory.StartAddress = spBackingMemory->GetGPUVirtualAddress();
+
+	Microsoft::WRL::ComPtr<ID3D12Resource> buffer{};
+	resource_desc.Width = 16777216 * sizeof(uint32);
+	device14->CreateCommittedResource
+	(
+		&heap_properties, D3D12_HEAP_FLAG_NONE,
+		&resource_desc,
+		D3D12_RESOURCE_STATE_COMMON,
+		nullptr, IID_PPV_ARGS(&buffer)) >> CHK;
+
 	D3D12_SET_PROGRAM_DESC program_desc =
 	{
 		.Type = D3D12_PROGRAM_TYPE_WORK_GRAPH,
 		.WorkGraph =
 		{
-			.ProgramIdentifier = 0, // TODO
+			.ProgramIdentifier = program_identifier,
 			.Flags = D3D12_SET_WORK_GRAPH_FLAG_INITIALIZE,
-			.BackingMemory = 0, // TODO
+			.BackingMemory = BackingMemory,
 			.NodeLocalRootArgumentsTable = 0,
 		},
 	};
-	cmd_list10->SetProgram(&program_desc);
 
 	struct Record
 	{
-		uint32 index_record;
+		UINT gridSize; // : SV_DispatchGrid;
+		UINT recordIndex;
 	};
 	std::vector<Record> records{};
-	records.push_back(Record{0});
+	records.push_back(Record{ 1, 0 });
+	records.push_back(Record{ 2, 1 });
+	records.push_back(Record{ 3, 2 });
+	records.push_back(Record{ 4, 3 });
 	D3D12_DISPATCH_GRAPH_DESC wg_desc =
 	{
 		.Mode = D3D12_DISPATCH_MODE_NODE_CPU_INPUT,
@@ -614,8 +692,10 @@ void RunWorkGraph(DXContext& dx_context)
 			.RecordStrideInBytes = sizeof(Record)
 		},
 	};
+	//cmd_list10->SetComputeRootSignature(root_signature.Get());
+	//cmd_list10->SetComputeRootUnorderedAccessView(0, buffer->GetGPUVirtualAddress());
+	cmd_list10->SetProgram(&program_desc);
 	cmd_list10->DispatchGraph(&wg_desc); 
-	//cmd_list14->dispatch
 }
 
 class Application

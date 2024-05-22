@@ -11,6 +11,7 @@ static const std::pair<ShaderType, std::string> g_shader_type_map_string[] =
 	{ShaderType::VERTEX_SHADER, "vs"},
 	{ShaderType::PIXEL_SHADER, "ps"},
 	{ShaderType::COMPUTE_SHADER, "cs"},
+	{ShaderType::LIB_SHADER, "lib"},
 };
 
 std::string GetShaderTypeString(const ShaderType& shader_type)

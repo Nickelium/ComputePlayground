@@ -13,6 +13,7 @@ enum class ShaderType
 	VERTEX_SHADER = 0,
 	PIXEL_SHADER,
 	COMPUTE_SHADER,
+	LIB_SHADER, // For workgraphs and raytracing shaders
 	NUMBER_SHADER_TYPES,
 };
 
