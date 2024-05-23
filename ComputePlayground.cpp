@@ -54,7 +54,7 @@ void CreateComputeResources(const DXContext& dx_context, const DXCompiler& dx_co
 
 	D3D12_COMPUTE_PIPELINE_STATE_DESC pso_desc =
 	{
-		.pRootSignature = resource.m_compute_root_signature.Get(),
+		.pRootSignature = /*resource.m_compute_root_signature.Get()*/nullptr,
 		.CS = 
 		{
 			.pShaderBytecode = resource.m_compute_shader->GetBufferPointer(),
@@ -203,7 +203,7 @@ void CreateGraphicsResources
 
 		const D3D12_GRAPHICS_PIPELINE_STATE_DESC gfx_pso_desc
 		{
-			.pRootSignature = resource.m_gfx_root_signature.Get(),
+			.pRootSignature = /*resource.m_gfx_root_signature.Get()*/nullptr /*root signature already embed in shader*/,
 			.VS =
 			{
 				.pShaderBytecode = resource.m_vertex_shader->GetBufferPointer(),
@@ -411,291 +411,321 @@ void FillCommandList
 	dx_window.EndFrame(dx_context);
 }
 void RunTest();
-void RunWorkGraph(DXContext& dx_context);
+
+void RunWorkGraph(DXContext& dx_context, DXCompiler& dx_compiler)
+{
+	dx_context.InitCommandLists();
+	{
+		Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> cmd_list = dx_context.GetCommandListGraphics();
+		dx_context.InitCommandLists();
+		Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList10> cmd_list10{};
+		cmd_list.As(&cmd_list10) >> CHK;
+		Microsoft::WRL::ComPtr<ID3D12Device> device = dx_context.GetDevice();
+		Microsoft::WRL::ComPtr<ID3D12Device5> device5{};
+		device.As(&device5) >> CHK;
+
+		Microsoft::WRL::ComPtr<IDxcBlob> outShaderBlob{};
+		dx_compiler.Compile(dx_context.GetDevice(), &outShaderBlob, "WorkGraphShader.hlsl", ShaderType::LIB_SHADER);
+
+		D3D12_SHADER_BYTECODE byte_code
+		{
+			.pShaderBytecode = outShaderBlob->GetBufferPointer(),
+			.BytecodeLength = outShaderBlob->GetBufferSize()
+		};
+
+		Microsoft::WRL::ComPtr<ID3D12Device14> device14{};
+		device.As(&device14) >> CHK;
+
+		CD3DX12_SHADER_BYTECODE libCode(byte_code);
+		Microsoft::WRL::ComPtr<ID3D12RootSignature> root_signature{};
+		device14->CreateRootSignature(0, libCode.pShaderBytecode, libCode.BytecodeLength, /*L"globalRS",*/ IID_PPV_ARGS(&root_signature)) >> CHK;
+		NAME_DX_OBJECT(root_signature, "Global RootSignature");
+
+		Microsoft::WRL::ComPtr<ID3D12StateObject> state_object{};
+
+		D3D12_DXIL_LIBRARY_DESC sub_object_library =
+		{
+			.DXILLibrary = byte_code,
+			.NumExports = 0,
+			.pExports = nullptr,
+		};
+		std::string work_graph_name{ "WorkGraph" };
+		std::wstring work_graph_wname = std::to_wstring(work_graph_name);
+		D3D12_WORK_GRAPH_DESC sub_object_work_graph
+		{
+			.ProgramName = work_graph_wname.c_str(),
+			.Flags = D3D12_WORK_GRAPH_FLAG_INCLUDE_ALL_AVAILABLE_NODES,
+			.NumEntrypoints = 0,
+			.pEntrypoints = nullptr,
+			.NumExplicitlyDefinedNodes = 0,
+			.pExplicitlyDefinedNodes = nullptr,
+		};
+
+		D3D12_GLOBAL_ROOT_SIGNATURE sub_object_global_rootsignature
+		{
+			.pGlobalRootSignature = root_signature.Get(),
+		};
+
+		std::vector<D3D12_STATE_SUBOBJECT> state_subobjects =
+		{
+			{
+				.Type = D3D12_STATE_SUBOBJECT_TYPE_DXIL_LIBRARY,
+				.pDesc = &sub_object_library,
+			},
+			{
+				.Type = D3D12_STATE_SUBOBJECT_TYPE_WORK_GRAPH,
+				.pDesc = &sub_object_work_graph,
+			},
+			{
+				.Type = D3D12_STATE_SUBOBJECT_TYPE_GLOBAL_ROOT_SIGNATURE,
+				.pDesc = &sub_object_global_rootsignature,
+			}, // Even though global rootsignature is embed in the shader, still needs to mark as subobject to the stateobject
+		};
+
+		D3D12_STATE_OBJECT_DESC state_object_desc =
+		{
+			.Type = D3D12_STATE_OBJECT_TYPE_EXECUTABLE,
+			.NumSubobjects = (uint32)state_subobjects.size(),
+			.pSubobjects = state_subobjects.data()
+		};
+
+		device14->CreateStateObject(&state_object_desc, IID_PPV_ARGS(&state_object)) >> CHK;
+		NAME_DX_OBJECT(state_object, "State Object");
+
+		// Are these subtypes?
+		Microsoft::WRL::ComPtr<ID3D12StateObjectProperties1> spWGProp1;
+		state_object.As(&spWGProp1) >> CHK;
+		D3D12_PROGRAM_IDENTIFIER program_identifier{};
+		program_identifier = spWGProp1->GetProgramIdentifier(work_graph_wname.c_str());
+
+		Microsoft::WRL::ComPtr<ID3D12WorkGraphProperties> spWGProps;
+		state_object.As(&spWGProps) >> CHK;
+		UINT WorkGraphIndex = spWGProps->GetWorkGraphIndex(work_graph_wname.c_str());
+		D3D12_WORK_GRAPH_MEMORY_REQUIREMENTS MemReqs{};
+		spWGProps->GetWorkGraphMemoryRequirements(WorkGraphIndex, &MemReqs);
+		D3D12_GPU_VIRTUAL_ADDRESS_RANGE BackingMemory{};
+		BackingMemory.SizeInBytes = MemReqs.MaxSizeInBytes;
+
+		Microsoft::WRL::ComPtr<ID3D12Resource> spBackingMemory{};
+		D3D12_HEAP_PROPERTIES heap_properties
+		{
+			.Type = D3D12_HEAP_TYPE_DEFAULT,
+			.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN,
+			.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN,
+			.CreationNodeMask = 0,
+			.VisibleNodeMask = 0
+		};
+		D3D12_RESOURCE_DESC resource_desc
+		{
+			.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER,
+			.Alignment = 0,
+			.Width = MemReqs.MaxSizeInBytes,
+			.Height = 1,
+			.DepthOrArraySize = 1,
+			.MipLevels = 1,
+			.Format = DXGI_FORMAT_UNKNOWN,
+			.SampleDesc =
+			{
+				.Count = 1,
+				.Quality = 0,
+			},
+			.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR,
+			.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS,
+		};
+		device14->CreateCommittedResource
+		(
+			&heap_properties, D3D12_HEAP_FLAG_NONE,
+			&resource_desc,
+			D3D12_RESOURCE_STATE_COMMON,
+			nullptr, IID_PPV_ARGS(&spBackingMemory)) >> CHK;
+		NAME_DX_OBJECT(spBackingMemory, "Scratch Memory");
+
+		BackingMemory.StartAddress = spBackingMemory->GetGPUVirtualAddress();
+
+		Microsoft::WRL::ComPtr<ID3D12Resource> buffer{};
+		resource_desc.Width = 16777216 * sizeof(uint32);
+		device14->CreateCommittedResource
+		(
+			&heap_properties, D3D12_HEAP_FLAG_NONE,
+			&resource_desc,
+			D3D12_RESOURCE_STATE_COMMON,
+			nullptr, IID_PPV_ARGS(&buffer)
+		) >> CHK;
+		NAME_DX_OBJECT(buffer, "Buffer UAV resource");
+
+		D3D12_SET_PROGRAM_DESC program_desc =
+		{
+			.Type = D3D12_PROGRAM_TYPE_WORK_GRAPH,
+			.WorkGraph =
+			{
+				.ProgramIdentifier = program_identifier,
+				.Flags = D3D12_SET_WORK_GRAPH_FLAG_INITIALIZE,
+				.BackingMemory = BackingMemory,
+				.NodeLocalRootArgumentsTable = 0,
+			},
+		};
+
+		struct Record
+		{
+			UINT gridSize; // : SV_DispatchGrid;
+			UINT recordIndex;
+		};
+		std::vector<Record> records{};
+		records.push_back(Record{ 1, 0 });
+		records.push_back(Record{ 2, 1 });
+		records.push_back(Record{ 3, 2 });
+		records.push_back(Record{ 4, 3 });
+		D3D12_DISPATCH_GRAPH_DESC wg_desc =
+		{
+			.Mode = D3D12_DISPATCH_MODE_NODE_CPU_INPUT,
+			.NodeCPUInput =
+			{
+				.EntrypointIndex = 0,
+				.NumRecords = (uint32)records.size(),
+				.pRecords = records.data(),
+				.RecordStrideInBytes = sizeof(Record)
+			},
+		};
+		cmd_list10->SetComputeRootSignature(root_signature.Get());
+		cmd_list10->SetComputeRootUnorderedAccessView(0, buffer->GetGPUVirtualAddress());
+		cmd_list10->SetProgram(&program_desc);
+		cmd_list10->DispatchGraph(&wg_desc);
+		dx_context.ExecuteCommandListGraphics();
+		dx_context.Flush(1);
+	}
+	LogTrace("Workgraph Dispatched");
+}
+
+void RunWindowLoop(DXContext& dx_context, DXCompiler& dx_compiler, GPUCapture* gpu_capture)
+{
+	DXWindowManager window_manager;
+	{
+		uint32 width = 1500;
+		uint32 height = 800;
+		WindowDesc window_desc =
+		{
+			.m_window_name = { "Playground" },
+			.m_width = width,
+			.m_height = height,
+			.m_origin_x = (1920 >> 1) - (width >> 1),
+			.m_origin_y = (1080 >> 1) - (height >> 1),
+		};
+		DXWindow dx_window(dx_context, window_manager, window_desc);
+		{
+			Resources resource{};
+			CreateComputeResources(dx_context, dx_compiler, resource);
+			DXResource vertex_buffer{};
+			D3D12_VERTEX_BUFFER_VIEW vertex_buffer_view{};
+			uint32 vertex_count{};
+			CreateGraphicsResources(dx_context, dx_compiler, dx_window, resource, vertex_buffer, vertex_buffer_view, vertex_count);
+
+			while (!dx_window.ShouldClose())
+			{
+				// Process window message
+				dx_window.Update();
+					
+				// Key input handling of application
+				static bool prev_F1_pressed = false;
+				bool capture = false;
+				bool current_F1_pressed = dx_window.input.IsKeyPressed(VK_F1);
+				if (current_F1_pressed && prev_F1_pressed != current_F1_pressed)
+				{
+					capture = true;
+				}
+				prev_F1_pressed = current_F1_pressed;
+					
+				if (dx_window.input.IsKeyPressed(VK_ESCAPE))
+				{
+					dx_window.m_should_close = true;
+				}
+
+				// TODO support release button essentially needed
+				static bool prev_F11_pressed = false;
+				bool current_F11_pressed = dx_window.input.IsKeyPressed(VK_F11);
+				if (current_F11_pressed && prev_F11_pressed != current_F11_pressed)
+				{
+					// F11 also sends a WM_SIZE after
+					WindowMode current_window_mode = dx_window.GetWindowModeRequest();
+					WindowMode next_window_mode = static_cast<WindowMode>((static_cast<int32>(current_window_mode) + 1) % (static_cast<int32>(WindowMode::Count)));
+
+					dx_window.SetWindowModeRequest(next_window_mode);
+					//dx_window.ToggleWindowMode();
+				}
+				prev_F11_pressed = current_F11_pressed;
+
+
+				if (capture)
+				{
+					gpu_capture->StartCapture();
+				}
+				// rendering
+				{
+					// Handle resizing
+					if (dx_window.ShouldResize())
+					{
+						dx_context.Flush(dx_window.GetBackBufferCount());
+						dx_window.Resize(dx_context);
+					}
+
+					dx_context.InitCommandLists();
+					FillCommandList(dx_context, dx_window, resource, vertex_buffer_view, vertex_count);
+					dx_context.ExecuteCommandListGraphics();
+					dx_window.Present(dx_context);
+
+					float32* data = nullptr;
+					const D3D12_RANGE range = { 0, resource.m_uav.m_readback_desc.Width };
+					resource.m_uav.m_read_back_resource->Map(0, &range, (void**)&data);
+					static bool has_display = false;
+					if (!has_display)
+					{
+						for (uint32 i = 0; i < resource.m_uav.m_readback_desc.Width / sizeof(float32) / 4; i++)
+						{
+							LogTrace("uav[{}] = {}, {}, {}, {}\n", i, data[i * 4 + 0], data[i * 4 + 1], data[i * 4 + 2], data[i * 4 + 3]);
+						}
+						has_display = true;
+					}
+					resource.m_uav.m_read_back_resource->Unmap(0, nullptr);
+				}
+				if (capture)
+				{
+					gpu_capture->EndCapture();
+					gpu_capture->OpenCapture();
+				}
+
+			}
+			dx_context.Flush(dx_window.GetBackBufferCount());
+		}
+	}
+}
+
 int main()
 {
 	MemoryTrack();
 
-	//RunTest();
-	//return 0;
-
 	DXReportContext dx_report_context{};
 	{
 		// TODO PIX / renderdoc markers
-		//GPUCapture* gpu_capture = new PIXCapture();
-		GPUCapture * gpu_capture = nullptr;
+		//GPUCapture * gpu_capture = nullptr;
+		GPUCapture* gpu_capture = new PIXCapture();
 		//GPUCapture* gpu_capture = new RenderDocCapture();
+		
 		DXContext dx_context{};
 		dx_report_context.SetDevice(dx_context.GetDevice());
-		RunWorkGraph(dx_context);
-		return 0;
-
 		DXCompiler dx_compiler("shaders");
-		DXWindowManager window_manager;
+		gpu_capture->StartCapture();
 		{
-			uint32 width = 1500;
-			uint32 height = 800;
-			WindowDesc window_desc =
-			{
-				.m_window_name = { "Playground" },
-				.m_width = width,
-				.m_height = height,
-				.m_origin_x = (1920 >> 1) - (width >> 1),
-				.m_origin_y = (1080 >> 1) - (height >> 1),
-			};
-			DXWindow dx_window(dx_context, window_manager, window_desc);
-			{
-				Resources resource{};
-				CreateComputeResources(dx_context, dx_compiler, resource);
-				DXResource vertex_buffer{};
-				D3D12_VERTEX_BUFFER_VIEW vertex_buffer_view{};
-				uint32 vertex_count{};
-				CreateGraphicsResources(dx_context, dx_compiler, dx_window, resource, vertex_buffer, vertex_buffer_view, vertex_count);
-
-				while (!dx_window.ShouldClose())
-				{
-					// Process window message
-					dx_window.Update();
-					
-					// Key input handling of application
-					static bool prev_F1_pressed = false;
-					bool capture = false;
-					bool current_F1_pressed = dx_window.input.IsKeyPressed(VK_F1);
-					if (current_F1_pressed && prev_F1_pressed != current_F1_pressed)
-					{
-						capture = true;
-					}
-					prev_F1_pressed = current_F1_pressed;
-					
-					if (dx_window.input.IsKeyPressed(VK_ESCAPE))
-					{
-						dx_window.m_should_close = true;
-					}
-
-					// TODO support release button essentially needed
-					static bool prev_F11_pressed = false;
-					bool current_F11_pressed = dx_window.input.IsKeyPressed(VK_F11);
-					if (current_F11_pressed && prev_F11_pressed != current_F11_pressed)
-					{
-						// F11 also sends a WM_SIZE after
-						WindowMode current_window_mode = dx_window.GetWindowModeRequest();
-						WindowMode next_window_mode = static_cast<WindowMode>((static_cast<int32>(current_window_mode) + 1) % (static_cast<int32>(WindowMode::Count)));
-
-						dx_window.SetWindowModeRequest(next_window_mode);
-						//dx_window.ToggleWindowMode();
-					}
-					prev_F11_pressed = current_F11_pressed;
-
-
-					if (capture)
-					{
-						gpu_capture->StartCapture();
-					}
-					// rendering
-					{
-						// Handle resizing
-						if (dx_window.ShouldResize())
-						{
-							dx_context.Flush(dx_window.GetBackBufferCount());
-							dx_window.Resize(dx_context);
-						}
-
-						dx_context.InitCommandLists();
-						FillCommandList(dx_context, dx_window, resource, vertex_buffer_view, vertex_count);
-						dx_context.ExecuteCommandListGraphics();
-						dx_window.Present(dx_context);
-
-						float32* data = nullptr;
-						const D3D12_RANGE range = { 0, resource.m_uav.m_readback_desc.Width };
-						resource.m_uav.m_read_back_resource->Map(0, &range, (void**)&data);
-						static bool has_display = false;
-						if (!has_display)
-						{
-							for (uint32 i = 0; i < resource.m_uav.m_readback_desc.Width / sizeof(float32) / 4; i++)
-							{
-								LogTrace("uav[{}] = {}, {}, {}, {}\n", i, data[i * 4 + 0], data[i * 4 + 1], data[i * 4 + 2], data[i * 4 + 3]);
-							}
-							has_display = true;
-						}
-						resource.m_uav.m_read_back_resource->Unmap(0, nullptr);
-					}
-					if (capture)
-					{
-						gpu_capture->EndCapture();
-						gpu_capture->OpenCapture();
-					}
-
-				}
-				dx_context.Flush(dx_window.GetBackBufferCount());
-			}
+			RunWorkGraph(dx_context, dx_compiler);
 		}
+		gpu_capture->EndCapture();
+		gpu_capture->OpenCapture();
+
+		//RunWindowLoop(dx_context, dx_compiler, gpu_capture);
+		//RunTest();
+
 		delete gpu_capture;
 	}
 	
 	return 0;
-}
-
-
-void RunWorkGraph(DXContext& dx_context)
-{
-
-	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> cmd_list = dx_context.GetCommandListGraphics();
-	dx_context.InitCommandLists();
-	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList10> cmd_list10{};
-	cmd_list.As(&cmd_list10) >> CHK;
-	Microsoft::WRL::ComPtr<ID3D12Device> device = dx_context.GetDevice();
-	Microsoft::WRL::ComPtr<ID3D12Device5> device5{};
-	device.As(&device5) >> CHK;
-
-
-	Microsoft::WRL::ComPtr<IDxcBlob> outShaderBlob{};
-	DXCompiler dx_compiler("shaders");
-	dx_compiler.Compile(dx_context.GetDevice(), &outShaderBlob, "WorkGraphShader.hlsl", ShaderType::LIB_SHADER);
-	
-	Microsoft::WRL::ComPtr<ID3D12StateObject> state_object{};
-	D3D12_SHADER_BYTECODE byte_code
-	{
-		.pShaderBytecode = outShaderBlob->GetBufferPointer(),
-		.BytecodeLength = outShaderBlob->GetBufferSize()
-	};
-	D3D12_DXIL_LIBRARY_DESC sub_object_library =
-	{
-		.DXILLibrary = byte_code,
-		.NumExports = 0,
-		.pExports = nullptr,
-	};
-	std::string work_graph_name{ "WorkGraph" };
-	std::wstring work_graph_wname = std::to_wstring(work_graph_name);
-	D3D12_WORK_GRAPH_DESC sub_object_work_graph
-	{
-		.ProgramName = work_graph_wname.c_str(),
-		.Flags = D3D12_WORK_GRAPH_FLAG_INCLUDE_ALL_AVAILABLE_NODES,
-		.NumEntrypoints = 0,
-		.pEntrypoints = nullptr,
-		.NumExplicitlyDefinedNodes = 0,
-		.pExplicitlyDefinedNodes = nullptr,
-	};
-	std::vector<D3D12_STATE_SUBOBJECT> state_subobjects =
-	{
-		{
-			.Type = D3D12_STATE_SUBOBJECT_TYPE_DXIL_LIBRARY,
-			.pDesc = &sub_object_library,
-		},
-		{
-			.Type = D3D12_STATE_SUBOBJECT_TYPE_WORK_GRAPH,
-			.pDesc = &sub_object_work_graph,
-		},
-	};
-
-	D3D12_STATE_OBJECT_DESC state_object_desc =
-	{
-		.Type = D3D12_STATE_OBJECT_TYPE_EXECUTABLE,
-		.NumSubobjects = (uint32)state_subobjects.size(),
-		.pSubobjects = state_subobjects.data()
-	};
-
-	Microsoft::WRL::ComPtr<ID3D12Device14> device14{};
-	device.As(&device14) >> CHK;
-	device14->CreateStateObject(&state_object_desc, IID_PPV_ARGS(&state_object)) >> CHK;
-
-	CD3DX12_SHADER_BYTECODE libCode(byte_code);
-	Microsoft::WRL::ComPtr<ID3D12RootSignature> root_signature{};
-	//device14->CreateRootSignatureFromSubobjectInLibrary(0, libCode.pShaderBytecode, libCode.BytecodeLength, L"globalRS", IID_PPV_ARGS(&root_signature)) >> CHK;
-	
-	// Are these subtypes?
-	Microsoft::WRL::ComPtr<ID3D12StateObjectProperties1> spWGProp1;
-	state_object.As(&spWGProp1) >> CHK;
-	D3D12_PROGRAM_IDENTIFIER program_identifier{};
-	program_identifier = spWGProp1->GetProgramIdentifier(work_graph_wname.c_str());
-
-	Microsoft::WRL::ComPtr<ID3D12WorkGraphProperties> spWGProps;
-	state_object.As(&spWGProps) >> CHK;
-	UINT WorkGraphIndex = spWGProps->GetWorkGraphIndex(work_graph_wname.c_str());
-	D3D12_WORK_GRAPH_MEMORY_REQUIREMENTS MemReqs{};
-	spWGProps->GetWorkGraphMemoryRequirements(WorkGraphIndex, &MemReqs);
-	D3D12_GPU_VIRTUAL_ADDRESS_RANGE BackingMemory{};
-	BackingMemory.SizeInBytes = MemReqs.MaxSizeInBytes;
-
-	Microsoft::WRL::ComPtr<ID3D12Resource> spBackingMemory{};
-	D3D12_HEAP_PROPERTIES heap_properties
-	{
-		.Type = D3D12_HEAP_TYPE_DEFAULT,
-		.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN,
-		.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN,
-		.CreationNodeMask = 0,
-		.VisibleNodeMask = 0
-	};
-	D3D12_RESOURCE_DESC resource_desc
-	{
-		.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER,
-		.Alignment = 0,
-		.Width = MemReqs.MaxSizeInBytes,
-		.Height = 1,
-		.DepthOrArraySize = 1,
-		.MipLevels = 1,
-		.Format = DXGI_FORMAT_UNKNOWN,
-		.SampleDesc =
-		{
-			.Count = 1,
-			.Quality = 0,
-		},
-		.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR,
-		.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS,
-	};
-	device14->CreateCommittedResource
-	(
-		&heap_properties, D3D12_HEAP_FLAG_NONE,
-		&resource_desc,
-		D3D12_RESOURCE_STATE_COMMON,
-		nullptr, IID_PPV_ARGS(&spBackingMemory)) >> CHK;
-	BackingMemory.StartAddress = spBackingMemory->GetGPUVirtualAddress();
-
-	Microsoft::WRL::ComPtr<ID3D12Resource> buffer{};
-	resource_desc.Width = 16777216 * sizeof(uint32);
-	device14->CreateCommittedResource
-	(
-		&heap_properties, D3D12_HEAP_FLAG_NONE,
-		&resource_desc,
-		D3D12_RESOURCE_STATE_COMMON,
-		nullptr, IID_PPV_ARGS(&buffer)) >> CHK;
-
-	D3D12_SET_PROGRAM_DESC program_desc =
-	{
-		.Type = D3D12_PROGRAM_TYPE_WORK_GRAPH,
-		.WorkGraph =
-		{
-			.ProgramIdentifier = program_identifier,
-			.Flags = D3D12_SET_WORK_GRAPH_FLAG_INITIALIZE,
-			.BackingMemory = BackingMemory,
-			.NodeLocalRootArgumentsTable = 0,
-		},
-	};
-
-	struct Record
-	{
-		UINT gridSize; // : SV_DispatchGrid;
-		UINT recordIndex;
-	};
-	std::vector<Record> records{};
-	records.push_back(Record{ 1, 0 });
-	records.push_back(Record{ 2, 1 });
-	records.push_back(Record{ 3, 2 });
-	records.push_back(Record{ 4, 3 });
-	D3D12_DISPATCH_GRAPH_DESC wg_desc =
-	{
-		.Mode = D3D12_DISPATCH_MODE_NODE_CPU_INPUT,
-		.NodeCPUInput =
-		{
-			.EntrypointIndex = 0,
-			.NumRecords = (uint32)records.size(),
-			.pRecords = records.data(),
-			.RecordStrideInBytes = sizeof(Record)
-		},
-	};
-	//cmd_list10->SetComputeRootSignature(root_signature.Get());
-	//cmd_list10->SetComputeRootUnorderedAccessView(0, buffer->GetGPUVirtualAddress());
-	cmd_list10->SetProgram(&program_desc);
-	cmd_list10->DispatchGraph(&wg_desc); 
 }
 
 class Application

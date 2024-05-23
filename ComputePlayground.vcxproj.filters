@@ -60,6 +60,7 @@
     <None Include="packages.config" />
     <None Include="shaders\PixelShader.hlsl" />
     <None Include="shaders\VertexShader.hlsl" />
+    <None Include="shaders\WorkGraphShader.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="DX\DXCompiler.h">

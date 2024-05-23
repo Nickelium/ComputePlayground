@@ -164,6 +164,11 @@ xcopy /y /d $(ProjectDir)dependencies\warp\d3d10warp.dll $(OutDir)</Command>
       <FileType>Document</FileType>
     </Text>
   </ItemGroup>
+  <ItemGroup>
+    <None Include="shaders\WorkGraphShader.hlsl">
+      <FileType>Document</FileType>
+    </None>
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
     <Import Project="packages\WinPixEventRuntime.1.0.231030001\build\WinPixEventRuntime.targets" Condition="Exists('packages\WinPixEventRuntime.1.0.231030001\build\WinPixEventRuntime.targets')" />

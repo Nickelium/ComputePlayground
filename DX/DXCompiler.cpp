@@ -91,7 +91,7 @@ void DXCompiler::Compile(Microsoft::WRL::ComPtr<ID3D12Device> device, Microsoft:
 	compileResult->GetOutput(DXC_OUT_ERRORS, IID_PPV_ARGS(&pErrors), nullptr) >> CHK;
 	if (pErrors && pErrors->GetStringLength() > 0)
 	{
-		printf("%s", (char*)pErrors->GetBufferPointer());
+		LogError("{0}", (char*)pErrors->GetBufferPointer());
 	}
 	HRESULT HR{};
 	compileResult->GetStatus(&HR) >> CHK;

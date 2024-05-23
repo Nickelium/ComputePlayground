@@ -70,13 +70,21 @@ void PIXCapture::StartCapture()
 		const std::string& pix_extension = ".wpix";
 		m_pix_absolute_path = GetNewestCaptureName(pix_relative_path, pix_template_name, pix_extension);
 		const std::wstring& pix_absolute_path_wstring = std::to_wstring(m_pix_absolute_path);
-		PIXGpuCaptureNextFrames(pix_absolute_path_wstring.c_str(), 1) >> CHK;
+		//PIXGpuCaptureNextFrames(pix_absolute_path_wstring.c_str(), 1) >> CHK;
+		PIXCaptureParameters captureParameters =
+		{
+			.GpuCaptureParameters = 
+			{
+				.FileName = pix_absolute_path_wstring.c_str()
+			}
+		};
+		PIXBeginCapture2(PIX_CAPTURE_GPU, &captureParameters) >> CHK;
 	}
 }
 
 void PIXCapture::EndCapture()
 {
-
+	PIXEndCapture(false);
 }
 
 void PIXCapture::OpenCapture()
