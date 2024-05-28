@@ -19,7 +19,8 @@ DISABLE_OPTIMISATIONS()
 struct Resources
 {
 	// Compute
-	UAV m_uav;
+	HeapResource* m_gpu_resource;
+	HeapResource* m_cpu_resource;
 	Microsoft::WRL::ComPtr<IDxcBlob> m_compute_shader;
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> m_compute_pso;
 	Microsoft::WRL::ComPtr<ID3D12RootSignature> m_compute_root_signature;
@@ -40,15 +41,16 @@ void CreateComputeResources(const DXContext& dx_context, const DXCompiler& dx_co
 
 	dx_compiler.Compile(dx_context.GetDevice(), &resource.m_compute_shader, "ComputeShader.hlsl", ShaderType::COMPUTE_SHADER);
 
-	resource.m_uav.m_desc.Width = resource.m_group_size * resource.m_dispatch_count * sizeof(float32) * 4;
-	resource.m_uav.m_readback_desc.Width = resource.m_uav.m_desc.Width;
+	uint32 size = resource.m_group_size * resource.m_dispatch_count * sizeof(float32) * 4;
+	resource.m_gpu_resource = new HeapResource(D3D12_HEAP_TYPE_DEFAULT, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, size);
 	// Buffers have to start in COMMON_STATE, so we need to transition to UAV when recording
-	D3D12_RESOURCE_STATES initial_gpu_resource_state = D3D12_RESOURCE_STATE_COMMON;
-	dx_context.GetDevice()->CreateCommittedResource(&resource.m_uav.m_heap_properties, D3D12_HEAP_FLAG_NONE, &resource.m_uav.m_desc, initial_gpu_resource_state, nullptr, IID_PPV_ARGS(&resource.m_uav.m_gpu_resource)) >> CHK;
-	resource.m_uav.m_gpu_resource_state = initial_gpu_resource_state;
-	D3D12_RESOURCE_STATES initial_readback_resource_state = D3D12_RESOURCE_STATE_COPY_DEST;
-	dx_context.GetDevice()->CreateCommittedResource(&resource.m_uav.m_readback_heap_properties, D3D12_HEAP_FLAG_NONE, &resource.m_uav.m_readback_desc, initial_readback_resource_state, nullptr, IID_PPV_ARGS(&resource.m_uav.m_read_back_resource)) >> CHK;
-	resource.m_uav.m_readback_resource_state = initial_gpu_resource_state;
+	resource.m_gpu_resource->m_dx_resource.m_resource_state = D3D12_RESOURCE_STATE_COMMON;
+	dx_context.GetDevice()->CreateCommittedResource(&resource.m_gpu_resource->m_heap_properties, D3D12_HEAP_FLAG_NONE, &resource.m_gpu_resource->m_desc, resource.m_gpu_resource->m_dx_resource.m_resource_state, nullptr, IID_PPV_ARGS(&resource.m_gpu_resource->m_dx_resource.m_resource)) >> CHK;
+	
+	resource.m_cpu_resource = new HeapResource(D3D12_HEAP_TYPE_READBACK, D3D12_RESOURCE_FLAG_NONE, size);
+	resource.m_cpu_resource->m_dx_resource.m_resource_state = D3D12_RESOURCE_STATE_COPY_DEST;
+	dx_context.GetDevice()->CreateCommittedResource(&resource.m_cpu_resource->m_heap_properties, D3D12_HEAP_FLAG_NONE, &resource.m_cpu_resource->m_desc, resource.m_gpu_resource->m_dx_resource.m_resource_state, nullptr, IID_PPV_ARGS(&resource.m_cpu_resource->m_dx_resource.m_resource)) >> CHK;
+	
 	// Root signature embed in the shader already
 	dx_context.GetDevice()->CreateRootSignature(0, resource.m_compute_shader->GetBufferPointer(), resource.m_compute_shader->GetBufferSize(), IID_PPV_ARGS(&resource.m_compute_root_signature)) >> CHK;
 
@@ -323,18 +325,18 @@ void ComputeWork
 			.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION,
 			.Transition =
 			{
-				.pResource = resource.m_uav.m_gpu_resource.Get(),
+				.pResource = resource.m_gpu_resource->m_dx_resource.m_resource.Get(),
 				.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
-				.StateBefore = resource.m_uav.m_gpu_resource_state,
+				.StateBefore = resource.m_gpu_resource->m_dx_resource.m_resource_state,
 				.StateAfter = new_resource_state,
 			},
 		};
 		dx_context.GetCommandListGraphics()->ResourceBarrier(COUNT(barriers), &barriers[0]);
-		resource.m_uav.m_gpu_resource_state = new_resource_state;
+		resource.m_gpu_resource->m_dx_resource.m_resource_state = new_resource_state;
 	}
 	dx_context.GetCommandListGraphics()->SetComputeRootSignature(resource.m_compute_root_signature.Get());
 	dx_context.GetCommandListGraphics()->SetPipelineState(resource.m_compute_pso.Get());
-	dx_context.GetCommandListGraphics()->SetComputeRootUnorderedAccessView(0, resource.m_uav.m_gpu_resource->GetGPUVirtualAddress());
+	dx_context.GetCommandListGraphics()->SetComputeRootUnorderedAccessView(0, resource.m_gpu_resource->m_dx_resource.m_resource->GetGPUVirtualAddress());
 	dx_context.GetCommandListGraphics()->Dispatch(resource.m_dispatch_count, 1, 1);
 	// Transition to Copy Src
 	{
@@ -345,16 +347,16 @@ void ComputeWork
 			.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION,
 			.Transition =
 			{
-				.pResource = resource.m_uav.m_gpu_resource.Get(),
+				.pResource = resource.m_gpu_resource->m_dx_resource.m_resource.Get(),
 				.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
-				.StateBefore = resource.m_uav.m_gpu_resource_state,
+				.StateBefore = resource.m_gpu_resource->m_dx_resource.m_resource_state,
 				.StateAfter = new_resource_state,
 			},
 		};
 		dx_context.GetCommandListGraphics()->ResourceBarrier(COUNT(barriers), &barriers[0]);
-		resource.m_uav.m_gpu_resource_state = new_resource_state;
+		resource.m_gpu_resource->m_dx_resource.m_resource_state = new_resource_state;
 	}
-	dx_context.GetCommandListGraphics()->CopyResource(resource.m_uav.m_read_back_resource.Get(), resource.m_uav.m_gpu_resource.Get());
+	dx_context.GetCommandListGraphics()->CopyResource(resource.m_cpu_resource->m_dx_resource.m_resource.Get(), resource.m_gpu_resource->m_dx_resource.m_resource.Get());
 }
 
 #include "d3dx12.h"
@@ -592,6 +594,13 @@ void RunWorkGraph(DXContext& dx_context, DXCompiler& dx_compiler)
 		cmd_list10->DispatchGraph(&wg_desc);
 		dx_context.ExecuteCommandListGraphics();
 		dx_context.Flush(1);
+
+		// Make commited resource
+//		ComPtr<ID3D12Resource> read_back_resource{};
+//		D3D12_RESOURCE_STATES initial_readback_resource_state = D3D12_RESOURCE_STATE_COPY_DEST;
+//		dx_context.GetDevice()->CreateCommittedResource(&resource.m_uav.m_readback_heap_properties, D3D12_HEAP_FLAG_NONE, &resource.m_uav.m_readback_desc, initial_readback_resource_state, nullptr, IID_PPV_ARGS(&resource.m_uav.m_read_back_resource)) >> CHK;
+//		dx_context.GetDevice()->CreateCommittedResource();
+		// Copy readback
 	}
 	LogTrace("Workgraph Dispatched");
 }
@@ -673,18 +682,18 @@ void RunWindowLoop(DXContext& dx_context, DXCompiler& dx_compiler, GPUCapture* g
 					dx_window.Present(dx_context);
 
 					float32* data = nullptr;
-					const D3D12_RANGE range = { 0, resource.m_uav.m_readback_desc.Width };
-					resource.m_uav.m_read_back_resource->Map(0, &range, (void**)&data);
+					const D3D12_RANGE range = { 0, resource.m_gpu_resource->m_desc.Width };
+					resource.m_cpu_resource->m_dx_resource.m_resource->Map(0, &range, (void**)&data);
 					static bool has_display = false;
 					if (!has_display)
 					{
-						for (uint32 i = 0; i < resource.m_uav.m_readback_desc.Width / sizeof(float32) / 4; i++)
+						for (uint32 i = 0; i < resource.m_cpu_resource->m_desc.Width / sizeof(float32) / 4; i++)
 						{
 							LogTrace("uav[{}] = {}, {}, {}, {}\n", i, data[i * 4 + 0], data[i * 4 + 1], data[i * 4 + 2], data[i * 4 + 3]);
 						}
 						has_display = true;
 					}
-					resource.m_uav.m_read_back_resource->Unmap(0, nullptr);
+					resource.m_cpu_resource->m_dx_resource.m_resource->Unmap(0, nullptr);
 				}
 				if (capture)
 				{
@@ -712,14 +721,15 @@ int main()
 		DXContext dx_context{};
 		dx_report_context.SetDevice(dx_context.GetDevice());
 		DXCompiler dx_compiler("shaders");
-		gpu_capture->StartCapture();
+		//gpu_capture->StartCapture();
+		do
 		{
 			RunWorkGraph(dx_context, dx_compiler);
-		}
-		gpu_capture->EndCapture();
-		gpu_capture->OpenCapture();
+		}while (false);
+		//gpu_capture->EndCapture();
+		//gpu_capture->OpenCapture();
 
-		//RunWindowLoop(dx_context, dx_compiler, gpu_capture);
+		RunWindowLoop(dx_context, dx_compiler, gpu_capture);
 		//RunTest();
 
 		delete gpu_capture;

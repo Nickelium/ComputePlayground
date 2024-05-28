@@ -11,19 +11,11 @@ public:
 private:
 };
 
-struct UAV
+struct HeapResource
 {
-	UAV();
+	HeapResource(D3D12_HEAP_TYPE heap_type, D3D12_RESOURCE_FLAGS resource_flags, uint32 size);
 
-	// GPU resource
 	D3D12_RESOURCE_DESC m_desc;
 	D3D12_HEAP_PROPERTIES m_heap_properties;
-	Microsoft::WRL::ComPtr<ID3D12Resource> m_gpu_resource;
-	D3D12_RESOURCE_STATES m_gpu_resource_state;
-
-	// Readback resource
-	D3D12_RESOURCE_DESC m_readback_desc;
-	D3D12_HEAP_PROPERTIES m_readback_heap_properties;
-	Microsoft::WRL::ComPtr<ID3D12Resource> m_read_back_resource;
-	D3D12_RESOURCE_STATES m_readback_resource_state;
+	DXResource m_dx_resource;
 };
