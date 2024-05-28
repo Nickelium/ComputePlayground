@@ -19,8 +19,8 @@ DISABLE_OPTIMISATIONS()
 struct Resources
 {
 	// Compute
-	HeapResource* m_gpu_resource;
-	HeapResource* m_cpu_resource;
+	DXResource m_gpu_resource;
+	DXResource m_cpu_resource;
 	Microsoft::WRL::ComPtr<IDxcBlob> m_compute_shader;
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> m_compute_pso;
 	Microsoft::WRL::ComPtr<ID3D12RootSignature> m_compute_root_signature;
@@ -34,7 +34,7 @@ struct Resources
 	Microsoft::WRL::ComPtr<ID3D12RootSignature> m_gfx_root_signature;
 };
 
-void CreateComputeResources(const DXContext& dx_context, const DXCompiler& dx_compiler, Resources& resource)
+void CreateComputeResources(DXContext& dx_context, const DXCompiler& dx_compiler, Resources& resource)
 {
 	resource.m_group_size = 1024;
 	resource.m_dispatch_count = 1;
@@ -42,14 +42,12 @@ void CreateComputeResources(const DXContext& dx_context, const DXCompiler& dx_co
 	dx_compiler.Compile(dx_context.GetDevice(), &resource.m_compute_shader, "ComputeShader.hlsl", ShaderType::COMPUTE_SHADER);
 
 	uint32 size = resource.m_group_size * resource.m_dispatch_count * sizeof(float32) * 4;
-	resource.m_gpu_resource = new HeapResource(D3D12_HEAP_TYPE_DEFAULT, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, size);
-	// Buffers have to start in COMMON_STATE, so we need to transition to UAV when recording
-	resource.m_gpu_resource->m_dx_resource.m_resource_state = D3D12_RESOURCE_STATE_COMMON;
-	dx_context.GetDevice()->CreateCommittedResource(&resource.m_gpu_resource->m_heap_properties, D3D12_HEAP_FLAG_NONE, &resource.m_gpu_resource->m_desc, resource.m_gpu_resource->m_dx_resource.m_resource_state, nullptr, IID_PPV_ARGS(&resource.m_gpu_resource->m_dx_resource.m_resource)) >> CHK;
-	
-	resource.m_cpu_resource = new HeapResource(D3D12_HEAP_TYPE_READBACK, D3D12_RESOURCE_FLAG_NONE, size);
-	resource.m_cpu_resource->m_dx_resource.m_resource_state = D3D12_RESOURCE_STATE_COPY_DEST;
-	dx_context.GetDevice()->CreateCommittedResource(&resource.m_cpu_resource->m_heap_properties, D3D12_HEAP_FLAG_NONE, &resource.m_cpu_resource->m_desc, resource.m_gpu_resource->m_dx_resource.m_resource_state, nullptr, IID_PPV_ARGS(&resource.m_cpu_resource->m_dx_resource.m_resource)) >> CHK;
+	resource.m_gpu_resource.SetResourceInfo(D3D12_HEAP_TYPE_DEFAULT, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, size);
+	resource.m_gpu_resource.CreateResource(dx_context, "GPU resource");
+
+	resource.m_cpu_resource.SetResourceInfo(D3D12_HEAP_TYPE_READBACK, D3D12_RESOURCE_FLAG_NONE, size);
+	resource.m_cpu_resource.m_resource_state = D3D12_RESOURCE_STATE_COPY_DEST;
+	resource.m_cpu_resource.CreateResource(dx_context, "CPU resource");
 	
 	// Root signature embed in the shader already
 	dx_context.GetDevice()->CreateRootSignature(0, resource.m_compute_shader->GetBufferPointer(), resource.m_compute_shader->GetBufferSize(), IID_PPV_ARGS(&resource.m_compute_root_signature)) >> CHK;
@@ -99,59 +97,13 @@ void CreateGraphicsResources
 
 		vertex_count = COUNT(vertex_data);
 
-		const D3D12_RESOURCE_DESC vertex_desc =
-		{
-			.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER,
-			.Alignment = D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT, // 64 * 1024 bytes = 64kB
-			.Width = sizeof(vertex_data),
-			.Height = 1,
-			.DepthOrArraySize = 1,
-			.MipLevels = 1,
-			.Format = DXGI_FORMAT_UNKNOWN,
-			.SampleDesc =
-			{
-				.Count = 1,
-				.Quality = 0,
-			},
-			.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR, // In order, no swizzle
-			.Flags = D3D12_RESOURCE_FLAG_NONE,
-		};
-		const D3D12_HEAP_PROPERTIES heap_properties =
-		{
-			.Type = D3D12_HEAP_TYPE_DEFAULT,
-			.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN,
-			.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN,
-			.CreationNodeMask = 1,
-			.VisibleNodeMask = 1,
-		};
-		D3D12_RESOURCE_STATES initial_vertex_buffer_resource_state = D3D12_RESOURCE_STATE_COMMON;
-		dx_context.GetDevice()->CreateCommittedResource
-		(
-			&heap_properties, D3D12_HEAP_FLAG_NONE, &vertex_desc,
-			initial_vertex_buffer_resource_state, nullptr,
-			IID_PPV_ARGS(&vertex_buffer.m_resource)
-		) >> CHK;
-		NAME_DX_OBJECT(vertex_buffer.m_resource, "VertexBuffer");
-		vertex_buffer.m_resource_state = initial_vertex_buffer_resource_state;
+		vertex_buffer.SetResourceInfo(D3D12_HEAP_TYPE_DEFAULT, D3D12_RESOURCE_FLAG_NONE, sizeof(vertex_data));
+		vertex_buffer.CreateResource(dx_context, "VertexBuffer");
 
-		const D3D12_HEAP_PROPERTIES heap_properties_upload =
-		{
-			.Type = D3D12_HEAP_TYPE_UPLOAD,
-			.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN,
-			.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN,
-			.CreationNodeMask = 1,
-			.VisibleNodeMask = 1,
-		};
 		DXResource vertex_upload_buffer{};
-		D3D12_RESOURCE_STATES initial_vertex_upload_buffer_resource_state = D3D12_RESOURCE_STATE_GENERIC_READ;
-		dx_context.GetDevice()->CreateCommittedResource
-		(
-			&heap_properties_upload, D3D12_HEAP_FLAG_NONE, &vertex_desc,
-			initial_vertex_upload_buffer_resource_state, nullptr,
-			IID_PPV_ARGS(&vertex_upload_buffer.m_resource)
-		) >> CHK;
-		NAME_DX_OBJECT(vertex_upload_buffer.m_resource, "VertexUploadBuffer");
-		vertex_upload_buffer.m_resource_state = initial_vertex_upload_buffer_resource_state;
+		vertex_upload_buffer.SetResourceInfo(D3D12_HEAP_TYPE_UPLOAD, D3D12_RESOURCE_FLAG_NONE, sizeof(vertex_data));
+		vertex_upload_buffer.m_resource_state = D3D12_RESOURCE_STATE_GENERIC_READ;
+		vertex_upload_buffer.CreateResource(dx_context, "VertexUploadBuffer");
 
 		Vertex* data = nullptr;
 		vertex_upload_buffer.m_resource->Map(0, nullptr, reinterpret_cast<void**>(&data)) >> CHK;
@@ -325,18 +277,18 @@ void ComputeWork
 			.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION,
 			.Transition =
 			{
-				.pResource = resource.m_gpu_resource->m_dx_resource.m_resource.Get(),
+				.pResource = resource.m_gpu_resource.m_resource.Get(),
 				.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
-				.StateBefore = resource.m_gpu_resource->m_dx_resource.m_resource_state,
+				.StateBefore = resource.m_gpu_resource.m_resource_state,
 				.StateAfter = new_resource_state,
 			},
 		};
 		dx_context.GetCommandListGraphics()->ResourceBarrier(COUNT(barriers), &barriers[0]);
-		resource.m_gpu_resource->m_dx_resource.m_resource_state = new_resource_state;
+		resource.m_gpu_resource.m_resource_state = new_resource_state;
 	}
 	dx_context.GetCommandListGraphics()->SetComputeRootSignature(resource.m_compute_root_signature.Get());
 	dx_context.GetCommandListGraphics()->SetPipelineState(resource.m_compute_pso.Get());
-	dx_context.GetCommandListGraphics()->SetComputeRootUnorderedAccessView(0, resource.m_gpu_resource->m_dx_resource.m_resource->GetGPUVirtualAddress());
+	dx_context.GetCommandListGraphics()->SetComputeRootUnorderedAccessView(0, resource.m_gpu_resource.m_resource->GetGPUVirtualAddress());
 	dx_context.GetCommandListGraphics()->Dispatch(resource.m_dispatch_count, 1, 1);
 	// Transition to Copy Src
 	{
@@ -347,16 +299,16 @@ void ComputeWork
 			.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION,
 			.Transition =
 			{
-				.pResource = resource.m_gpu_resource->m_dx_resource.m_resource.Get(),
+				.pResource = resource.m_gpu_resource.m_resource.Get(),
 				.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
-				.StateBefore = resource.m_gpu_resource->m_dx_resource.m_resource_state,
+				.StateBefore = resource.m_gpu_resource.m_resource_state,
 				.StateAfter = new_resource_state,
 			},
 		};
 		dx_context.GetCommandListGraphics()->ResourceBarrier(COUNT(barriers), &barriers[0]);
-		resource.m_gpu_resource->m_dx_resource.m_resource_state = new_resource_state;
+		resource.m_gpu_resource.m_resource_state = new_resource_state;
 	}
-	dx_context.GetCommandListGraphics()->CopyResource(resource.m_cpu_resource->m_dx_resource.m_resource.Get(), resource.m_gpu_resource->m_dx_resource.m_resource.Get());
+	dx_context.GetCommandListGraphics()->CopyResource(resource.m_cpu_resource.m_resource.Get(), resource.m_gpu_resource.m_resource.Get());
 }
 
 #include "d3dx12.h"
@@ -508,52 +460,15 @@ void RunWorkGraph(DXContext& dx_context, DXCompiler& dx_compiler)
 		D3D12_GPU_VIRTUAL_ADDRESS_RANGE BackingMemory{};
 		BackingMemory.SizeInBytes = MemReqs.MaxSizeInBytes;
 
-		Microsoft::WRL::ComPtr<ID3D12Resource> spBackingMemory{};
-		D3D12_HEAP_PROPERTIES heap_properties
-		{
-			.Type = D3D12_HEAP_TYPE_DEFAULT,
-			.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN,
-			.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN,
-			.CreationNodeMask = 0,
-			.VisibleNodeMask = 0
-		};
-		D3D12_RESOURCE_DESC resource_desc
-		{
-			.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER,
-			.Alignment = 0,
-			.Width = MemReqs.MaxSizeInBytes,
-			.Height = 1,
-			.DepthOrArraySize = 1,
-			.MipLevels = 1,
-			.Format = DXGI_FORMAT_UNKNOWN,
-			.SampleDesc =
-			{
-				.Count = 1,
-				.Quality = 0,
-			},
-			.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR,
-			.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS,
-		};
-		device14->CreateCommittedResource
-		(
-			&heap_properties, D3D12_HEAP_FLAG_NONE,
-			&resource_desc,
-			D3D12_RESOURCE_STATE_COMMON,
-			nullptr, IID_PPV_ARGS(&spBackingMemory)) >> CHK;
-		NAME_DX_OBJECT(spBackingMemory, "Scratch Memory");
+		DXResource scratch_resource{};
+		scratch_resource.SetResourceInfo(D3D12_HEAP_TYPE_DEFAULT, D3D12_RESOURCE_FLAG_NONE, MemReqs.MaxSizeInBytes);
+		scratch_resource.CreateResource(dx_context, "Scratch Memory");
 
-		BackingMemory.StartAddress = spBackingMemory->GetGPUVirtualAddress();
+		BackingMemory.StartAddress = scratch_resource.m_resource->GetGPUVirtualAddress();
 
-		Microsoft::WRL::ComPtr<ID3D12Resource> buffer{};
-		resource_desc.Width = 16777216 * sizeof(uint32);
-		device14->CreateCommittedResource
-		(
-			&heap_properties, D3D12_HEAP_FLAG_NONE,
-			&resource_desc,
-			D3D12_RESOURCE_STATE_COMMON,
-			nullptr, IID_PPV_ARGS(&buffer)
-		) >> CHK;
-		NAME_DX_OBJECT(buffer, "Buffer UAV resource");
+		DXResource buffer{};
+		buffer.SetResourceInfo(D3D12_HEAP_TYPE_DEFAULT, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, 16777216 * sizeof(uint32));
+		buffer.CreateResource(dx_context, "Buffer UAV resource");
 
 		D3D12_SET_PROGRAM_DESC program_desc =
 		{
@@ -589,18 +504,30 @@ void RunWorkGraph(DXContext& dx_context, DXCompiler& dx_compiler)
 			},
 		};
 		cmd_list10->SetComputeRootSignature(root_signature.Get());
-		cmd_list10->SetComputeRootUnorderedAccessView(0, buffer->GetGPUVirtualAddress());
+		cmd_list10->SetComputeRootUnorderedAccessView(0, buffer.m_resource->GetGPUVirtualAddress());
 		cmd_list10->SetProgram(&program_desc);
 		cmd_list10->DispatchGraph(&wg_desc);
+
+		dx_context.Transition(D3D12_RESOURCE_STATE_COPY_SOURCE, buffer);
+
+		DXResource readback_resource{};
+		readback_resource.SetResourceInfo(D3D12_HEAP_TYPE_READBACK, D3D12_RESOURCE_FLAG_NONE, buffer.m_resource_desc.Width);
+		readback_resource.m_resource_state = D3D12_RESOURCE_STATE_COPY_DEST;
+		readback_resource.CreateResource(dx_context, "Readback resource");
+
+		dx_context.GetCommandListGraphics()->CopyResource(readback_resource.m_resource.Get(), buffer.m_resource.Get());
+	
 		dx_context.ExecuteCommandListGraphics();
 		dx_context.Flush(1);
 
-		// Make commited resource
-//		ComPtr<ID3D12Resource> read_back_resource{};
-//		D3D12_RESOURCE_STATES initial_readback_resource_state = D3D12_RESOURCE_STATE_COPY_DEST;
-//		dx_context.GetDevice()->CreateCommittedResource(&resource.m_uav.m_readback_heap_properties, D3D12_HEAP_FLAG_NONE, &resource.m_uav.m_readback_desc, initial_readback_resource_state, nullptr, IID_PPV_ARGS(&resource.m_uav.m_read_back_resource)) >> CHK;
-//		dx_context.GetDevice()->CreateCommittedResource();
-		// Copy readback
+		uint32* data = nullptr;
+		const D3D12_RANGE range = { 0, 20/*readback_resource.m_resource_desc.Width*/ };
+		readback_resource.m_resource->Map(0, &range, (void**)&data);
+		for (uint32 i = 0; i < range.End - range.Begin; ++i)
+		{
+			LogTrace("uav workgraph[{}] = {}\n", i, data[i]);
+		}
+		readback_resource.m_resource->Unmap(0, nullptr);
 	}
 	LogTrace("Workgraph Dispatched");
 }
@@ -682,18 +609,18 @@ void RunWindowLoop(DXContext& dx_context, DXCompiler& dx_compiler, GPUCapture* g
 					dx_window.Present(dx_context);
 
 					float32* data = nullptr;
-					const D3D12_RANGE range = { 0, resource.m_gpu_resource->m_desc.Width };
-					resource.m_cpu_resource->m_dx_resource.m_resource->Map(0, &range, (void**)&data);
+					const D3D12_RANGE range = { 0, resource.m_gpu_resource.m_resource_desc.Width };
+					resource.m_cpu_resource.m_resource->Map(0, &range, (void**)&data);
 					static bool has_display = false;
 					if (!has_display)
 					{
-						for (uint32 i = 0; i < resource.m_cpu_resource->m_desc.Width / sizeof(float32) / 4; i++)
+						for (uint32 i = 0; i < resource.m_cpu_resource.m_resource_desc.Width / sizeof(float32) / 4; i++)
 						{
 							LogTrace("uav[{}] = {}, {}, {}, {}\n", i, data[i * 4 + 0], data[i * 4 + 1], data[i * 4 + 2], data[i * 4 + 3]);
 						}
 						has_display = true;
 					}
-					resource.m_cpu_resource->m_dx_resource.m_resource->Unmap(0, nullptr);
+					resource.m_cpu_resource.m_resource->Unmap(0, nullptr);
 				}
 				if (capture)
 				{
