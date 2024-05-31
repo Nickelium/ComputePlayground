@@ -1,30 +1,142 @@
-//=================================================================================================================================
-//
-// Copyright (c) Microsoft. All rights reserved.
-// This code is licensed under the MIT License (MIT).
-// THIS CODE IS PROVIDED *AS IS* WITHOUT WARRANTY OF ANY KIND, EITHER EXPRESS OR IMPLIED, INCLUDING ANY
-// IMPLIED WARRANTIES OF FITNESS FOR A PARTICULAR PURPOSE, MERCHANTABILITY, OR NON-INFRINGEMENT.
-//
-//=================================================================================================================================
-
-// ================================================================================================================================
-// D3D12 Hello Work Graphs shaders
-// 
-// Defines a work graph that is a chain of 3 nodes with different launch modes.
-// The nodes log output to a UAV that's just an array of uints.
-// 
-// The C++ code seeds the graph with 4 records "entryRecord".
-// The second node writes to location UAV[entryRecordIndex] and the third node writes to location UAV[4 + entryNodeIndex],
-// so 8 uints modified in total.  These are printed to the console by the calling C++ code.  A simple tweak you can do
-// in the C++ code is make it log more uints to the console if you want to play around with making the graph do more.
-// 
-// The app asks D3D to autopopulate the graph based on all nodes available, so you can play around with adding
-// and changing nodes without having to change the C++ code, unless you want to tweak how the graph is seeded or how
-// results are printed to console.
-// 
-// ================================================================================================================================
 GlobalRootSignature globalRS = { "UAV(u0)" };
 RWStructuredBuffer<uint> UAV : register(u0); // 16MB byte buffer from global root sig
+//#define WORKGRAPH_TEST1
+//#define WORKGRAPH_TEST2
+//#define WORKGRAPH_TEST3
+//#define WORKGRAPH_TEST4
+//#define WORKGRAPH_TEST5
+#define WORKGRAPH_TEST6
+#if defined(WORKGRAPH_TEST1)
+
+[Shader("node")]
+[NodeLaunch("broadcasting")]
+[NodeDispatchGrid(1, 1, 1)]
+[NumThreads(1, 1, 1)]
+void BroadcastNode()
+{
+	InterlockedAdd(UAV[0], 123);
+}
+
+#elif defined(WORKGRAPH_TEST2)
+struct InputRecord
+{
+	uint index;
+};
+
+[Shader("node")]
+[NodeLaunch("broadcasting")]
+[NodeDispatchGrid(1, 1, 1)]
+[NumThreads(1,1,1)]
+void BroadcastNode(DispatchNodeInputRecord<InputRecord> inputData)
+{
+	InterlockedAdd(UAV[inputData.Get().index * 4], 124);
+}
+
+#elif defined(WORKGRAPH_TEST3)
+struct InputRecord
+{
+	uint3 DispatchGrid : SV_DispatchGrid;
+	uint index;
+};
+
+[Shader("node")]
+[NodeLaunch("broadcasting")]
+[NodeMaxDispatchGrid(64, 64, 1)]
+[NumThreads(1, 1, 1)]
+void BroadcastNode(DispatchNodeInputRecord<InputRecord> inputData)
+{
+	InterlockedAdd(UAV[inputData.Get().index * 4], 1);
+}
+#elif defined(WORKGRAPH_TEST4)
+struct InputRecord
+{
+	uint index;
+};
+
+[Shader("node")]
+[NodeLaunch("broadcasting")]
+[NodeDispatchGrid(1, 1, 1)]
+[NumThreads(1, 1, 1)]
+void FirstNode([MaxRecords(1)] NodeOutput<InputRecord> SecondNode)
+{
+	ThreadNodeOutputRecords<InputRecord> record = SecondNode.GetThreadNodeOutputRecords(1);
+	record.Get().index = 0;
+	record.OutputComplete();
+}
+
+[Shader("node")]
+[NodeLaunch("broadcasting")]
+[NodeDispatchGrid(1, 1, 1)]
+[NumThreads(1, 1, 1)]
+void SecondNode(DispatchNodeInputRecord<InputRecord> inputData)
+{
+	InterlockedAdd(UAV[inputData.Get().index * 4], 1);
+}
+
+#elif defined(WORKGRAPH_TEST5)
+struct InputRecord
+{
+	uint index;
+};
+
+[Shader("node")]
+[NodeLaunch("broadcasting")]
+[NodeDispatchGrid(1, 1, 1)]
+[NumThreads(5, 1, 1)]
+void FirstNode
+(
+	uint GroupIndex : SV_GroupIndex,
+	[MaxRecords(5)] NodeOutput<InputRecord> SecondNode
+)
+{
+	ThreadNodeOutputRecords<InputRecord> record = SecondNode.GetThreadNodeOutputRecords(1);
+	record.Get().index = GroupIndex + 1;
+	record.OutputComplete();
+}
+
+[Shader("node")]
+[NodeLaunch("coalescing")]
+[NumThreads(32, 1, 1)]
+void SecondNode
+(
+	uint GroupIndex : SV_GroupIndex,
+	[MaxRecords(8)] GroupNodeInputRecords<InputRecord> inputData
+)
+{
+	uint inputDataIndex = GroupIndex / 4;
+	if (inputDataIndex < inputData.Count())
+	{
+		UAV[GroupIndex * 4] = inputData[inputDataIndex].index;
+	}
+}
+#elif defined(WORKGRAPH_TEST6)
+struct InputRecord
+{
+	uint depth;
+};
+
+[Shader("node")]
+[NodeLaunch("broadcasting")]
+[NodeDispatchGrid(1, 1, 1)]
+[NodeMaxRecursionDepth(5)]
+[NumThreads(1, 1, 1)]
+void RecursiveNode
+(
+	DispatchNodeInputRecord<InputRecord> inputData,
+	[MaxRecords(1)] NodeOutput<InputRecord> RecursiveNode
+)
+{
+	UAV[inputData.Get().depth * 4] = GetRemainingRecursionLevels();
+    
+	bool shouldRecurse = (GetRemainingRecursionLevels() > 0);
+	GroupNodeOutputRecords<InputRecord> record = RecursiveNode.GetGroupNodeOutputRecords(shouldRecurse ? 1 : 0);
+	if (shouldRecurse)
+	{
+		record.Get().depth = inputData.Get().depth + 1;
+		record.OutputComplete();
+	}
+}
+#else
 
 struct entryRecord
 {
@@ -144,3 +256,4 @@ void thirdNode(
         InterlockedAdd(UAV[recordIndex],g_sum[l]);
     }
 }
+#endif

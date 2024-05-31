@@ -47,7 +47,7 @@ void DXCompiler::Compile(Microsoft::WRL::ComPtr<ID3D12Device> device, Microsoft:
 	sourceBuffer.Size = shaderSource->GetBufferSize();
 
 	std::vector<std::string> compile_arguments{};
-	compile_arguments.push_back("-E "); // Entry point 
+	compile_arguments.push_back("-E "); // Entry point name
 	compile_arguments.push_back("main");
 	compile_arguments.push_back("-T"); // Target profile 
 	std::string shader_type_model_string = GetShaderTypeString(shaderType);
@@ -62,17 +62,18 @@ void DXCompiler::Compile(Microsoft::WRL::ComPtr<ID3D12Device> device, Microsoft:
 	if (m_debug)
 	{
 		compile_arguments.push_back("-Od"); // Disable Optimizations
-		compile_arguments.push_back("-Zi"); // Debug symbols
+		compile_arguments.push_back("-Zi"); // Debug Informations/Symbols
 	}
 	else
 	{
-		//compile_arguments.push_back("-O1"); // Min Optimizations
-		//compile_arguments.push_back("-O2"); // Mid Optimizations
-		compile_arguments.push_back("-O3"); // Max Optimizations
+		//compile_arguments.push_back("-O0"); // Optimization Level 0
+		//compile_arguments.push_back("-O1"); // Optimization Level 1
+		//compile_arguments.push_back("-O2"); // Optimization Level 2
+		compile_arguments.push_back("-O3"); // Optimization Level 3 (Default)
 	}
 	//compile_arguments.push_back("-Fd"); // PDB options followed by pdbpath
 	compile_arguments.push_back("-HV 2021"); // HLSL 2021
-	compile_arguments.push_back("-WX"); // Warnings are errors
+	compile_arguments.push_back("-WX"); // 	Treat warnings as errors
 	std::string include_string_argument = "-I " + m_directory;
 	compile_arguments.push_back(include_string_argument.c_str());
 

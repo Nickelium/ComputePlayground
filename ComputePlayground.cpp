@@ -446,25 +446,32 @@ void RunWorkGraph(DXContext& dx_context, DXCompiler& dx_compiler)
 		device14->CreateStateObject(&state_object_desc, IID_PPV_ARGS(&state_object)) >> CHK;
 		NAME_DX_OBJECT(state_object, "State Object");
 
-		// Are these subtypes?
-		Microsoft::WRL::ComPtr<ID3D12StateObjectProperties1> spWGProp1;
-		state_object.As(&spWGProp1) >> CHK;
+		// These are not subtypes but you can QueryInterface as how ComPtr works apparently
+		// To figure out from which to what you can QueryInterface, look up the docs they said ..
+		Microsoft::WRL::ComPtr<ID3D12StateObjectProperties1> state_object_properties;
+		state_object.As(&state_object_properties) >> CHK;
 		D3D12_PROGRAM_IDENTIFIER program_identifier{};
-		program_identifier = spWGProp1->GetProgramIdentifier(work_graph_wname.c_str());
+		program_identifier = state_object_properties->GetProgramIdentifier(work_graph_wname.c_str());
 
-		Microsoft::WRL::ComPtr<ID3D12WorkGraphProperties> spWGProps;
-		state_object.As(&spWGProps) >> CHK;
-		UINT WorkGraphIndex = spWGProps->GetWorkGraphIndex(work_graph_wname.c_str());
-		D3D12_WORK_GRAPH_MEMORY_REQUIREMENTS MemReqs{};
-		spWGProps->GetWorkGraphMemoryRequirements(WorkGraphIndex, &MemReqs);
-		D3D12_GPU_VIRTUAL_ADDRESS_RANGE BackingMemory{};
-		BackingMemory.SizeInBytes = MemReqs.MaxSizeInBytes;
+		Microsoft::WRL::ComPtr<ID3D12WorkGraphProperties> workgraph_properties;
+		state_object.As(&workgraph_properties) >> CHK;
+		UINT WorkGraphIndex = workgraph_properties->GetWorkGraphIndex(work_graph_wname.c_str());
+		D3D12_WORK_GRAPH_MEMORY_REQUIREMENTS mem_requirements{};
+		workgraph_properties->GetWorkGraphMemoryRequirements(WorkGraphIndex, &mem_requirements);
 
 		DXResource scratch_resource{};
-		scratch_resource.SetResourceInfo(D3D12_HEAP_TYPE_DEFAULT, D3D12_RESOURCE_FLAG_NONE, MemReqs.MaxSizeInBytes);
-		scratch_resource.CreateResource(dx_context, "Scratch Memory");
+		if (mem_requirements.MaxSizeInBytes > 0)
+		{
+			scratch_resource.SetResourceInfo(D3D12_HEAP_TYPE_DEFAULT, D3D12_RESOURCE_FLAG_NONE, mem_requirements.MaxSizeInBytes);
+			scratch_resource.CreateResource(dx_context, "Scratch Memory");
+		}
 
-		BackingMemory.StartAddress = scratch_resource.m_resource->GetGPUVirtualAddress();
+		D3D12_GPU_VIRTUAL_ADDRESS_RANGE backing_memory{};
+		if (scratch_resource.m_resource)
+		{
+			backing_memory.SizeInBytes = mem_requirements.MaxSizeInBytes;
+			backing_memory.StartAddress = scratch_resource.m_resource->GetGPUVirtualAddress();
+		}
 
 		DXResource buffer{};
 		buffer.SetResourceInfo(D3D12_HEAP_TYPE_DEFAULT, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, 16777216 * sizeof(uint32));
@@ -477,28 +484,88 @@ void RunWorkGraph(DXContext& dx_context, DXCompiler& dx_compiler)
 			{
 				.ProgramIdentifier = program_identifier,
 				.Flags = D3D12_SET_WORK_GRAPH_FLAG_INITIALIZE,
-				.BackingMemory = BackingMemory,
+				.BackingMemory = backing_memory,
 				.NodeLocalRootArgumentsTable = 0,
 			},
 		};
+//#define WORKGRAPH_TEST1
+//#define WORKGRAPH_TEST2
+//#define WORKGRAPH_TEST3
+//#define WORKGRAPH_TEST4
+//#define WORKGRAPH_TEST5
+#define WORKGRAPH_TEST6
+#if defined(WORKGRAPH_TEST1)
+		struct Record
+		{
+			uint32 index;
+		};
+		std::vector<Record> records{};
+		//records.push_back(Record{ 0 });
+		//records.push_back(Record{ 1 });
+#elif defined(WORKGRAPH_TEST2)
+		struct Record
+		{
+			uint32 index;
+		};
+		std::vector<Record> records{};
+		records.push_back(Record{ 0 });
+		records.push_back(Record{ 1 });
+#elif defined(WORKGRAPH_TEST3)
+		struct Record
+		{
+			uint32 DispatchGrid[3];
+			uint32 index;
+		};
+		std::vector<Record> records{};
+		records.push_back( {{ 1, 2, 3 }, 0});
+		records.push_back( {{ 2, 2, 2 }, 1});
+#elif defined(WORKGRAPH_TEST4)
+		struct Record
+		{
+			uint32 index;
+		};
+		std::vector<Record> records{};
+		records.push_back(Record{ 0 });
+		records.push_back(Record{ 1 });
+		records.push_back(Record{ 2 });
+#elif defined(WORKGRAPH_TEST5)
+		struct Record
+		{
+			uint32 index;
+		};
+		std::vector<Record> records{};
+		records.push_back(Record{ 0 });
+		records.push_back(Record{ 1 });
+		records.push_back(Record{ 2 });
+#elif defined(WORKGRAPH_TEST6)
+		struct Record
+		{
+			uint32 index;
+		};
+		std::vector<Record> records{};
+		records.push_back(Record{ 0 });
+		//records.push_back(Record{ 1 });
+		//records.push_back(Record{ 2 });
+#else
 
 		struct Record
 		{
-			UINT gridSize; // : SV_DispatchGrid;
-			UINT recordIndex;
+			uint32 gridSize; // : SV_DispatchGrid;
+			uint32 recordIndex;
 		};
 		std::vector<Record> records{};
 		records.push_back(Record{ 1, 0 });
 		records.push_back(Record{ 2, 1 });
 		records.push_back(Record{ 3, 2 });
 		records.push_back(Record{ 4, 3 });
+#endif
 		D3D12_DISPATCH_GRAPH_DESC wg_desc =
 		{
 			.Mode = D3D12_DISPATCH_MODE_NODE_CPU_INPUT,
 			.NodeCPUInput =
 			{
 				.EntrypointIndex = 0,
-				.NumRecords = (uint32)records.size(),
+				.NumRecords = std::max((uint32)records.size(), 1u), // Needs at least 1 to dispatch work graph
 				.pRecords = records.data(),
 				.RecordStrideInBytes = sizeof(Record)
 			},
@@ -507,6 +574,8 @@ void RunWorkGraph(DXContext& dx_context, DXCompiler& dx_compiler)
 		cmd_list10->SetComputeRootUnorderedAccessView(0, buffer.m_resource->GetGPUVirtualAddress());
 		cmd_list10->SetProgram(&program_desc);
 		cmd_list10->DispatchGraph(&wg_desc);
+
+		LogTrace("Workgraph Dispatched");
 
 		dx_context.Transition(D3D12_RESOURCE_STATE_COPY_SOURCE, buffer);
 
@@ -521,15 +590,16 @@ void RunWorkGraph(DXContext& dx_context, DXCompiler& dx_compiler)
 		dx_context.Flush(1);
 
 		uint32* data = nullptr;
-		const D3D12_RANGE range = { 0, 20/*readback_resource.m_resource_desc.Width*/ };
+		const D3D12_RANGE range = { 0, readback_resource.m_resource_desc.Width };
 		readback_resource.m_resource->Map(0, &range, (void**)&data);
-		for (uint32 i = 0; i < range.End - range.Begin; ++i)
+		readback_resource.m_resource->Unmap(0, nullptr);
+		LogTrace("Readback from GPU");
+
+		for (uint32 i = 0; i < 16; ++i)
 		{
 			LogTrace("uav workgraph[{}] = {}\n", i, data[i]);
 		}
-		readback_resource.m_resource->Unmap(0, nullptr);
 	}
-	LogTrace("Workgraph Dispatched");
 }
 
 void RunWindowLoop(DXContext& dx_context, DXCompiler& dx_compiler, GPUCapture* gpu_capture)
