@@ -15,8 +15,7 @@ AGILITY_SDK_DECLARE()
 
 DISABLE_OPTIMISATIONS()
 
-
-struct Resources
+struct ComputeResources
 {
 	// Compute
 	DXResource m_gpu_resource;
@@ -26,6 +25,10 @@ struct Resources
 	Microsoft::WRL::ComPtr<ID3D12RootSignature> m_compute_root_signature;
 	uint32 m_group_size;
 	uint32 m_dispatch_count;
+};
+
+struct GraphicsResources
+{
 
 	// Graphics
 	Microsoft::WRL::ComPtr<IDxcBlob> m_vertex_shader;
@@ -34,7 +37,7 @@ struct Resources
 	Microsoft::WRL::ComPtr<ID3D12RootSignature> m_gfx_root_signature;
 };
 
-void CreateComputeResources(DXContext& dx_context, const DXCompiler& dx_compiler, Resources& resource)
+void CreateComputeResources(DXContext& dx_context, const DXCompiler& dx_compiler, ComputeResources& resource)
 {
 	resource.m_group_size = 1024;
 	resource.m_dispatch_count = 1;
@@ -67,7 +70,7 @@ void CreateComputeResources(DXContext& dx_context, const DXCompiler& dx_compiler
 void CreateGraphicsResources
 (
 	DXContext& dx_context, const DXCompiler& dx_compiler, const DXWindow& dx_window, 
-	Resources& resource, 
+	GraphicsResources& resource, 
 	DXResource& vertex_buffer, D3D12_VERTEX_BUFFER_VIEW& vertex_buffer_view, 
 	uint32& vertex_count
 )
@@ -264,7 +267,7 @@ void CreateGraphicsResources
 
 void ComputeWork
 (
-	DXContext& dx_context, Resources& resource
+	DXContext& dx_context, ComputeResources& resource
 )
 {
 	// Compute Work
@@ -311,11 +314,9 @@ void ComputeWork
 	dx_context.GetCommandListGraphics()->CopyResource(resource.m_cpu_resource.m_resource.Get(), resource.m_gpu_resource.m_resource.Get());
 }
 
-#include "d3dx12.h"
-
 void GraphicsWork
 (
-	DXContext& dx_context, DXWindow& dx_window, Resources& resource, 	
+	DXContext& dx_context, DXWindow& dx_window, GraphicsResources& resource, 	
 	const D3D12_VERTEX_BUFFER_VIEW& vertex_buffer_view, uint32 vertex_count
 )
 {
@@ -354,24 +355,22 @@ void GraphicsWork
 void FillCommandList
 (
 	DXContext& dx_context, 
-	DXWindow& dx_window, Resources& resource, 
+	DXWindow& dx_window, GraphicsResources& resource, 
 	const D3D12_VERTEX_BUFFER_VIEW& vertex_buffer_view, uint32 vertex_count
 )
 {
 	// Fill CommandList
 	dx_window.BeginFrame(dx_context);
-	ComputeWork(dx_context, resource);
 	GraphicsWork(dx_context, dx_window, resource, vertex_buffer_view, vertex_count);
 	dx_window.EndFrame(dx_context);
 }
 void RunTest();
 
-void RunWorkGraph(DXContext& dx_context, DXCompiler& dx_compiler)
+void RunWorkGraph(DXContext& dx_context, DXCompiler& dx_compiler, bool is_pix_running = false)
 {
 	dx_context.InitCommandLists();
 	{
 		Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> cmd_list = dx_context.GetCommandListGraphics();
-		dx_context.InitCommandLists();
 		Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList10> cmd_list10{};
 		cmd_list.As(&cmd_list10) >> CHK;
 		Microsoft::WRL::ComPtr<ID3D12Device> device = dx_context.GetDevice();
@@ -390,7 +389,7 @@ void RunWorkGraph(DXContext& dx_context, DXCompiler& dx_compiler)
 		Microsoft::WRL::ComPtr<ID3D12Device14> device14{};
 		device.As(&device14) >> CHK;
 
-		CD3DX12_SHADER_BYTECODE libCode(byte_code);
+		D3D12_SHADER_BYTECODE libCode(byte_code);
 		Microsoft::WRL::ComPtr<ID3D12RootSignature> root_signature{};
 		device14->CreateRootSignature(0, libCode.pShaderBytecode, libCode.BytecodeLength, /*L"globalRS",*/ IID_PPV_ARGS(&root_signature)) >> CHK;
 		NAME_DX_OBJECT(root_signature, "Global RootSignature");
@@ -462,7 +461,9 @@ void RunWorkGraph(DXContext& dx_context, DXCompiler& dx_compiler)
 		DXResource scratch_resource{};
 		if (mem_requirements.MaxSizeInBytes > 0)
 		{
-			scratch_resource.SetResourceInfo(D3D12_HEAP_TYPE_DEFAULT, D3D12_RESOURCE_FLAG_NONE, mem_requirements.MaxSizeInBytes);
+			// For some reason running with PIX requires UAV
+			// Probably PIX needs to read the resource
+			scratch_resource.SetResourceInfo(D3D12_HEAP_TYPE_DEFAULT, is_pix_running ? D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS : D3D12_RESOURCE_FLAG_NONE, mem_requirements.MaxSizeInBytes);
 			scratch_resource.CreateResource(dx_context, "Scratch Memory");
 		}
 
@@ -492,8 +493,8 @@ void RunWorkGraph(DXContext& dx_context, DXCompiler& dx_compiler)
 //#define WORKGRAPH_TEST2
 //#define WORKGRAPH_TEST3
 //#define WORKGRAPH_TEST4
-//#define WORKGRAPH_TEST5
-#define WORKGRAPH_TEST6
+#define WORKGRAPH_TEST5
+//#define WORKGRAPH_TEST6
 #if defined(WORKGRAPH_TEST1)
 		struct Record
 		{
@@ -536,7 +537,7 @@ void RunWorkGraph(DXContext& dx_context, DXCompiler& dx_compiler)
 		std::vector<Record> records{};
 		records.push_back(Record{ 0 });
 		records.push_back(Record{ 1 });
-		records.push_back(Record{ 2 });
+		//records.push_back(Record{ 2 });
 #elif defined(WORKGRAPH_TEST6)
 		struct Record
 		{
@@ -595,11 +596,36 @@ void RunWorkGraph(DXContext& dx_context, DXCompiler& dx_compiler)
 		readback_resource.m_resource->Unmap(0, nullptr);
 		LogTrace("Readback from GPU");
 
-		for (uint32 i = 0; i < 16; ++i)
+		for (uint32 i = 0; i < 25; ++i)
 		{
 			LogTrace("uav workgraph[{}] = {}\n", i, data[i]);
 		}
 	}
+}
+
+void RunComputeWork(DXContext& dx_context, DXCompiler& dx_compiler)
+{
+	ComputeResources resource{};
+	CreateComputeResources(dx_context, dx_compiler, resource);
+
+	dx_context.InitCommandLists();
+	ComputeWork(dx_context, resource);
+	dx_context.ExecuteCommandListGraphics();
+	dx_context.Flush(1);
+
+	float32* data = nullptr;
+	const D3D12_RANGE range = { 0, resource.m_gpu_resource.m_resource_desc.Width };
+	resource.m_cpu_resource.m_resource->Map(0, &range, (void**)&data);
+	static bool has_display = false;
+	if (!has_display)
+	{
+		for (uint32 i = 0; i < resource.m_cpu_resource.m_resource_desc.Width / sizeof(float32) / 4; i++)
+		{
+			LogTrace("uav[{}] = {}, {}, {}, {}\n", i, data[i * 4 + 0], data[i * 4 + 1], data[i * 4 + 2], data[i * 4 + 3]);
+		}
+		has_display = true;
+	}
+	resource.m_cpu_resource.m_resource->Unmap(0, nullptr);
 }
 
 void RunWindowLoop(DXContext& dx_context, DXCompiler& dx_compiler, GPUCapture* gpu_capture)
@@ -618,8 +644,7 @@ void RunWindowLoop(DXContext& dx_context, DXCompiler& dx_compiler, GPUCapture* g
 		};
 		DXWindow dx_window(dx_context, window_manager, window_desc);
 		{
-			Resources resource{};
-			CreateComputeResources(dx_context, dx_compiler, resource);
+			GraphicsResources resource{};
 			DXResource vertex_buffer{};
 			D3D12_VERTEX_BUFFER_VIEW vertex_buffer_view{};
 			uint32 vertex_count{};
@@ -659,7 +684,6 @@ void RunWindowLoop(DXContext& dx_context, DXCompiler& dx_compiler, GPUCapture* g
 				}
 				prev_F11_pressed = current_F11_pressed;
 
-
 				if (capture)
 				{
 					gpu_capture->StartCapture();
@@ -677,20 +701,6 @@ void RunWindowLoop(DXContext& dx_context, DXCompiler& dx_compiler, GPUCapture* g
 					FillCommandList(dx_context, dx_window, resource, vertex_buffer_view, vertex_count);
 					dx_context.ExecuteCommandListGraphics();
 					dx_window.Present(dx_context);
-
-					float32* data = nullptr;
-					const D3D12_RANGE range = { 0, resource.m_gpu_resource.m_resource_desc.Width };
-					resource.m_cpu_resource.m_resource->Map(0, &range, (void**)&data);
-					static bool has_display = false;
-					if (!has_display)
-					{
-						for (uint32 i = 0; i < resource.m_cpu_resource.m_resource_desc.Width / sizeof(float32) / 4; i++)
-						{
-							LogTrace("uav[{}] = {}, {}, {}, {}\n", i, data[i * 4 + 0], data[i * 4 + 1], data[i * 4 + 2], data[i * 4 + 3]);
-						}
-						has_display = true;
-					}
-					resource.m_cpu_resource.m_resource->Unmap(0, nullptr);
 				}
 				if (capture)
 				{
@@ -721,12 +731,16 @@ int main()
 		//gpu_capture->StartCapture();
 		do
 		{
-			RunWorkGraph(dx_context, dx_compiler);
+			RunWorkGraph(dx_context, dx_compiler, dynamic_cast<PIXCapture*>(gpu_capture) != nullptr);
 		}while (false);
 		//gpu_capture->EndCapture();
 		//gpu_capture->OpenCapture();
 
-		RunWindowLoop(dx_context, dx_compiler, gpu_capture);
+		//RunWindowLoop(dx_context, dx_compiler, gpu_capture);
+		//gpu_capture->StartCapture();
+		//RunComputeWork(dx_context, dx_compiler);
+		//gpu_capture->EndCapture();
+		//gpu_capture->OpenCapture();
 		//RunTest();
 
 		delete gpu_capture;

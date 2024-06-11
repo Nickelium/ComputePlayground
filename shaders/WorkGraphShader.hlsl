@@ -1,11 +1,11 @@
 GlobalRootSignature globalRS = { "UAV(u0)" };
-RWStructuredBuffer<uint> UAV : register(u0); // 16MB byte buffer from global root sig
+globallycoherent RWStructuredBuffer<uint> UAV : register(u0); // 16MB byte buffer from global root sig
 //#define WORKGRAPH_TEST1
 //#define WORKGRAPH_TEST2
 //#define WORKGRAPH_TEST3
 //#define WORKGRAPH_TEST4
-//#define WORKGRAPH_TEST5
-#define WORKGRAPH_TEST6
+#define WORKGRAPH_TEST5
+//#define WORKGRAPH_TEST6
 #if defined(WORKGRAPH_TEST1)
 
 [Shader("node")]
@@ -93,7 +93,7 @@ void FirstNode
 	record.Get().index = GroupIndex + 1;
 	record.OutputComplete();
 }
-
+// TODO under coalescing with 2 input CPU records
 [Shader("node")]
 [NodeLaunch("coalescing")]
 [NumThreads(32, 1, 1)]
@@ -106,7 +106,8 @@ void SecondNode
 	uint inputDataIndex = GroupIndex / 4;
 	if (inputDataIndex < inputData.Count())
 	{
-		UAV[GroupIndex * 4] = inputData[inputDataIndex].index;
+		//InterlockedAdd(UAV[GroupIndex], inputData[inputDataIndex].index);
+		InterlockedAdd(UAV[GroupIndex], 1);
 	}
 }
 #elif defined(WORKGRAPH_TEST6)
