@@ -3,6 +3,8 @@
 
 void DXResource::SetResourceInfo(D3D12_HEAP_TYPE heap_type, D3D12_RESOURCE_FLAGS resource_flags, uint32 size)
 {
+	m_size = size;
+
 	m_heap_properties =
 	{
 		.Type = heap_type,
@@ -16,7 +18,7 @@ void DXResource::SetResourceInfo(D3D12_HEAP_TYPE heap_type, D3D12_RESOURCE_FLAGS
 	{
 		.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER,
 		.Alignment = D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT,
-		.Width = size,
+		.Width = m_size,
 		.Height = 1,
 		.DepthOrArraySize = 1,
 		.MipLevels = 1,
@@ -43,8 +45,7 @@ void DXVertexBufferResource::SetResourceInfo(D3D12_HEAP_TYPE heap_type, D3D12_RE
 {
 	DXResource::SetResourceInfo(heap_type, resource_flags, size);
 	m_stride = stride;
-	m_size = size;
-	m_count = size / stride;
+	m_count = m_size / m_stride;
 }
 
 void DXVertexBufferResource::CreateResource(DXContext& dx_context, const std::string& name_resource)

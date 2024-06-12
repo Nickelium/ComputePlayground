@@ -78,7 +78,7 @@ struct CommandAllocator
 
 struct CommandList
 {
-	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList6> m_list;
+	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList10> m_list;
 	D3D12_COMMAND_LIST_TYPE m_type;
 	bool m_is_open = false;
 };
@@ -108,8 +108,8 @@ public:
 	void Transition(D3D12_RESOURCE_STATES new_resource_state, DXResource& resource) const;
 
 	// Note we use the full namespace Microsoft::WRL to help 10xEditor autocompletion
-	Microsoft::WRL::ComPtr<ID3D12Device> GetDevice() const;
-	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> GetCommandListGraphics() const;
+	Microsoft::WRL::ComPtr<ID3D12Device14> GetDevice() const;
+	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList10> GetCommandListGraphics() const;
 	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList>GetCommandListCompute() const;
 	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> GetCommandListCopy() const;
 	Microsoft::WRL::ComPtr<IDXGIFactory> GetFactory() const;
@@ -164,7 +164,7 @@ private:
 
 	Microsoft::WRL::ComPtr<IDXGIFactory7> m_factory;
 	Microsoft::WRL::ComPtr<IDXGIAdapter4> m_adapter; // GPU
-	Microsoft::WRL::ComPtr<ID3D12Device9> m_device;
+	Microsoft::WRL::ComPtr<ID3D12Device14> m_device;
 	bool m_use_warp;
 public:
 	// Graphics + Compute + Copy

@@ -332,12 +332,12 @@ void DXContext::Transition(D3D12_RESOURCE_STATES new_resource_state, DXResource&
 	}
 }
 
-Microsoft::WRL::ComPtr<ID3D12Device> DXContext::GetDevice() const
+Microsoft::WRL::ComPtr<ID3D12Device14> DXContext::GetDevice() const
 {
 	return m_device;
 }
 
-Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> DXContext::GetCommandListGraphics() const
+Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList10> DXContext::GetCommandListGraphics() const
 {
 	return m_command_list_graphics.m_list;
 }

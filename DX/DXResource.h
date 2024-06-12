@@ -7,6 +7,8 @@ class DXContext;
 class DXResource
 {
 public:
+	uint32 m_size;
+
 	D3D12_RESOURCE_STATES m_resource_state = D3D12_RESOURCE_STATE_COMMON;
 	Microsoft::WRL::ComPtr<ID3D12Resource> m_resource;
 
@@ -22,7 +24,6 @@ class DXVertexBufferResource : public DXResource
 {
 public:
 	uint32 m_stride;
-	uint32 m_size;
 	uint32 m_count;
 
 	D3D12_VERTEX_BUFFER_VIEW m_vertex_buffer_view{};
