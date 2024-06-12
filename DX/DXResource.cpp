@@ -38,3 +38,22 @@ void DXResource::CreateResource(DXContext& dx_context, const std::string& name_r
 	dx_context.GetDevice()->CreateCommittedResource(&m_heap_properties, D3D12_HEAP_FLAG_NONE, &m_resource_desc, m_resource_state, nullptr, IID_PPV_ARGS(&m_resource)) >> CHK;
 	NAME_DX_OBJECT(m_resource, name_resource);
 }
+
+void DXVertexBufferResource::SetResourceInfo(D3D12_HEAP_TYPE heap_type, D3D12_RESOURCE_FLAGS resource_flags, uint32 size, uint32 stride)
+{
+	DXResource::SetResourceInfo(heap_type, resource_flags, size);
+	m_stride = stride;
+	m_size = size;
+	m_count = size / stride;
+}
+
+void DXVertexBufferResource::CreateResource(DXContext& dx_context, const std::string& name_resource)
+{
+	DXResource::CreateResource(dx_context, name_resource);
+	m_vertex_buffer_view =
+	{
+		.BufferLocation = m_resource->GetGPUVirtualAddress(),
+		.SizeInBytes = m_size,
+		.StrideInBytes = m_stride,
+	};
+}

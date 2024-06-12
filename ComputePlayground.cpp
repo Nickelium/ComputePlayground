@@ -29,8 +29,8 @@ struct ComputeResources
 
 struct GraphicsResources
 {
-
 	// Graphics
+	DXVertexBufferResource m_vertex_buffer;
 	Microsoft::WRL::ComPtr<IDxcBlob> m_vertex_shader;
 	Microsoft::WRL::ComPtr<IDxcBlob> m_pixel_shader;
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> m_gfx_pso;
@@ -70,20 +70,12 @@ void CreateComputeResources(DXContext& dx_context, const DXCompiler& dx_compiler
 void CreateGraphicsResources
 (
 	DXContext& dx_context, const DXCompiler& dx_compiler, const DXWindow& dx_window, 
-	GraphicsResources& resource, 
-	DXResource& vertex_buffer, D3D12_VERTEX_BUFFER_VIEW& vertex_buffer_view, 
-	uint32& vertex_count
+	GraphicsResources& resource
 )
 {
 	dx_compiler.Compile(dx_context.GetDevice(), &resource.m_vertex_shader, "VertexShader.hlsl", ShaderType::VERTEX_SHADER);
 	dx_compiler.Compile(dx_context.GetDevice(), &resource.m_pixel_shader, "PixelShader.hlsl", ShaderType::PIXEL_SHADER);
 
-	D3D12_DESCRIPTOR_HEAP_DESC desc_heap_desc =
-	{
-		.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV,
-		.NumDescriptors = 1,
-		.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE,
-	};
 	{
 		struct Vertex
 		{
@@ -98,10 +90,8 @@ void CreateGraphicsResources
 			{ {-0.25f, -0.25f}, {0.0f, 0.0f, 1.0f} },
 		};
 
-		vertex_count = COUNT(vertex_data);
-
-		vertex_buffer.SetResourceInfo(D3D12_HEAP_TYPE_DEFAULT, D3D12_RESOURCE_FLAG_NONE, sizeof(vertex_data));
-		vertex_buffer.CreateResource(dx_context, "VertexBuffer");
+		resource.m_vertex_buffer.SetResourceInfo(D3D12_HEAP_TYPE_DEFAULT, D3D12_RESOURCE_FLAG_NONE, sizeof(vertex_data), sizeof(vertex_data[0]));
+		resource.m_vertex_buffer.CreateResource(dx_context, "VertexBuffer");
 
 		DXResource vertex_upload_buffer{};
 		vertex_upload_buffer.SetResourceInfo(D3D12_HEAP_TYPE_UPLOAD, D3D12_RESOURCE_FLAG_NONE, sizeof(vertex_data));
@@ -114,20 +104,13 @@ void CreateGraphicsResources
 		vertex_upload_buffer.m_resource->Unmap(0, nullptr);
 		dx_context.InitCommandLists();
 		dx_context.Transition(D3D12_RESOURCE_STATE_COPY_SOURCE, vertex_upload_buffer);
-		dx_context.Transition(D3D12_RESOURCE_STATE_COPY_DEST, vertex_buffer);
-		dx_context.GetCommandListGraphics()->CopyResource(vertex_buffer.m_resource.Get(), vertex_upload_buffer.m_resource.Get());
-		dx_context.Transition(D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER, vertex_buffer);
+		dx_context.Transition(D3D12_RESOURCE_STATE_COPY_DEST, resource.m_vertex_buffer);
+		dx_context.GetCommandListGraphics()->CopyResource(resource.m_vertex_buffer.m_resource.Get(), vertex_upload_buffer.m_resource.Get());
+		dx_context.Transition(D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER, resource.m_vertex_buffer);
 		// Copy queue has some constraints regarding copy state and barriers
 		// Compute has synchronization issue
 		dx_context.ExecuteCommandListGraphics();
 		dx_context.Flush(1);
-
-		vertex_buffer_view =
-		{
-			.BufferLocation = vertex_buffer.m_resource->GetGPUVirtualAddress(),
-			.SizeInBytes = sizeof(vertex_data),
-			.StrideInBytes = sizeof(vertex_data[0]),
-		};
 
 		const D3D12_INPUT_ELEMENT_DESC element_descs[] =
 		{
@@ -316,8 +299,8 @@ void ComputeWork
 
 void GraphicsWork
 (
-	DXContext& dx_context, DXWindow& dx_window, GraphicsResources& resource, 	
-	const D3D12_VERTEX_BUFFER_VIEW& vertex_buffer_view, uint32 vertex_count
+	DXContext& dx_context, DXWindow& dx_window, 
+	GraphicsResources& resource
 )
 {
 	// Draw Work
@@ -346,22 +329,21 @@ void GraphicsWork
 		dx_context.GetCommandListGraphics()->RSSetScissorRects(1, scissor_rects);
 		dx_context.GetCommandListGraphics()->SetPipelineState(resource.m_gfx_pso.Get());
 		dx_context.GetCommandListGraphics()->SetGraphicsRootSignature(resource.m_gfx_root_signature.Get());
-		dx_context.GetCommandListGraphics()->IASetVertexBuffers(0, 1, &vertex_buffer_view);
+		dx_context.GetCommandListGraphics()->IASetVertexBuffers(0, 1, &resource.m_vertex_buffer.m_vertex_buffer_view);
 		dx_context.GetCommandListGraphics()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-		dx_context.GetCommandListGraphics()->DrawInstanced(vertex_count, 1, 0, 0);
+		dx_context.GetCommandListGraphics()->DrawInstanced(resource.m_vertex_buffer.m_count, 1, 0, 0);
 	}
 }
 
 void FillCommandList
 (
 	DXContext& dx_context, 
-	DXWindow& dx_window, GraphicsResources& resource, 
-	const D3D12_VERTEX_BUFFER_VIEW& vertex_buffer_view, uint32 vertex_count
+	DXWindow& dx_window, GraphicsResources& resource 
 )
 {
 	// Fill CommandList
 	dx_window.BeginFrame(dx_context);
-	GraphicsWork(dx_context, dx_window, resource, vertex_buffer_view, vertex_count);
+	GraphicsWork(dx_context, dx_window, resource);
 	dx_window.EndFrame(dx_context);
 }
 void RunTest();
@@ -463,7 +445,7 @@ void RunWorkGraph(DXContext& dx_context, DXCompiler& dx_compiler, bool is_pix_ru
 		{
 			// For some reason running with PIX requires UAV
 			// Probably PIX needs to read the resource
-			scratch_resource.SetResourceInfo(D3D12_HEAP_TYPE_DEFAULT, is_pix_running ? D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS : D3D12_RESOURCE_FLAG_NONE, mem_requirements.MaxSizeInBytes);
+			scratch_resource.SetResourceInfo(D3D12_HEAP_TYPE_DEFAULT, is_pix_running ? D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS : D3D12_RESOURCE_FLAG_NONE, (uint32)mem_requirements.MaxSizeInBytes);
 			scratch_resource.CreateResource(dx_context, "Scratch Memory");
 		}
 
@@ -581,7 +563,7 @@ void RunWorkGraph(DXContext& dx_context, DXCompiler& dx_compiler, bool is_pix_ru
 		dx_context.Transition(D3D12_RESOURCE_STATE_COPY_SOURCE, buffer);
 
 		DXResource readback_resource{};
-		readback_resource.SetResourceInfo(D3D12_HEAP_TYPE_READBACK, D3D12_RESOURCE_FLAG_NONE, buffer.m_resource_desc.Width);
+		readback_resource.SetResourceInfo(D3D12_HEAP_TYPE_READBACK, D3D12_RESOURCE_FLAG_NONE, (uint32)buffer.m_resource_desc.Width);
 		readback_resource.m_resource_state = D3D12_RESOURCE_STATE_COPY_DEST;
 		readback_resource.CreateResource(dx_context, "Readback resource");
 
@@ -645,10 +627,7 @@ void RunWindowLoop(DXContext& dx_context, DXCompiler& dx_compiler, GPUCapture* g
 		DXWindow dx_window(dx_context, window_manager, window_desc);
 		{
 			GraphicsResources resource{};
-			DXResource vertex_buffer{};
-			D3D12_VERTEX_BUFFER_VIEW vertex_buffer_view{};
-			uint32 vertex_count{};
-			CreateGraphicsResources(dx_context, dx_compiler, dx_window, resource, vertex_buffer, vertex_buffer_view, vertex_count);
+			CreateGraphicsResources(dx_context, dx_compiler, dx_window, resource);
 
 			while (!dx_window.ShouldClose())
 			{
@@ -698,7 +677,7 @@ void RunWindowLoop(DXContext& dx_context, DXCompiler& dx_compiler, GPUCapture* g
 					}
 
 					dx_context.InitCommandLists();
-					FillCommandList(dx_context, dx_window, resource, vertex_buffer_view, vertex_count);
+					FillCommandList(dx_context, dx_window, resource);
 					dx_context.ExecuteCommandListGraphics();
 					dx_window.Present(dx_context);
 				}
@@ -736,7 +715,7 @@ int main()
 		//gpu_capture->EndCapture();
 		//gpu_capture->OpenCapture();
 
-		//RunWindowLoop(dx_context, dx_compiler, gpu_capture);
+		RunWindowLoop(dx_context, dx_compiler, gpu_capture);
 		//gpu_capture->StartCapture();
 		//RunComputeWork(dx_context, dx_compiler);
 		//gpu_capture->EndCapture();

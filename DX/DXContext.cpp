@@ -468,7 +468,7 @@ void DXContext::CreateFence(Fence& out_fence)
 {
 	uint64 initial_value = 0u;
 	out_fence.m_value = initial_value;
-	memset(&out_fence.m_cpus, initial_value , sizeof(out_fence.m_cpus));
+	memset(&out_fence.m_cpus, (uint32)initial_value, sizeof(out_fence.m_cpus));
 	m_device->CreateFence(initial_value  /* Initial fence value */, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&out_fence.m_gpu)) >> CHK;
 	out_fence.m_event = CreateEvent(nullptr, false, false, nullptr);
 	ASSERT(out_fence.m_event != nullptr);

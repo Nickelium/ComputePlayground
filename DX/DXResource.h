@@ -15,5 +15,18 @@ public:
 	D3D12_HEAP_PROPERTIES m_heap_properties;
 
 	void SetResourceInfo(D3D12_HEAP_TYPE heap_type, D3D12_RESOURCE_FLAGS resource_flags, uint32 size);
-	void CreateResource(DXContext& dx_context, const std::string& name_resource);
+	virtual void CreateResource(DXContext& dx_context, const std::string& name_resource);
+};
+
+class DXVertexBufferResource : public DXResource
+{
+public:
+	uint32 m_stride;
+	uint32 m_size;
+	uint32 m_count;
+
+	D3D12_VERTEX_BUFFER_VIEW m_vertex_buffer_view{};
+
+	void SetResourceInfo(D3D12_HEAP_TYPE heap_type, D3D12_RESOURCE_FLAGS resource_flags, uint32 size, uint32 stride);
+	virtual void CreateResource(DXContext& dx_context, const std::string& name_resource) override;
 };
