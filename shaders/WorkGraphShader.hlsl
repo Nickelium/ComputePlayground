@@ -4,7 +4,7 @@ globallycoherent RWStructuredBuffer<uint> UAV : register(u0); // 16MB byte buffe
 //#define WORKGRAPH_TEST2
 //#define WORKGRAPH_TEST3
 //#define WORKGRAPH_TEST4
-#define WORKGRAPH_TEST5
+//#define WORKGRAPH_TEST5
 //#define WORKGRAPH_TEST6
 #if defined(WORKGRAPH_TEST1)
 
@@ -93,7 +93,8 @@ void FirstNode
 	record.Get().index = GroupIndex + 1;
 	record.OutputComplete();
 }
-// TODO under coalescing with 2 input CPU records
+
+// Note: input records are unordered
 [Shader("node")]
 [NodeLaunch("coalescing")]
 [NumThreads(32, 1, 1)]
@@ -106,8 +107,8 @@ void SecondNode
 	uint inputDataIndex = GroupIndex / 4;
 	if (inputDataIndex < inputData.Count())
 	{
-		//InterlockedAdd(UAV[GroupIndex], inputData[inputDataIndex].index);
-		InterlockedAdd(UAV[GroupIndex], 1);
+		InterlockedAdd(UAV[GroupIndex], inputData[inputDataIndex].index);
+		//InterlockedAdd(UAV[GroupIndex], 1);
 	}
 }
 #elif defined(WORKGRAPH_TEST6)
@@ -127,7 +128,7 @@ void RecursiveNode
 	[MaxRecords(1)] NodeOutput<InputRecord> RecursiveNode
 )
 {
-	UAV[inputData.Get().depth * 4] = GetRemainingRecursionLevels();
+	UAV[inputData.Get().depth] = GetRemainingRecursionLevels();
     
 	bool shouldRecurse = (GetRemainingRecursionLevels() > 0);
 	GroupNodeOutputRecords<InputRecord> record = RecursiveNode.GetGroupNodeOutputRecords(shouldRecurse ? 1 : 0);
@@ -173,11 +174,13 @@ static const uint c_numEntryRecords = 4;
 [NodeMaxDispatchGrid(16,1,1)] // Contrived value, input records from the app only top out at grid size of 4.  
                               // This declaration should be as accurate as possible, but not too small (undefined behavior).
 [NumThreads(2,1,1)]
-void firstNode(
+void firstNode
+(
     DispatchNodeInputRecord<entryRecord> inputData,
     [MaxRecords(2)] NodeOutput<secondNodeInput> secondNode,
     uint threadIndex : SV_GroupIndex,
-    uint dispatchThreadID : SV_DispatchThreadID)
+    uint dispatchThreadID : SV_DispatchThreadID
+)
 {
     // Methods for allocating output records must be called at thread group scope (uniform call across the group)
     // Allocations can be per thread as well: GetThreadNodeOutputRecords(...), but the call still has to be
@@ -199,9 +202,11 @@ void firstNode(
 // --------------------------------------------------------------------------------------------------------------------------------
 [Shader("node")]
 [NodeLaunch("thread")]
-void secondNode(
+void secondNode
+(
     ThreadNodeInputRecord<secondNodeInput> inputData,
-    [MaxRecords(1)] NodeOutput<thirdNodeInput> thirdNode)
+    [MaxRecords(1)] NodeOutput<thirdNodeInput> thirdNode
+)
 {
     // In a future language version, "->" will be available instead of ".Get()" to access record members
 
@@ -224,9 +229,11 @@ groupshared uint g_sum[c_numEntryRecords];
 [Shader("node")]
 [NodeLaunch("coalescing")]
 [NumThreads(32,1,1)]
-void thirdNode(
+void thirdNode
+(
     [MaxRecords(32)] GroupNodeInputRecords<thirdNodeInput> inputData,
-    uint threadIndex : SV_GroupIndex)
+    uint threadIndex : SV_GroupIndex
+)
 {
     // Check how many records we got
     // It could be less than the max declared if the system doesn't have that many

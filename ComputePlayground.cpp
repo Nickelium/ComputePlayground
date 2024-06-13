@@ -99,6 +99,7 @@ void CreateGraphicsResources
 		};
 
 		dx_context.GetDevice()->CreateRootSignature(0, resource.m_vertex_shader->GetBufferPointer(), resource.m_vertex_shader->GetBufferSize(), IID_PPV_ARGS(&resource.m_gfx_root_signature)) >> CHK;
+		NAME_DX_OBJECT(resource.m_gfx_root_signature, "Graphics RootSignature");
 
 		const D3D12_GRAPHICS_PIPELINE_STATE_DESC gfx_pso_desc
 		{
@@ -349,10 +350,13 @@ struct ComputeResources
 	DXResource m_gpu_resource;
 	DXResource m_cpu_resource;
 	Microsoft::WRL::ComPtr<IDxcBlob> m_compute_shader;
-	Microsoft::WRL::ComPtr<ID3D12PipelineState> m_compute_pso;
+	//Microsoft::WRL::ComPtr<ID3D12PipelineState> m_compute_pso;
 	Microsoft::WRL::ComPtr<ID3D12RootSignature> m_compute_root_signature;
 	uint32 m_group_size;
 	uint32 m_dispatch_count;
+	
+	Microsoft::WRL::ComPtr<ID3D12StateObject> m_compute_so;
+	D3D12_PROGRAM_IDENTIFIER m_program_id;
 };
 
 void CreateComputeResources(DXContext& dx_context, const DXCompiler& dx_compiler, ComputeResources& resource)
@@ -372,17 +376,83 @@ void CreateComputeResources(DXContext& dx_context, const DXCompiler& dx_compiler
 	
 	// Root signature embed in the shader already
 	dx_context.GetDevice()->CreateRootSignature(0, resource.m_compute_shader->GetBufferPointer(), resource.m_compute_shader->GetBufferSize(), IID_PPV_ARGS(&resource.m_compute_root_signature)) >> CHK;
+	NAME_DX_OBJECT(resource.m_compute_root_signature, "Compute RootSignature");
 
-	D3D12_COMPUTE_PIPELINE_STATE_DESC pso_desc =
+//	D3D12_COMPUTE_PIPELINE_STATE_DESC pso_desc =
+//	{
+//		.pRootSignature = nullptr,
+//		.CS = 
+//		{
+//			.pShaderBytecode = resource.m_compute_shader->GetBufferPointer(),
+//			.BytecodeLength = resource.m_compute_shader->GetBufferSize(),
+//		},
+//	};
+//	dx_context.GetDevice()->CreateComputePipelineState(&pso_desc, IID_PPV_ARGS(&resource.m_compute_pso)) >> CHK;
+
+	D3D12_DXIL_LIBRARY_DESC sub_object_library =
 	{
-		.pRootSignature = nullptr,
-		.CS = 
+		.DXILLibrary =
 		{
 			.pShaderBytecode = resource.m_compute_shader->GetBufferPointer(),
 			.BytecodeLength = resource.m_compute_shader->GetBufferSize(),
 		},
+		.NumExports = 0,
+		.pExports = nullptr,
 	};
-	dx_context.GetDevice()->CreateComputePipelineState(&pso_desc, IID_PPV_ARGS(&resource.m_compute_pso)) >> CHK;
+
+	std::string compute_name{ "Compute" };
+	std::wstring compute_wname = std::to_wstring(compute_name);
+
+	// Need to export entry point with generic program
+	std::wstring computeshader_entrypoint = L"main";
+	LPCWSTR exports[] =
+	{
+		computeshader_entrypoint.c_str(),
+	};
+
+	D3D12_GENERIC_PROGRAM_DESC sub_object_generic_program
+	{
+		.ProgramName = compute_wname.c_str(),
+		.NumExports = COUNT(exports),
+		.pExports = exports,
+		.NumSubobjects = 0,
+		.ppSubobjects = nullptr,
+	};
+
+	D3D12_GLOBAL_ROOT_SIGNATURE sub_object_lobal_rootsignature
+	{
+		.pGlobalRootSignature = resource.m_compute_root_signature.Get(),
+	};
+
+	std::vector<D3D12_STATE_SUBOBJECT> state_subobjects =
+	{
+		{
+			.Type = D3D12_STATE_SUBOBJECT_TYPE_DXIL_LIBRARY,
+			.pDesc = &sub_object_library,
+		},
+		{
+			.Type = D3D12_STATE_SUBOBJECT_TYPE_GENERIC_PROGRAM,
+			.pDesc = &sub_object_generic_program,
+		},
+		{
+			.Type = D3D12_STATE_SUBOBJECT_TYPE_GLOBAL_ROOT_SIGNATURE,
+			.pDesc = &sub_object_lobal_rootsignature,
+		},
+	};
+
+	D3D12_STATE_OBJECT_DESC state_object_desc =
+	{
+		.Type = D3D12_STATE_OBJECT_TYPE_EXECUTABLE,
+		.NumSubobjects = (uint32)state_subobjects.size(),
+		.pSubobjects = state_subobjects.data()
+	};
+
+	dx_context.GetDevice()->CreateStateObject(&state_object_desc, IID_PPV_ARGS(&resource.m_compute_so)) >> CHK;
+	NAME_DX_OBJECT(resource.m_compute_so, "Compute State Object");
+
+	Microsoft::WRL::ComPtr<ID3D12StateObjectProperties1> state_object_properties;
+	resource.m_compute_so.As(&state_object_properties) >> CHK;
+	resource.m_program_id = state_object_properties->GetProgramIdentifier(compute_wname.c_str());
 }
 
 void ComputeWork
@@ -394,7 +464,18 @@ void ComputeWork
 	// Transition to UAV
 	dx_context.Transition(D3D12_RESOURCE_STATE_UNORDERED_ACCESS, resource.m_gpu_resource);
 	dx_context.GetCommandListGraphics()->SetComputeRootSignature(resource.m_compute_root_signature.Get());
-	dx_context.GetCommandListGraphics()->SetPipelineState(resource.m_compute_pso.Get());
+	//dx_context.GetCommandListGraphics()->SetPipelineState(resource.m_compute_pso.Get());
+	
+	D3D12_SET_PROGRAM_DESC program_desc
+	{
+		.Type = D3D12_PROGRAM_TYPE_GENERIC_PIPELINE,
+		.GenericPipeline =
+		{
+			.ProgramIdentifier = resource.m_program_id
+		},
+	};
+	dx_context.GetCommandListGraphics()->SetProgram(&program_desc);
+
 	dx_context.GetCommandListGraphics()->SetComputeRootUnorderedAccessView(0, resource.m_gpu_resource.m_resource->GetGPUVirtualAddress());
 	dx_context.GetCommandListGraphics()->Dispatch(resource.m_dispatch_count, 1, 1);
 	// Transition to Copy Src
@@ -415,7 +496,7 @@ void RunComputeWork(DXContext& dx_context, DXCompiler& dx_compiler)
 	float32* data = nullptr;
 	const D3D12_RANGE range = { 0, resource.m_gpu_resource.m_resource_desc.Width };
 	resource.m_cpu_resource.m_resource->Map(0, &range, (void**)&data);
-	static bool has_display = false;
+	bool has_display = false;
 	if (!has_display)
 	{
 		for (uint32 i = 0; i < resource.m_cpu_resource.m_resource_desc.Width / sizeof(float32) / 4; i++)
@@ -458,8 +539,7 @@ void CreateWorkGraphResource
 		.BytecodeLength = resource.m_workgraph_shader->GetBufferSize()
 	};
 
-	D3D12_SHADER_BYTECODE libCode(byte_code);
-	dx_context.GetDevice()->CreateRootSignature(0, libCode.pShaderBytecode, libCode.BytecodeLength, /*L"globalRS",*/ IID_PPV_ARGS(&resource.m_workgraph_root_signature)) >> CHK;
+	dx_context.GetDevice()->CreateRootSignature(0, byte_code.pShaderBytecode, byte_code.BytecodeLength, /*L"globalRS",*/ IID_PPV_ARGS(&resource.m_workgraph_root_signature)) >> CHK;
 	NAME_DX_OBJECT(resource.m_workgraph_root_signature, "Global RootSignature");
 
 	D3D12_DXIL_LIBRARY_DESC sub_object_library =
@@ -509,7 +589,7 @@ void CreateWorkGraphResource
 	};
 
 	dx_context.GetDevice()->CreateStateObject(&state_object_desc, IID_PPV_ARGS(&resource.m_workgraph_so)) >> CHK;
-	NAME_DX_OBJECT(resource.m_workgraph_so, "State Object");
+	NAME_DX_OBJECT(resource.m_workgraph_so, "Workgraph State Object");
 
 	// These are not subtypes but you can QueryInterface as how ComPtr works apparently
 	// To figure out from which to what you can QueryInterface, look up the docs they said ..
@@ -519,9 +599,9 @@ void CreateWorkGraphResource
 
 	Microsoft::WRL::ComPtr<ID3D12WorkGraphProperties> workgraph_properties;
 	resource.m_workgraph_so.As(&workgraph_properties) >> CHK;
-	UINT WorkGraphIndex = workgraph_properties->GetWorkGraphIndex(work_graph_wname.c_str());
+	uint32 workgraph_index = workgraph_properties->GetWorkGraphIndex(work_graph_wname.c_str());
 	D3D12_WORK_GRAPH_MEMORY_REQUIREMENTS mem_requirements{};
-	workgraph_properties->GetWorkGraphMemoryRequirements(WorkGraphIndex, &mem_requirements);
+	workgraph_properties->GetWorkGraphMemoryRequirements(workgraph_index, &mem_requirements);
 
 	if (mem_requirements.MaxSizeInBytes > 0)
 	{
@@ -541,134 +621,132 @@ void CreateWorkGraphResource
 
 void RunWorkGraph(DXContext& dx_context, DXCompiler& dx_compiler, bool is_pix_running = false)
 {
-	dx_context.InitCommandLists();
+	WorkGraphResources resource{};
+	CreateWorkGraphResource(dx_context, dx_compiler, resource, is_pix_running);
+
+	D3D12_GPU_VIRTUAL_ADDRESS_RANGE backing_memory{};
+	if (resource.m_scratch_buffer.m_resource)
 	{
-		WorkGraphResources resource{};
-		CreateWorkGraphResource(dx_context, dx_compiler, resource, is_pix_running);
+		backing_memory.SizeInBytes = resource.m_scratch_buffer.m_size;
+		backing_memory.StartAddress = resource.m_scratch_buffer.m_resource->GetGPUVirtualAddress();
+	}
 
-		D3D12_GPU_VIRTUAL_ADDRESS_RANGE backing_memory{};
-		if (resource.m_scratch_buffer.m_resource)
+	D3D12_SET_PROGRAM_DESC program_desc =
+	{
+		.Type = D3D12_PROGRAM_TYPE_WORK_GRAPH,
+		.WorkGraph =
 		{
-			backing_memory.SizeInBytes = resource.m_scratch_buffer.m_size;
-			backing_memory.StartAddress = resource.m_scratch_buffer.m_resource->GetGPUVirtualAddress();
-		}
-
-		D3D12_SET_PROGRAM_DESC program_desc =
-		{
-			.Type = D3D12_PROGRAM_TYPE_WORK_GRAPH,
-			.WorkGraph =
-			{
-				.ProgramIdentifier = resource.m_program_id,
-				.Flags = D3D12_SET_WORK_GRAPH_FLAG_INITIALIZE,
-				.BackingMemory = backing_memory,
-				.NodeLocalRootArgumentsTable = 0,
-			},
-		};
+			.ProgramIdentifier = resource.m_program_id,
+			.Flags = D3D12_SET_WORK_GRAPH_FLAG_INITIALIZE,
+			.BackingMemory = backing_memory,
+			.NodeLocalRootArgumentsTable = 0,
+		},
+	};
 //#define WORKGRAPH_TEST1
 //#define WORKGRAPH_TEST2
 //#define WORKGRAPH_TEST3
 //#define WORKGRAPH_TEST4
-#define WORKGRAPH_TEST5
+//#define WORKGRAPH_TEST5
 //#define WORKGRAPH_TEST6
 #if defined(WORKGRAPH_TEST1)
-		struct Record
-		{
-			uint32 index;
-		};
-		std::vector<Record> records{};
-		//records.push_back(Record{ 0 });
-		//records.push_back(Record{ 1 });
+	struct Record
+	{
+		uint32 index;
+	};
+	std::vector<Record> records{};
+	//records.push_back(Record{ 0 });
+	//records.push_back(Record{ 1 });
 #elif defined(WORKGRAPH_TEST2)
-		struct Record
-		{
-			uint32 index;
-		};
-		std::vector<Record> records{};
-		records.push_back(Record{ 0 });
-		records.push_back(Record{ 1 });
+	struct Record
+	{
+		uint32 index;
+	};
+	std::vector<Record> records{};
+	records.push_back(Record{ 0 });
+	records.push_back(Record{ 1 });
 #elif defined(WORKGRAPH_TEST3)
-		struct Record
-		{
-			uint32 DispatchGrid[3];
-			uint32 index;
-		};
-		std::vector<Record> records{};
-		records.push_back( {{ 1, 2, 3 }, 0});
-		records.push_back( {{ 2, 2, 2 }, 1});
+	struct Record
+	{
+		uint32 DispatchGrid[3];
+		uint32 index;
+	};
+	std::vector<Record> records{};
+	records.push_back( {{ 1, 2, 3 }, 0});
+	records.push_back( {{ 2, 2, 2 }, 1});
 #elif defined(WORKGRAPH_TEST4)
-		struct Record
-		{
-			uint32 index;
-		};
-		std::vector<Record> records{};
-		records.push_back(Record{ 0 });
-		records.push_back(Record{ 1 });
-		records.push_back(Record{ 2 });
+	struct Record
+	{
+		uint32 index;
+	};
+	std::vector<Record> records{};
+	records.push_back(Record{ 0 });
+	records.push_back(Record{ 1 });
+	records.push_back(Record{ 2 });
 #elif defined(WORKGRAPH_TEST5)
-		struct Record
-		{
-			uint32 index;
-		};
-		std::vector<Record> records{};
-		records.push_back(Record{ 0 });
-		records.push_back(Record{ 1 });
-		//records.push_back(Record{ 2 });
+	struct Record
+	{
+		uint32 index;
+	};
+	std::vector<Record> records{};
+	records.push_back(Record{ 0 });
+	records.push_back(Record{ 1 });
+	//records.push_back(Record{ 2 });
 #elif defined(WORKGRAPH_TEST6)
-		struct Record
-		{
-			uint32 index;
-		};
-		std::vector<Record> records{};
-		records.push_back(Record{ 0 });
-		//records.push_back(Record{ 1 });
-		//records.push_back(Record{ 2 });
+	struct Record
+	{
+		uint32 index;
+	};
+	std::vector<Record> records{};
+	records.push_back(Record{ 0 });
+	//records.push_back(Record{ 1 });
+	//records.push_back(Record{ 2 });
 #else
 
-		struct Record
-		{
-			uint32 gridSize; // : SV_DispatchGrid;
-			uint32 recordIndex;
-		};
-		std::vector<Record> records{};
-		records.push_back(Record{ 1, 0 });
-		records.push_back(Record{ 2, 1 });
-		records.push_back(Record{ 3, 2 });
-		records.push_back(Record{ 4, 3 });
+	struct Record
+	{
+		uint32 gridSize; // : SV_DispatchGrid;
+		uint32 recordIndex;
+	};
+	std::vector<Record> records{};
+//	records.push_back(Record{ 1, 0 });
+	records.push_back(Record{ 2, 1 });
+//	records.push_back(Record{ 3, 2 });
+//	records.push_back(Record{ 4, 3 });
 #endif
-		D3D12_DISPATCH_GRAPH_DESC wg_desc =
+
+	D3D12_DISPATCH_GRAPH_DESC workgraph_desc =
+	{
+		.Mode = D3D12_DISPATCH_MODE_NODE_CPU_INPUT,
+		.NodeCPUInput =
 		{
-			.Mode = D3D12_DISPATCH_MODE_NODE_CPU_INPUT,
-			.NodeCPUInput =
-			{
-				.EntrypointIndex = 0,
-				.NumRecords = std::max((uint32)records.size(), 1u), // Needs at least 1 to dispatch work graph
-				.pRecords = records.data(),
-				.RecordStrideInBytes = sizeof(Record)
-			},
-		};
-		dx_context.GetCommandListGraphics()->SetComputeRootSignature(resource.m_workgraph_root_signature.Get());
-		dx_context.GetCommandListGraphics()->SetComputeRootUnorderedAccessView(0, resource.m_gpu_buffer.m_resource->GetGPUVirtualAddress());
-		dx_context.GetCommandListGraphics()->SetProgram(&program_desc);
-		dx_context.GetCommandListGraphics()->DispatchGraph(&wg_desc);
+			.EntrypointIndex = 0,
+			.NumRecords = std::max((uint32)records.size(), 1u), // Needs at least 1 to dispatch work graph
+			.pRecords = records.data(),
+			.RecordStrideInBytes = sizeof(Record)
+		},
+	};
 
-		LogTrace("Workgraph Dispatched");
+	dx_context.InitCommandLists();
+	dx_context.GetCommandListGraphics()->SetComputeRootSignature(resource.m_workgraph_root_signature.Get());
+	dx_context.GetCommandListGraphics()->SetComputeRootUnorderedAccessView(0, resource.m_gpu_buffer.m_resource->GetGPUVirtualAddress());
+	dx_context.GetCommandListGraphics()->SetProgram(&program_desc);
+	dx_context.GetCommandListGraphics()->DispatchGraph(&workgraph_desc);
+	LogTrace("Workgraph Dispatched");
 
-		dx_context.Transition(D3D12_RESOURCE_STATE_COPY_SOURCE, resource.m_gpu_buffer);
-		dx_context.GetCommandListGraphics()->CopyResource(resource.m_cpu_buffer.m_resource.Get(), resource.m_gpu_buffer.m_resource.Get());
-	
-		dx_context.ExecuteCommandListGraphics();
-		dx_context.Flush(1);
+	dx_context.Transition(D3D12_RESOURCE_STATE_COPY_SOURCE, resource.m_gpu_buffer);
+	dx_context.GetCommandListGraphics()->CopyResource(resource.m_cpu_buffer.m_resource.Get(), resource.m_gpu_buffer.m_resource.Get());
+	dx_context.ExecuteCommandListGraphics();
+	dx_context.Flush(1);
 
-		uint32* data = nullptr;
-		const D3D12_RANGE range = { 0, resource.m_cpu_buffer.m_resource_desc.Width };
-		resource.m_cpu_buffer.m_resource->Map(0, &range, (void**)&data);
-		resource.m_cpu_buffer.m_resource->Unmap(0, nullptr);
-		LogTrace("Readback from GPU");
+	uint32* data = nullptr;
+	const D3D12_RANGE range = { 0, resource.m_cpu_buffer.m_resource_desc.Width };
+	resource.m_cpu_buffer.m_resource->Map(0, &range, (void**)&data);
+	resource.m_cpu_buffer.m_resource->Unmap(0, nullptr);
+	LogTrace("Readback from GPU");
 
-		for (uint32 i = 0; i < 25; ++i)
-		{
-			LogTrace("uav workgraph[{}] = {}\n", i, data[i]);
-		}
+	for (uint32 i = 0; i < 33; ++i)
+	{
+		LogTrace("uav workgraph[{}] = {}\n", i, data[i]);
 	}
 }
 #pragma endregion
@@ -730,7 +808,7 @@ int main()
 
 		//RunWindowLoop(dx_context, dx_compiler, gpu_capture);
 		//gpu_capture->StartCapture();
-		//RunComputeWork(dx_context, dx_compiler);
+		RunComputeWork(dx_context, dx_compiler);
 		//gpu_capture->EndCapture();
 		//gpu_capture->OpenCapture();
 		//RunTest();
