@@ -16,6 +16,29 @@ AGILITY_SDK_DECLARE()
 DISABLE_OPTIMISATIONS()
 
 #pragma region GRAPHICS
+struct ComputeResources
+{
+	// Compute
+	DescriptorHeap m_descriptor_heap{};
+
+	DXTextureResource m_gpu_resource;
+	DXResource m_cpu_resource;
+	Microsoft::WRL::ComPtr<IDxcBlob> m_compute_shader;
+	Microsoft::WRL::ComPtr<ID3D12RootSignature> m_compute_root_signature;
+	
+	Microsoft::WRL::ComPtr<ID3D12StateObject> m_compute_so;
+	D3D12_PROGRAM_IDENTIFIER m_program_id;
+};
+
+void ComputeWork
+(
+	DXContext& dx_context, 
+	ComputeResources& compute_resource, 
+	DXResource& output_resource
+);
+
+void CreateComputeResources(DXContext& dx_context, const DXCompiler& dx_compiler, DXWindow& dx_window, ComputeResources& resource);
+
 struct GraphicsResources
 {
 	// Graphics
@@ -24,6 +47,9 @@ struct GraphicsResources
 	Microsoft::WRL::ComPtr<IDxcBlob> m_pixel_shader;
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> m_gfx_pso;
 	Microsoft::WRL::ComPtr<ID3D12RootSignature> m_gfx_root_signature;
+
+	Microsoft::WRL::ComPtr<ID3D12StateObject> m_gfx_so;
+	D3D12_PROGRAM_IDENTIFIER m_program_id;
 };
 
 void CreateGraphicsResources
@@ -71,6 +97,9 @@ void CreateGraphicsResources
 		dx_context.ExecuteCommandListGraphics();
 		dx_context.Flush(1);
 
+		dx_context.GetDevice()->CreateRootSignature(0, resource.m_vertex_shader->GetBufferPointer(), resource.m_vertex_shader->GetBufferSize(), IID_PPV_ARGS(&resource.m_gfx_root_signature)) >> CHK;
+		NAME_DX_OBJECT(resource.m_gfx_root_signature, "Graphics RootSignature");
+
 		const D3D12_INPUT_ELEMENT_DESC element_descs[] =
 		{
 			{
@@ -97,9 +126,6 @@ void CreateGraphicsResources
 			.pInputElementDescs = element_descs,
 			.NumElements = COUNT(element_descs),
 		};
-
-		dx_context.GetDevice()->CreateRootSignature(0, resource.m_vertex_shader->GetBufferPointer(), resource.m_vertex_shader->GetBufferSize(), IID_PPV_ARGS(&resource.m_gfx_root_signature)) >> CHK;
-		NAME_DX_OBJECT(resource.m_gfx_root_signature, "Graphics RootSignature");
 
 		const D3D12_GRAPHICS_PIPELINE_STATE_DESC gfx_pso_desc
 		{
@@ -206,6 +232,74 @@ void CreateGraphicsResources
 			.Flags = D3D12_PIPELINE_STATE_FLAG_NONE,
 		};
 		dx_context.GetDevice()->CreateGraphicsPipelineState(&gfx_pso_desc, IID_PPV_ARGS(&resource.m_gfx_pso)) >> CHK;
+	
+
+#if defined(TEST_GENERIC_PROGRAM_GFX)
+		D3D12_DXIL_LIBRARY_DESC sub_object_library =
+		{
+			.DXILLibrary =
+			{
+				.pShaderBytecode = resource.m_vertex_shader->GetBufferPointer(),
+				.BytecodeLength = resource.m_vertex_shader->GetBufferSize(),
+			},
+			.NumExports = 0,
+			.pExports = nullptr,
+		};
+
+		std::string graphics_name{ "Graphics" };
+		std::wstring graphics_wname = std::to_wstring(graphics_name);
+
+		// Need to export entry point with generic program
+		std::wstring computeshader_entrypoint = L"main";
+		LPCWSTR exports[] =
+		{
+			computeshader_entrypoint.c_str(),
+		};
+
+		D3D12_GENERIC_PROGRAM_DESC sub_object_generic_program
+		{
+			.ProgramName = graphics_wname.c_str(),
+			.NumExports = COUNT(exports),
+			.pExports = exports,
+			.NumSubobjects = 0,
+			.ppSubobjects = nullptr,
+		};
+
+		D3D12_GLOBAL_ROOT_SIGNATURE sub_object_lobal_rootsignature
+		{
+			.pGlobalRootSignature = resource.m_compute_root_signature.Get(),
+		};
+
+		std::vector<D3D12_STATE_SUBOBJECT> state_subobjects =
+		{
+			{
+				.Type = D3D12_STATE_SUBOBJECT_TYPE_DXIL_LIBRARY,
+				.pDesc = &sub_object_library,
+			},
+			{
+				.Type = D3D12_STATE_SUBOBJECT_TYPE_GENERIC_PROGRAM,
+				.pDesc = &sub_object_generic_program,
+			},
+			{
+				.Type = D3D12_STATE_SUBOBJECT_TYPE_GLOBAL_ROOT_SIGNATURE,
+				.pDesc = &sub_object_lobal_rootsignature,
+			},
+		};
+
+		D3D12_STATE_OBJECT_DESC state_object_desc =
+		{
+			.Type = D3D12_STATE_OBJECT_TYPE_EXECUTABLE,
+			.NumSubobjects = (uint32)state_subobjects.size(),
+			.pSubobjects = state_subobjects.data()
+		};
+
+		dx_context.GetDevice()->CreateStateObject(&state_object_desc, IID_PPV_ARGS(&resource.m_gfx_so)) >> CHK;
+		NAME_DX_OBJECT(resource.m_gfx_so, "Graphics State Object");
+
+		Microsoft::WRL::ComPtr<ID3D12StateObjectProperties1> state_object_properties;
+		resource.m_gfx_so.As(&state_object_properties) >> CHK;
+		resource.m_program_id = state_object_properties->GetProgramIdentifier(graphics_wname.c_str());
+#endif
 	}
 }
 
@@ -239,7 +333,19 @@ void GraphicsWork
 		};
 		dx_context.GetCommandListGraphics()->RSSetViewports(1, view_ports);
 		dx_context.GetCommandListGraphics()->RSSetScissorRects(1, scissor_rects);
+#if defined(TEST_GENERIC_PROGRAM_GFX)
+		D3D12_SET_PROGRAM_DESC program_desc
+		{
+			.Type = D3D12_PROGRAM_TYPE_GENERIC_PIPELINE,
+			.GenericPipeline =
+			{
+				.ProgramIdentifier = resource.m_program_id,
+			},
+		};
+		dx_context.GetCommandListGraphics()->SetProgram(&program_desc);
+#else
 		dx_context.GetCommandListGraphics()->SetPipelineState(resource.m_gfx_pso.Get());
+#endif
 		dx_context.GetCommandListGraphics()->SetGraphicsRootSignature(resource.m_gfx_root_signature.Get());
 		dx_context.GetCommandListGraphics()->IASetVertexBuffers(0, 1, &resource.m_vertex_buffer.m_vertex_buffer_view);
 		dx_context.GetCommandListGraphics()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
@@ -250,12 +356,14 @@ void GraphicsWork
 void FillCommandList
 (
 	DXContext& dx_context, DXWindow& dx_window, 
-	GraphicsResources& resource 
+	GraphicsResources& gfx_resource,
+	ComputeResources& compute_resource
 )
 {
 	// Fill CommandList
 	dx_window.BeginFrame(dx_context);
-	GraphicsWork(dx_context, dx_window, resource);
+	GraphicsWork(dx_context, dx_window, gfx_resource);
+	ComputeWork(dx_context, compute_resource, dx_window.m_buffers[g_current_buffer_index]);
 	dx_window.EndFrame(dx_context);
 }
 
@@ -275,9 +383,10 @@ void RunWindowLoop(DXContext& dx_context, DXCompiler& dx_compiler, GPUCapture* g
 		};
 		DXWindow dx_window(dx_context, window_manager, window_desc);
 		{
-			GraphicsResources resource{};
-			CreateGraphicsResources(dx_context, dx_compiler, dx_window, resource);
-
+			GraphicsResources gfx_resource{};
+			CreateGraphicsResources(dx_context, dx_compiler, dx_window, gfx_resource);
+			ComputeResources compute_resource{};
+			CreateComputeResources(dx_context, dx_compiler, dx_window, compute_resource);
 			while (!dx_window.ShouldClose())
 			{
 				// Process window message
@@ -326,9 +435,11 @@ void RunWindowLoop(DXContext& dx_context, DXCompiler& dx_compiler, GPUCapture* g
 					}
 
 					dx_context.InitCommandLists();
-					FillCommandList(dx_context, dx_window, resource);
+					FillCommandList(dx_context, dx_window, gfx_resource, compute_resource);
 					dx_context.ExecuteCommandListGraphics();
 					dx_window.Present(dx_context);
+					// Work around of UAV resource still in flight
+					dx_context.Flush(1);
 				}
 				if (capture)
 				{
@@ -344,50 +455,16 @@ void RunWindowLoop(DXContext& dx_context, DXCompiler& dx_compiler, GPUCapture* g
 #pragma endregion
 
 #pragma region COMPUTE
-struct ComputeResources
+void CreateComputeResources(DXContext& dx_context, const DXCompiler& dx_compiler, DXWindow& dx_window, ComputeResources& resource)
 {
-	// Compute
-	DXResource m_gpu_resource;
-	DXResource m_cpu_resource;
-	Microsoft::WRL::ComPtr<IDxcBlob> m_compute_shader;
-	//Microsoft::WRL::ComPtr<ID3D12PipelineState> m_compute_pso;
-	Microsoft::WRL::ComPtr<ID3D12RootSignature> m_compute_root_signature;
-	uint32 m_group_size;
-	uint32 m_dispatch_count;
-	
-	Microsoft::WRL::ComPtr<ID3D12StateObject> m_compute_so;
-	D3D12_PROGRAM_IDENTIFIER m_program_id;
-};
-
-void CreateComputeResources(DXContext& dx_context, const DXCompiler& dx_compiler, ComputeResources& resource)
-{
-	resource.m_group_size = 1024;
-	resource.m_dispatch_count = 1;
-
 	dx_compiler.Compile(dx_context.GetDevice(), &resource.m_compute_shader, "ComputeShader.hlsl", ShaderType::COMPUTE_SHADER);
 
-	uint32 size = resource.m_group_size * resource.m_dispatch_count * sizeof(float32) * 4;
-	resource.m_gpu_resource.SetResourceInfo(D3D12_HEAP_TYPE_DEFAULT, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, size);
+	resource.m_gpu_resource.SetResourceInfo(D3D12_HEAP_TYPE_DEFAULT, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, dx_window.GetWidth(), dx_window.GetHeight(), DXGI_FORMAT_R8G8B8A8_UINT);
 	resource.m_gpu_resource.CreateResource(dx_context, "GPU resource");
 
-	resource.m_cpu_resource.SetResourceInfo(D3D12_HEAP_TYPE_READBACK, D3D12_RESOURCE_FLAG_NONE, size);
-	resource.m_cpu_resource.m_resource_state = D3D12_RESOURCE_STATE_COPY_DEST;
-	resource.m_cpu_resource.CreateResource(dx_context, "CPU resource");
-	
 	// Root signature embed in the shader already
 	dx_context.GetDevice()->CreateRootSignature(0, resource.m_compute_shader->GetBufferPointer(), resource.m_compute_shader->GetBufferSize(), IID_PPV_ARGS(&resource.m_compute_root_signature)) >> CHK;
 	NAME_DX_OBJECT(resource.m_compute_root_signature, "Compute RootSignature");
-
-//	D3D12_COMPUTE_PIPELINE_STATE_DESC pso_desc =
-//	{
-//		.pRootSignature = nullptr,
-//		.CS = 
-//		{
-//			.pShaderBytecode = resource.m_compute_shader->GetBufferPointer(),
-//			.BytecodeLength = resource.m_compute_shader->GetBufferSize(),
-//		},
-//	};
-//	dx_context.GetDevice()->CreateComputePipelineState(&pso_desc, IID_PPV_ARGS(&resource.m_compute_pso)) >> CHK;
 
 	D3D12_DXIL_LIBRARY_DESC sub_object_library =
 	{
@@ -453,46 +530,72 @@ void CreateComputeResources(DXContext& dx_context, const DXCompiler& dx_compiler
 	Microsoft::WRL::ComPtr<ID3D12StateObjectProperties1> state_object_properties;
 	resource.m_compute_so.As(&state_object_properties) >> CHK;
 	resource.m_program_id = state_object_properties->GetProgramIdentifier(compute_wname.c_str());
+
+	dx_context.CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 1, "Descriptor Heap UAV", resource.m_descriptor_heap);
 }
 
 void ComputeWork
 (
-	DXContext& dx_context, ComputeResources& resource
+	DXContext& dx_context, 
+	ComputeResources& compute_resource, 
+	DXResource& output_resource
 )
 {
 	// Compute Work
 	// Transition to UAV
-	dx_context.Transition(D3D12_RESOURCE_STATE_UNORDERED_ACCESS, resource.m_gpu_resource);
-	dx_context.GetCommandListGraphics()->SetComputeRootSignature(resource.m_compute_root_signature.Get());
+	dx_context.Transition(D3D12_RESOURCE_STATE_UNORDERED_ACCESS, compute_resource.m_gpu_resource);
+	//dx_context.GetCommandListGraphics()->SetComputeRootSignature(compute_resource.m_compute_root_signature.Get());
 	//dx_context.GetCommandListGraphics()->SetPipelineState(resource.m_compute_pso.Get());
-	
+	dx_context.GetCommandListGraphics()->SetComputeRootSignature(compute_resource.m_compute_root_signature.Get());
 	D3D12_SET_PROGRAM_DESC program_desc
 	{
 		.Type = D3D12_PROGRAM_TYPE_GENERIC_PIPELINE,
 		.GenericPipeline =
 		{
-			.ProgramIdentifier = resource.m_program_id
+			.ProgramIdentifier = compute_resource.m_program_id
 		},
 	};
 	dx_context.GetCommandListGraphics()->SetProgram(&program_desc);
 
-	dx_context.GetCommandListGraphics()->SetComputeRootUnorderedAccessView(0, resource.m_gpu_resource.m_resource->GetGPUVirtualAddress());
-	dx_context.GetCommandListGraphics()->Dispatch(resource.m_dispatch_count, 1, 1);
+	// TODO resource with RTV / SRV / UAV
+	// Populate descriptor
+	D3D12_UNORDERED_ACCESS_VIEW_DESC UAV_desc
+	{
+		.Format = DXGI_FORMAT_R8G8B8A8_UNORM,
+		// TODO Difference betwen UNORM and UINT
+		//.Format = compute_resource.m_gpu_resource.m_format,
+		.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D,
+		.Texture2D =
+		{
+			.MipSlice = 0,
+			.PlaneSlice = 0,
+		},
+	};
+	dx_context.GetDevice()->CreateUnorderedAccessView(compute_resource.m_gpu_resource.m_resource.Get(), nullptr, &UAV_desc, dx_context.GetDescriptorHandle(compute_resource.m_descriptor_heap, 0));
+	// Set descriptor table
+	dx_context.GetCommandListGraphics()->SetDescriptorHeaps(1, compute_resource.m_descriptor_heap.m_heap.GetAddressOf());
+	dx_context.GetCommandListGraphics()->SetComputeRootDescriptorTable(0, compute_resource.m_descriptor_heap.m_heap->GetGPUDescriptorHandleForHeapStart());
+
+	//dx_context.GetCommandListGraphics()->SetComputeRootUnorderedAccessView(0, compute_resource.m_gpu_resource.m_resource->GetGPUVirtualAddress());
+	uint32 dispatch_x = ceil(compute_resource.m_gpu_resource.m_width / 8.0f);
+	uint32 dispatch_y = ceil(compute_resource.m_gpu_resource.m_height / 8.0f);
+	dx_context.GetCommandListGraphics()->Dispatch(dispatch_x, dispatch_y, 1);
 	// Transition to Copy Src
-	dx_context.Transition(D3D12_RESOURCE_STATE_COPY_SOURCE, resource.m_gpu_resource);
-	dx_context.GetCommandListGraphics()->CopyResource(resource.m_cpu_resource.m_resource.Get(), resource.m_gpu_resource.m_resource.Get());
+	dx_context.Transition(D3D12_RESOURCE_STATE_COPY_DEST, output_resource);
+	dx_context.Transition(D3D12_RESOURCE_STATE_COPY_SOURCE, compute_resource.m_gpu_resource);
+	dx_context.GetCommandListGraphics()->CopyResource(output_resource.m_resource.Get(), compute_resource.m_gpu_resource.m_resource.Get());
+	//dx_context.GetCommandListGraphics()->CopyResource(compute_resource.m_cpu_resource.m_resource.Get(), compute_resource.m_gpu_resource.m_resource.Get());
+	dx_context.Transition(D3D12_RESOURCE_STATE_RENDER_TARGET, output_resource);
 }
 
 void RunComputeWork(DXContext& dx_context, DXCompiler& dx_compiler)
 {
-	ComputeResources resource{};
-	CreateComputeResources(dx_context, dx_compiler, resource);
-
 	dx_context.InitCommandLists();
-	ComputeWork(dx_context, resource);
+	//ComputeWork(dx_context, resource);
 	dx_context.ExecuteCommandListGraphics();
-	dx_context.Flush(1);
 
+#if defined(TEST_READBACK_COMPUTE)
+	dx_context.Flush(1);
 	float32* data = nullptr;
 	const D3D12_RANGE range = { 0, resource.m_gpu_resource.m_resource_desc.Width };
 	resource.m_cpu_resource.m_resource->Map(0, &range, (void**)&data);
@@ -506,6 +609,7 @@ void RunComputeWork(DXContext& dx_context, DXCompiler& dx_compiler)
 		has_display = true;
 	}
 	resource.m_cpu_resource.m_resource->Unmap(0, nullptr);
+#endif
 }
 #pragma endregion
 
@@ -806,9 +910,9 @@ int main()
 		//gpu_capture->EndCapture();
 		//gpu_capture->OpenCapture();
 
-		//RunWindowLoop(dx_context, dx_compiler, gpu_capture);
+		RunWindowLoop(dx_context, dx_compiler, gpu_capture);
 		//gpu_capture->StartCapture();
-		RunComputeWork(dx_context, dx_compiler);
+		//RunComputeWork(dx_context, dx_compiler);
 		//gpu_capture->EndCapture();
 		//gpu_capture->OpenCapture();
 		//RunTest();

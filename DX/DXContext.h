@@ -56,6 +56,7 @@ private:
 	uint32 m_frame_index{ 0 };
 };
 
+// Store CPU / GPU descriptor handle from start
 struct DescriptorHeap
 {
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> m_heap;
@@ -118,6 +119,7 @@ public:
 	void CreateDescriptorHeap
 	(
 		D3D12_DESCRIPTOR_HEAP_TYPE descriptor_heap_type, uint32 number_descriptors,
+		const std::string& descriptor_name,
 		DescriptorHeap& out_descriptor_heap
 	) const;
 

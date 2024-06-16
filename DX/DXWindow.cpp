@@ -160,7 +160,7 @@ void DXWindow::Init
 	// Disable ALT ENTER to disable exclusive fullscreen, we handle switching ourselves
 	factory->MakeWindowAssociation(m_handle, DXGI_MWA_NO_ALT_ENTER) >> CHK;
 
-	dx_context.CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_RTV, GetBackBufferCount(), m_rtv_desc_heap);
+	dx_context.CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_RTV, GetBackBufferCount(), "Descriptor Heap RTVs", m_rtv_desc_heap);
 
 	m_rtv_handles.resize(GetBackBufferCount());
 	for (uint32 i = 0; i < m_rtv_handles.size(); ++i)

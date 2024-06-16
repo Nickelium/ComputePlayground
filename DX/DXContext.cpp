@@ -174,15 +174,19 @@ void DXContext::Init()
 	m_command_allocator_graphics.resize(g_backbuffer_count);
 	// CommandAllocator has to wait that all commands in the command list has been executed by the GPU before reuse
 	// CommandList can be reused right away
+	// TODO name command allocator
 	for (uint32 i = 0; i < m_command_allocator_graphics.size(); ++i)
 		CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, m_command_allocator_graphics[i]);
 	CreateCommandList(D3D12_COMMAND_LIST_TYPE_DIRECT, m_command_allocator_graphics[0], m_command_list_graphics);
+	NAME_DX_OBJECT(m_command_list_graphics.m_list, "CommandList GFX");
 
 	CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_COMPUTE, m_command_allocator_compute);
 	CreateCommandList(D3D12_COMMAND_LIST_TYPE_COMPUTE, m_command_allocator_compute, m_command_list_compute);
+	NAME_DX_OBJECT(m_command_list_graphics.m_list, "CommandList Compute");
 
 	CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_COPY, m_command_allocator_copy);
 	CreateCommandList(D3D12_COMMAND_LIST_TYPE_COPY, m_command_allocator_copy, m_command_list_copy);
+	NAME_DX_OBJECT(m_command_list_graphics.m_list, "CommandList Copy");
 	
 	CreateFence(m_fence);
 
@@ -375,6 +379,7 @@ D3D12_DESCRIPTOR_HEAP_FLAGS GetShaderVisibile(D3D12_DESCRIPTOR_HEAP_TYPE descrip
 void DXContext::CreateDescriptorHeap 
 (
 	D3D12_DESCRIPTOR_HEAP_TYPE descriptor_heap_type, uint32 number_descriptors,
+	const std::string& descriptor_heap_name,
 	DescriptorHeap& out_descriptor_heap
 ) const
 {
@@ -390,7 +395,7 @@ void DXContext::CreateDescriptorHeap
 	out_descriptor_heap.m_number_descriptors = number_descriptors;
 	out_descriptor_heap.m_increment_size = m_device->GetDescriptorHandleIncrementSize(out_descriptor_heap.m_heap_type);
 
-	NAME_DX_OBJECT(out_descriptor_heap.m_heap, "Descriptor Heap");
+	NAME_DX_OBJECT(out_descriptor_heap.m_heap, descriptor_heap_name);
 }
 
 D3D12_CPU_DESCRIPTOR_HANDLE DXContext::GetDescriptorHandle

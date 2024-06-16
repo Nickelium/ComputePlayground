@@ -16,7 +16,7 @@ public:
 	D3D12_RESOURCE_DESC m_resource_desc;
 	D3D12_HEAP_PROPERTIES m_heap_properties;
 
-	void SetResourceInfo(D3D12_HEAP_TYPE heap_type, D3D12_RESOURCE_FLAGS resource_flags, uint32 size);
+	virtual void SetResourceInfo(D3D12_HEAP_TYPE heap_type, D3D12_RESOURCE_FLAGS resource_flags, uint32 size);
 	virtual void CreateResource(DXContext& dx_context, const std::string& name_resource);
 };
 
@@ -30,4 +30,15 @@ public:
 
 	void SetResourceInfo(D3D12_HEAP_TYPE heap_type, D3D12_RESOURCE_FLAGS resource_flags, uint32 size, uint32 stride);
 	virtual void CreateResource(DXContext& dx_context, const std::string& name_resource) override;
+};
+
+class DXTextureResource : public DXResource
+{
+public:
+	uint32 m_width;
+	uint32 m_height;
+	DXGI_FORMAT m_format;
+
+	virtual void SetResourceInfo(D3D12_HEAP_TYPE heap_type, D3D12_RESOURCE_FLAGS resource_flags, uint32 width, uint32 height, DXGI_FORMAT format);
+	virtual void CreateResource(DXContext& dx_context, const std::string& name_resource);
 };

@@ -146,8 +146,9 @@ private:
 	WindowMode m_window_mode_request;
 
 	Microsoft::WRL::ComPtr<IDXGISwapChain4> m_swap_chain;
+public:
 	std::vector<DXResource> m_buffers;
-
+private:
 	DescriptorHeap m_rtv_desc_heap;
 	std::vector<D3D12_CPU_DESCRIPTOR_HANDLE> m_rtv_handles;
 

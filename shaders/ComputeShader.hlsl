@@ -1,9 +1,10 @@
 #include "Common.hlsl"
 
-RWStructuredBuffer<float4> m_uav : register(u0, space0);
+RWTexture2D<float4> m_uav : register(u0);
 
-[RootSignature("RootFlags(0), UAV(u0)")]
-[numthreads(1024, 1, 1)]
+// For any form of Texture2D, you need a descriptor table
+[RootSignature("RootFlags(0), DescriptorTable(UAV(u0))")]
+[numthreads(8, 8, 1)]
 void main
 (
 	const uint3 inGroupThreadID : SV_GroupThreadID,
@@ -12,9 +13,6 @@ void main
 	const uint inGroupIndex : SV_GroupIndex
 )
 {
-	m_uav[inDispatchThreadID.x] = 0;	
-	m_uav[inDispatchThreadID.x] = WaveGetLaneIndex();
-
-	//ComplexNumber c = ComplexNumber(1, 1) + ComplexNumber(1, 2);
-	//uav[inDispatchThreadID.x] = c.Imaginary;
+	float2 uv = inDispatchThreadID.xy / float2(1500.0f, 800);
+	m_uav[inDispatchThreadID.xy] = float4(uv,0,1);
 }
