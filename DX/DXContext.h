@@ -190,7 +190,10 @@ public:
 private:
 	Fence m_device_removed_fence;
 
+	void CacheDescriptorSizes();
 #if defined(_DEBUG)
 	DWORD m_callback_handle;
 #endif
+	// Descriptor size is fixed per GPU
+	static uint32 s_descriptor_sizes[D3D12_DESCRIPTOR_HEAP_TYPE_NUM_TYPES];
 };

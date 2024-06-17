@@ -511,10 +511,10 @@ void CreateComputeResources(DXContext& dx_context, const DXCompiler& dx_compiler
 			.Type = D3D12_STATE_SUBOBJECT_TYPE_GENERIC_PROGRAM,
 			.pDesc = &sub_object_generic_program,
 		},
-		{
-			.Type = D3D12_STATE_SUBOBJECT_TYPE_GLOBAL_ROOT_SIGNATURE,
-			.pDesc = &sub_object_lobal_rootsignature,
-		},
+//		{
+//			.Type = D3D12_STATE_SUBOBJECT_TYPE_GLOBAL_ROOT_SIGNATURE,
+//			.pDesc = &sub_object_lobal_rootsignature,
+//		},
 	};
 
 	D3D12_STATE_OBJECT_DESC state_object_desc =

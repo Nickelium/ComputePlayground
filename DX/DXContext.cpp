@@ -177,14 +177,19 @@ void DXContext::Init()
 	// TODO name command allocator
 	for (uint32 i = 0; i < m_command_allocator_graphics.size(); ++i)
 		CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, m_command_allocator_graphics[i]);
+	NAME_DX_OBJECT(m_command_allocator_graphics[0].m_allocator, "Command Allocator GFX 0");
+	NAME_DX_OBJECT(m_command_allocator_graphics[1].m_allocator, "Command Allocator GFX 1");
+	NAME_DX_OBJECT(m_command_allocator_graphics[2].m_allocator, "Command Allocator GFX 2");
 	CreateCommandList(D3D12_COMMAND_LIST_TYPE_DIRECT, m_command_allocator_graphics[0], m_command_list_graphics);
 	NAME_DX_OBJECT(m_command_list_graphics.m_list, "CommandList GFX");
 
 	CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_COMPUTE, m_command_allocator_compute);
+	NAME_DX_OBJECT(m_command_allocator_compute.m_allocator, "Command Allocator Compute");
 	CreateCommandList(D3D12_COMMAND_LIST_TYPE_COMPUTE, m_command_allocator_compute, m_command_list_compute);
 	NAME_DX_OBJECT(m_command_list_graphics.m_list, "CommandList Compute");
 
 	CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_COPY, m_command_allocator_copy);
+	NAME_DX_OBJECT(m_command_allocator_copy.m_allocator, "Command Allocator Copy");
 	CreateCommandList(D3D12_COMMAND_LIST_TYPE_COPY, m_command_allocator_copy, m_command_list_copy);
 	NAME_DX_OBJECT(m_command_list_graphics.m_list, "CommandList Copy");
 	
@@ -226,6 +231,8 @@ void DXContext::Init()
 	NAME_DX_OBJECT(m_command_list_copy.m_list, "Command list copy");
 	NAME_DX_OBJECT(m_fence.m_gpu, "Fence");
 	NAME_DX_OBJECT(m_device_removed_fence.m_gpu, "Device removed fence");
+
+	CacheDescriptorSizes();
 
 #if defined(_DEBUG)
 	LogTrace(DumpDX12Capabilities(m_device));
@@ -366,7 +373,7 @@ CommandQueue DXContext::GetCommandQueue() const
 	return m_queue_graphics;
 }
 
-D3D12_DESCRIPTOR_HEAP_FLAGS GetShaderVisibile(D3D12_DESCRIPTOR_HEAP_TYPE descriptor_heap_type)
+D3D12_DESCRIPTOR_HEAP_FLAGS GetShaderVisible(D3D12_DESCRIPTOR_HEAP_TYPE descriptor_heap_type)
 {
 	// Only CBV / SRV / UAV can be accessed directly in shaders
 	// RTV / DSR cant
@@ -374,6 +381,16 @@ D3D12_DESCRIPTOR_HEAP_FLAGS GetShaderVisibile(D3D12_DESCRIPTOR_HEAP_TYPE descrip
 	return 
 		descriptor_heap_type == D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV ?
 		D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE : D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+}
+
+uint32 DXContext::s_descriptor_sizes[D3D12_DESCRIPTOR_HEAP_TYPE_NUM_TYPES]{};
+
+void DXContext::CacheDescriptorSizes()
+{
+	for (uint32 i = 0; i < D3D12_DESCRIPTOR_HEAP_TYPE_NUM_TYPES; ++i)
+	{
+		s_descriptor_sizes[i]= m_device->GetDescriptorHandleIncrementSize((D3D12_DESCRIPTOR_HEAP_TYPE)i);
+	}
 }
 
 void DXContext::CreateDescriptorHeap 
@@ -387,13 +404,13 @@ void DXContext::CreateDescriptorHeap
 	{
 		.Type = descriptor_heap_type,
 		.NumDescriptors = number_descriptors,
-		.Flags = GetShaderVisibile(descriptor_heap_type),
+		.Flags = GetShaderVisible(descriptor_heap_type),
 		.NodeMask = 0,
 	};
 	m_device->CreateDescriptorHeap(&descriptor_heap_desc, IID_PPV_ARGS(&out_descriptor_heap.m_heap)) >> CHK;
 	out_descriptor_heap.m_heap_type = descriptor_heap_type;
 	out_descriptor_heap.m_number_descriptors = number_descriptors;
-	out_descriptor_heap.m_increment_size = m_device->GetDescriptorHandleIncrementSize(out_descriptor_heap.m_heap_type);
+	out_descriptor_heap.m_increment_size = s_descriptor_sizes[(uint32)out_descriptor_heap.m_heap_type];
 
 	NAME_DX_OBJECT(out_descriptor_heap.m_heap, descriptor_heap_name);
 }
