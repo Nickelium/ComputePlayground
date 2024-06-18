@@ -181,6 +181,7 @@ void DXWindow::BeginFrame(const DXContext& dx_context)
 	dx_context.Transition(D3D12_RESOURCE_STATE_RENDER_TARGET, m_buffers[g_current_buffer_index]);
 
 	const float4 color{ 85.0f / 255.0f, 230.0f / 255.0f, 23.0f / 255.0f, 1.0f };
+	// TODO replace with rtv descriptor manager
 	dx_context.GetCommandListGraphics()->ClearRenderTargetView(m_rtv_handles[g_current_buffer_index], color, 0, nullptr);
 	dx_context.GetCommandListGraphics()->OMSetRenderTargets(1, &m_rtv_handles[g_current_buffer_index], false, nullptr);
 }

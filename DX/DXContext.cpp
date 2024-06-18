@@ -16,6 +16,7 @@ DXContext::DXContext() :
 #endif
 {
 	Init();
+	m_rtv_descriptor_manager.Init(*this);
 }
 
 DXContext::~DXContext()
@@ -600,4 +601,69 @@ void DXCommand::EndFrame()
 	m_command_queue->ExecuteCommandLists(COUNT(command_lists), command_lists);
 
 	m_frame_index = (m_frame_index + 1) % g_backbuffer_count;
+}
+
+
+void RenderTargetDescriptorsManager::Init(DXContext& dx_context)
+{
+	dx_context.CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_RTV, D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT, "", m_rtv_descriptor_heap);
+	dx_context.CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 1, "", m_dsv_descriptor_heap);
+	m_rtv_descriptor = m_rtv_descriptor_heap.m_heap->GetCPUDescriptorHandleForHeapStart();
+	m_dsv_descriptor = m_dsv_descriptor_heap.m_heap->GetCPUDescriptorHandleForHeapStart();
+}
+
+void RenderTargetDescriptorsManager::OMSetRenderTargets
+(
+	DXContext& dx_context,
+	uint32 num_rtvs,
+	ID3D12Resource* const* pp_rtv_resources,
+	const D3D12_RENDER_TARGET_VIEW_DESC* p_rtv_desc,
+	ID3D12Resource* p_dsv_resource,
+	const D3D12_DEPTH_STENCIL_VIEW_DESC* p_dsv_desc
+)
+{
+	ASSERT(num_rtvs < D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT);
+	for (uint32 i = 0; i < num_rtvs; ++i)
+	{
+		D3D12_CPU_DESCRIPTOR_HANDLE descriptor_handle = 
+			m_rtv_descriptor + i * DXContext::s_descriptor_sizes[D3D12_DESCRIPTOR_HEAP_TYPE_RTV];
+		dx_context.GetDevice()->CreateRenderTargetView(pp_rtv_resources[i], p_rtv_desc, descriptor_handle);
+	}
+
+	dx_context.GetDevice()->CreateDepthStencilView(p_dsv_resource, p_dsv_desc, m_dsv_descriptor);
+	dx_context.GetCommandListGraphics()->OMSetRenderTargets
+	(
+		num_rtvs,
+		&m_rtv_descriptor,
+		true,
+		&m_dsv_descriptor
+	);
+}
+
+void RenderTargetDescriptorsManager::ClearRenderTargetView
+(
+	DXContext& dx_context,
+	ID3D12Resource* pRTVResource,
+	const D3D12_RENDER_TARGET_VIEW_DESC* pRTVDesc,
+	const FLOAT ColorRGBA[4],
+	UINT NumRects,
+	const D3D12_RECT* pRects
+)
+{
+	// TODO
+}
+
+void RenderTargetDescriptorsManager::ClearDepthStencilView
+(
+	DXContext& dx_context,
+	ID3D12Resource* pDSVResource,
+	const D3D12_DEPTH_STENCIL_VIEW_DESC* pDSVDesc,
+	D3D12_CLEAR_FLAGS ClearFlags,
+	FLOAT Depth,
+	UINT8 Stencil,
+	UINT NumRects,
+	const D3D12_RECT* pRects
+)
+{
+	// TODO
 }

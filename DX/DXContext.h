@@ -92,6 +92,51 @@ struct Fence
 	HANDLE m_event;
 };
 
+class DXContext;
+// Thin abstraction to avoid all non shader visible descriptors
+class RenderTargetDescriptorsManager
+{
+public:
+	void Init(DXContext& dx_context);
+
+	void OMSetRenderTargets
+	(
+		DXContext& dx_context,
+		uint32 num_rtvs,
+		ID3D12Resource* const* pp_rtv_resources,
+		const D3D12_RENDER_TARGET_VIEW_DESC* p_rtv_desc,
+		ID3D12Resource* p_dsv_resource,
+		const D3D12_DEPTH_STENCIL_VIEW_DESC* p_dsv_desc
+	);
+	void ClearRenderTargetView
+	(
+		DXContext& dx_context,
+		ID3D12Resource* pRTVResource,
+		const D3D12_RENDER_TARGET_VIEW_DESC* pRTVDesc,
+		const FLOAT ColorRGBA[4],
+		UINT NumRects,
+		const D3D12_RECT* pRects
+	);
+	void ClearDepthStencilView
+	(
+		DXContext& dx_context,
+		ID3D12Resource* pDSVResource,
+		const D3D12_DEPTH_STENCIL_VIEW_DESC* pDSVDesc,
+		D3D12_CLEAR_FLAGS ClearFlags,
+		FLOAT Depth,
+		UINT8 Stencil,
+		UINT NumRects,
+		const D3D12_RECT* pRects
+	);
+
+private:
+	DescriptorHeap m_rtv_descriptor_heap;
+	DescriptorHeap m_dsv_descriptor_heap;
+
+	D3D12_CPU_DESCRIPTOR_HANDLE m_rtv_descriptor;
+	D3D12_CPU_DESCRIPTOR_HANDLE m_dsv_descriptor;
+};
+
 class DXContext
 {
 public:
@@ -194,6 +239,19 @@ private:
 #if defined(_DEBUG)
 	DWORD m_callback_handle;
 #endif
+public:
 	// Descriptor size is fixed per GPU
 	static uint32 s_descriptor_sizes[D3D12_DESCRIPTOR_HEAP_TYPE_NUM_TYPES];
+
+	RenderTargetDescriptorsManager m_rtv_descriptor_manager;
 };
+
+inline D3D12_CPU_DESCRIPTOR_HANDLE operator+(D3D12_CPU_DESCRIPTOR_HANDLE x, uint32 y)
+{
+	return { x.ptr + y };
+}
+
+inline D3D12_CPU_DESCRIPTOR_HANDLE operator+(uint32 x, D3D12_CPU_DESCRIPTOR_HANDLE y)
+{
+	return y + x;
+}
