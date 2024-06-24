@@ -94,7 +94,7 @@ struct Fence
 
 class DXContext;
 // Thin abstraction to avoid all non shader visible descriptors
-class RenderTargetDescriptorsManager
+class RenderTargetDescriptorHandler
 {
 public:
 	void Init(DXContext& dx_context);
@@ -103,30 +103,30 @@ public:
 	(
 		DXContext& dx_context,
 		uint32 num_rtvs,
-		ID3D12Resource* const* pp_rtv_resources,
-		const D3D12_RENDER_TARGET_VIEW_DESC* p_rtv_desc,
-		ID3D12Resource* p_dsv_resource,
-		const D3D12_DEPTH_STENCIL_VIEW_DESC* p_dsv_desc
+		ID3D12Resource* const* rtv_resources,
+		const D3D12_RENDER_TARGET_VIEW_DESC* rtv_desc,
+		ID3D12Resource* dsv_resource,
+		const D3D12_DEPTH_STENCIL_VIEW_DESC* dsv_desc
 	);
 	void ClearRenderTargetView
 	(
 		DXContext& dx_context,
-		ID3D12Resource* pRTVResource,
-		const D3D12_RENDER_TARGET_VIEW_DESC* pRTVDesc,
-		const FLOAT ColorRGBA[4],
-		UINT NumRects,
-		const D3D12_RECT* pRects
+		ID3D12Resource* rtv_resource,
+		const D3D12_RENDER_TARGET_VIEW_DESC* rtv_desc,
+		float32 color[4],
+		uint32 num_rects,
+		const D3D12_RECT* rects
 	);
 	void ClearDepthStencilView
 	(
 		DXContext& dx_context,
-		ID3D12Resource* pDSVResource,
-		const D3D12_DEPTH_STENCIL_VIEW_DESC* pDSVDesc,
-		D3D12_CLEAR_FLAGS ClearFlags,
-		FLOAT Depth,
-		UINT8 Stencil,
-		UINT NumRects,
-		const D3D12_RECT* pRects
+		ID3D12Resource* dsv_resource,
+		const D3D12_DEPTH_STENCIL_VIEW_DESC* dsv_desc,
+		D3D12_CLEAR_FLAGS clear_flags,
+		float32 depth,
+		uint32 stencil,
+		uint32 num_rects,
+		const D3D12_RECT* rects
 	);
 
 private:
@@ -142,6 +142,34 @@ class DXContext
 public:
 	DXContext();
 	~DXContext();
+
+	void OMSetRenderTargets
+	(
+		uint32 num_rtvs,
+		ID3D12Resource* const* rtv_resources,
+		const D3D12_RENDER_TARGET_VIEW_DESC* rtv_desc,
+		ID3D12Resource* dsv_resource,
+		const D3D12_DEPTH_STENCIL_VIEW_DESC* dsv_desc
+	);
+	void ClearRenderTargetView
+	(
+		ID3D12Resource* rtv_resource,
+		const D3D12_RENDER_TARGET_VIEW_DESC* rtv_desc,
+		float32 color[4],
+		uint32 num_rects,
+		const D3D12_RECT* rects
+	);
+	void ClearDepthStencilView
+	(
+		ID3D12Resource* dsv_resource,
+		const D3D12_DEPTH_STENCIL_VIEW_DESC* dsv_desc,
+		D3D12_CLEAR_FLAGS clear_flags,
+		float32 depth,
+		uint32 stencil,
+		uint32 num_rects,
+		const D3D12_RECT* rects
+	);
+ 
 
 	void InitCommandLists();
 	void ExecuteCommandListGraphics();
@@ -243,7 +271,7 @@ public:
 	// Descriptor size is fixed per GPU
 	static uint32 s_descriptor_sizes[D3D12_DESCRIPTOR_HEAP_TYPE_NUM_TYPES];
 
-	RenderTargetDescriptorsManager m_rtv_descriptor_manager;
+	RenderTargetDescriptorHandler m_rtv_descriptor_handler;
 };
 
 inline D3D12_CPU_DESCRIPTOR_HANDLE operator+(D3D12_CPU_DESCRIPTOR_HANDLE x, uint32 y)
@@ -255,3 +283,4 @@ inline D3D12_CPU_DESCRIPTOR_HANDLE operator+(uint32 x, D3D12_CPU_DESCRIPTOR_HAND
 {
 	return y + x;
 }
+

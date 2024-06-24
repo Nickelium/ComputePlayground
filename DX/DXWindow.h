@@ -92,7 +92,7 @@ public:
 		const WindowDesc& window_desc
 	);
 
-	void BeginFrame(const DXContext& dx_context);
+	void BeginFrame(DXContext& dx_context);
 
 	void EndFrame(const DXContext& dx_context);
 
@@ -149,13 +149,6 @@ private:
 public:
 	std::vector<DXResource> m_buffers;
 private:
-	DescriptorHeap m_rtv_desc_heap;
-	// TODO CPU only descriptor and descriptor heap are not necessary
-	// The lifetime is just required during the command recording, not command execution
-	// Therefore we can abstract them away
-	// https://www.asawicki.info/news_1772_secrets_of_direct3d_12_do_rtv_and_dsv_descriptors_make_any_sense
-	std::vector<D3D12_CPU_DESCRIPTOR_HANDLE> m_rtv_handles;
-
 	uint32 m_width;
 	uint32 m_height;
 	uint32 m_windowed_origin_x;

@@ -350,6 +350,8 @@ void GraphicsWork
 		dx_context.GetCommandListGraphics()->IASetVertexBuffers(0, 1, &resource.m_vertex_buffer.m_vertex_buffer_view);
 		dx_context.GetCommandListGraphics()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 		dx_context.GetCommandListGraphics()->DrawInstanced(resource.m_vertex_buffer.m_count, 1, 0, 0);
+		//dx_context.GetCommandListGraphics()->DrawInstanced(3, 1, 0, 0);
+		//dx_context.GetCommandListGraphics()->DrawIndexedInstanced(3, 1, 0, 0, 0);
 	}
 }
 
@@ -363,7 +365,7 @@ void FillCommandList
 	// Fill CommandList
 	dx_window.BeginFrame(dx_context);
 	GraphicsWork(dx_context, dx_window, gfx_resource);
-	ComputeWork(dx_context, compute_resource, dx_window.m_buffers[g_current_buffer_index]);
+	//ComputeWork(dx_context, compute_resource, dx_window.m_buffers[g_current_buffer_index]);
 	dx_window.EndFrame(dx_context);
 }
 

@@ -159,31 +159,30 @@ void DXWindow::Init
 
 	// Disable ALT ENTER to disable exclusive fullscreen, we handle switching ourselves
 	factory->MakeWindowAssociation(m_handle, DXGI_MWA_NO_ALT_ENTER) >> CHK;
-
-	dx_context.CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_RTV, GetBackBufferCount(), "Descriptor Heap RTVs", m_rtv_desc_heap);
-
-	m_rtv_handles.resize(GetBackBufferCount());
-	for (uint32 i = 0; i < m_rtv_handles.size(); ++i)
-	{
-		m_rtv_handles[i] = dx_context.GetDescriptorHandle(m_rtv_desc_heap, i);
-	}
 	
 	GetBuffers();
-
-	for (uint32 i = 0; i < m_buffers.size(); ++i)
-	{
-		dx_context.CreateRTV(m_buffers[i], GetFormat(), m_rtv_handles[i]);
-	}
 }
 
-void DXWindow::BeginFrame(const DXContext& dx_context)
+DXGI_FORMAT GetBackBufferFormat(bool hdr);
+
+void DXWindow::BeginFrame(DXContext& dx_context)
 {
 	dx_context.Transition(D3D12_RESOURCE_STATE_RENDER_TARGET, m_buffers[g_current_buffer_index]);
 
-	const float4 color{ 85.0f / 255.0f, 230.0f / 255.0f, 23.0f / 255.0f, 1.0f };
-	// TODO replace with rtv descriptor manager
-	dx_context.GetCommandListGraphics()->ClearRenderTargetView(m_rtv_handles[g_current_buffer_index], color, 0, nullptr);
-	dx_context.GetCommandListGraphics()->OMSetRenderTargets(1, &m_rtv_handles[g_current_buffer_index], false, nullptr);
+	float32 color[4]{ 85.0f / 255.0f, 230.0f / 255.0f, 23.0f / 255.0f, 1.0f };
+	D3D12_RENDER_TARGET_VIEW_DESC rtv_desc
+	{
+		.Format = GetBackBufferFormat(false),
+		.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D,
+		.Texture2D =
+		{
+			.MipSlice = 0,
+			.PlaneSlice = 0,
+		},
+	};
+	dx_context.ClearRenderTargetView(m_buffers[g_current_buffer_index].m_resource.Get(), &rtv_desc, color, 0, nullptr);
+	ID3D12Resource* resource = m_buffers[g_current_buffer_index].m_resource.Get();
+	dx_context.OMSetRenderTargets(1, &resource, &rtv_desc, nullptr, nullptr);
 }
 
 void DXWindow::EndFrame(const DXContext& dx_context)
@@ -254,12 +253,6 @@ void DXWindow::Resize(const DXContext& dx_context)
 		m_should_resize = false;
 
 		GetBuffers();
-		// Recreate RTVs
-		// Dont need to recreate descriptors nor descriptor heap
-		for (uint32 i = 0; i < m_buffers.size(); ++i)
-		{
-			dx_context.CreateRTV(m_buffers[i], GetFormat(), m_rtv_handles[i]);
-		}
 	}
 }
 

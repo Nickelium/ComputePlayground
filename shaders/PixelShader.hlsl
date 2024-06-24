@@ -17,5 +17,6 @@ PSOutput main(in const PSInput input)
 	PSOutput output = (PSOutput)0;
     output.color = float4(input.color, 1.0f);
     output.color.rgb = Reinhard(output.color.rgb);
+	//output.color = float4(1, 0, 0, 1);
 	return output;
 }

@@ -13,10 +13,17 @@ struct VSOutput
 };
 
 [RootSignature("RootFlags(ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT)")]
-VSOutput main(in const VSInput input) 
+VSOutput main(in const VSInput input, uint id : SV_VERTEXID) 
 {
 	VSOutput output = (VSOutput)0;
-	output.pos = float4(input.pos,0,1);
-	output.color = input.color;
+	//if(id == 0)
+	//output.pos = float4(0.5, -0.5,0,1);
+	//if(id == 1)
+	//output.pos = float4(-0.5, 0.5,0,1);
+	//if(id == 2)
+	//output.pos = float4(-0.5, -0.5,0,1);
+
+    output.pos = float4(input.pos, 0, 1);
+    output.color = input.color;
 	return output;
 }

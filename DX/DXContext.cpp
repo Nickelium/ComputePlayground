@@ -16,7 +16,7 @@ DXContext::DXContext() :
 #endif
 {
 	Init();
-	m_rtv_descriptor_manager.Init(*this);
+	m_rtv_descriptor_handler.Init(*this);
 }
 
 DXContext::~DXContext()
@@ -37,6 +37,44 @@ DXContext::~DXContext()
 		}
 	}
 #endif
+}
+
+void DXContext::OMSetRenderTargets
+(
+	uint32 num_rtvs,
+	ID3D12Resource* const* rtv_resources,
+	const D3D12_RENDER_TARGET_VIEW_DESC* rtv_desc,
+	ID3D12Resource* dsv_resource,
+	const D3D12_DEPTH_STENCIL_VIEW_DESC* dsv_desc
+)
+{
+	m_rtv_descriptor_handler.OMSetRenderTargets(*this, num_rtvs, rtv_resources, rtv_desc, dsv_resource, dsv_desc);
+}
+
+void DXContext::ClearRenderTargetView
+(
+	ID3D12Resource* rtv_resource,
+	const D3D12_RENDER_TARGET_VIEW_DESC* rtv_desc,
+	float32 color[4],
+	uint32 num_rects,
+	const D3D12_RECT* rects
+)
+{
+	m_rtv_descriptor_handler.ClearRenderTargetView(*this, rtv_resource, rtv_desc, color, num_rects, rects);
+}
+
+void DXContext::ClearDepthStencilView
+(
+	ID3D12Resource* dsv_resource,
+	const D3D12_DEPTH_STENCIL_VIEW_DESC* dsv_desc,
+	D3D12_CLEAR_FLAGS clear_flags,
+	float32 depth,
+	uint32 stencil,
+	uint32 num_rects,
+	const D3D12_RECT* rects
+)
+{
+	m_rtv_descriptor_handler.ClearDepthStencilView(*this, dsv_resource, dsv_desc, clear_flags, depth, stencil, num_rects, rects);
 }
 
 namespace
@@ -604,7 +642,7 @@ void DXCommand::EndFrame()
 }
 
 
-void RenderTargetDescriptorsManager::Init(DXContext& dx_context)
+void RenderTargetDescriptorHandler::Init(DXContext& dx_context)
 {
 	dx_context.CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_RTV, D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT, "", m_rtv_descriptor_heap);
 	dx_context.CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 1, "", m_dsv_descriptor_heap);
@@ -612,58 +650,70 @@ void RenderTargetDescriptorsManager::Init(DXContext& dx_context)
 	m_dsv_descriptor = m_dsv_descriptor_heap.m_heap->GetCPUDescriptorHandleForHeapStart();
 }
 
-void RenderTargetDescriptorsManager::OMSetRenderTargets
+void RenderTargetDescriptorHandler::OMSetRenderTargets
 (
 	DXContext& dx_context,
 	uint32 num_rtvs,
-	ID3D12Resource* const* pp_rtv_resources,
-	const D3D12_RENDER_TARGET_VIEW_DESC* p_rtv_desc,
-	ID3D12Resource* p_dsv_resource,
-	const D3D12_DEPTH_STENCIL_VIEW_DESC* p_dsv_desc
+	ID3D12Resource* const* rtv_resources,
+	const D3D12_RENDER_TARGET_VIEW_DESC* rtv_desc,
+	ID3D12Resource* dsv_resource,
+	const D3D12_DEPTH_STENCIL_VIEW_DESC* dsv_desc
 )
 {
-	ASSERT(num_rtvs < D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT);
+	ASSERT(num_rtvs <= D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT);
 	for (uint32 i = 0; i < num_rtvs; ++i)
 	{
 		D3D12_CPU_DESCRIPTOR_HANDLE descriptor_handle = 
 			m_rtv_descriptor + i * DXContext::s_descriptor_sizes[D3D12_DESCRIPTOR_HEAP_TYPE_RTV];
-		dx_context.GetDevice()->CreateRenderTargetView(pp_rtv_resources[i], p_rtv_desc, descriptor_handle);
+		dx_context.GetDevice()->CreateRenderTargetView(rtv_resources[i], rtv_desc, descriptor_handle);
 	}
-
-	dx_context.GetDevice()->CreateDepthStencilView(p_dsv_resource, p_dsv_desc, m_dsv_descriptor);
+	D3D12_CPU_DESCRIPTOR_HANDLE* dsv_descriptor = &m_dsv_descriptor;
+	if (dsv_resource == nullptr || dsv_desc == nullptr)
+	{
+		dsv_descriptor = nullptr;
+	}
+	// TODO operator bool / operator int
+	if (dsv_descriptor != nullptr)
+	{
+		dx_context.GetDevice()->CreateDepthStencilView(dsv_resource, dsv_desc, *dsv_descriptor);
+	}
 	dx_context.GetCommandListGraphics()->OMSetRenderTargets
 	(
 		num_rtvs,
 		&m_rtv_descriptor,
 		true,
-		&m_dsv_descriptor
+		dsv_descriptor
 	);
 }
 
-void RenderTargetDescriptorsManager::ClearRenderTargetView
+void RenderTargetDescriptorHandler::ClearRenderTargetView
 (
 	DXContext& dx_context,
-	ID3D12Resource* pRTVResource,
-	const D3D12_RENDER_TARGET_VIEW_DESC* pRTVDesc,
-	const FLOAT ColorRGBA[4],
-	UINT NumRects,
-	const D3D12_RECT* pRects
+	ID3D12Resource* rtv_resource,
+	const D3D12_RENDER_TARGET_VIEW_DESC* rtv_desc,
+	float32 color[4],
+	uint32 num_rects,
+	const D3D12_RECT* rects
 )
 {
-	// TODO
+	D3D12_CPU_DESCRIPTOR_HANDLE descriptor_handle = m_rtv_descriptor;
+	dx_context.GetDevice()->CreateRenderTargetView(rtv_resource, rtv_desc, descriptor_handle);
+	dx_context.GetCommandListGraphics()->ClearRenderTargetView(descriptor_handle, color, num_rects, rects);
 }
 
-void RenderTargetDescriptorsManager::ClearDepthStencilView
+void RenderTargetDescriptorHandler::ClearDepthStencilView
 (
 	DXContext& dx_context,
-	ID3D12Resource* pDSVResource,
-	const D3D12_DEPTH_STENCIL_VIEW_DESC* pDSVDesc,
-	D3D12_CLEAR_FLAGS ClearFlags,
-	FLOAT Depth,
-	UINT8 Stencil,
-	UINT NumRects,
-	const D3D12_RECT* pRects
+	ID3D12Resource* dsv_resource,
+	const D3D12_DEPTH_STENCIL_VIEW_DESC* dsv_desc,
+	D3D12_CLEAR_FLAGS clear_flags,
+	float32 depth,
+	uint32 stencil,
+	uint32 num_rects,
+	const D3D12_RECT* rects
 )
 {
-	// TODO
+	D3D12_CPU_DESCRIPTOR_HANDLE descriptor_handle = m_dsv_descriptor;
+	dx_context.GetDevice()->CreateDepthStencilView(dsv_resource, dsv_desc, descriptor_handle);
+	dx_context.GetCommandListGraphics()->ClearDepthStencilView(descriptor_handle, clear_flags, depth, stencil, num_rects, rects);
 }
