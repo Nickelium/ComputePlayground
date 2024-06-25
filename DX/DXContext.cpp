@@ -667,14 +667,10 @@ void RenderTargetDescriptorHandler::OMSetRenderTargets
 			m_rtv_descriptor + i * DXContext::s_descriptor_sizes[D3D12_DESCRIPTOR_HEAP_TYPE_RTV];
 		dx_context.GetDevice()->CreateRenderTargetView(rtv_resources[i], rtv_desc, descriptor_handle);
 	}
-	D3D12_CPU_DESCRIPTOR_HANDLE* dsv_descriptor = &m_dsv_descriptor;
-	if (dsv_resource == nullptr || dsv_desc == nullptr)
+	D3D12_CPU_DESCRIPTOR_HANDLE* dsv_descriptor = nullptr;
+	if (dsv_resource != nullptr)
 	{
-		dsv_descriptor = nullptr;
-	}
-	// TODO operator bool / operator int
-	if (dsv_descriptor != nullptr)
-	{
+		dsv_descriptor = &m_dsv_descriptor;
 		dx_context.GetDevice()->CreateDepthStencilView(dsv_resource, dsv_desc, *dsv_descriptor);
 	}
 	dx_context.GetCommandListGraphics()->OMSetRenderTargets
