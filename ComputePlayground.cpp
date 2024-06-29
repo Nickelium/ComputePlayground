@@ -19,8 +19,6 @@ DISABLE_OPTIMISATIONS()
 struct ComputeResources
 {
 	// Compute
-	DescriptorHeap m_descriptor_heap{};
-
 	DXTextureResource m_gpu_resource;
 	DXResource m_cpu_resource;
 	Microsoft::WRL::ComPtr<IDxcBlob> m_compute_shader;
@@ -34,6 +32,7 @@ void ComputeWork
 (
 	DXContext& dx_context, 
 	ComputeResources& compute_resource, 
+	DXWindow& dx_window,
 	DXResource& output_resource
 );
 
@@ -364,8 +363,8 @@ void FillCommandList
 {
 	// Fill CommandList
 	dx_window.BeginFrame(dx_context);
-	GraphicsWork(dx_context, dx_window, gfx_resource);
-	//ComputeWork(dx_context, compute_resource, dx_window.m_buffers[g_current_buffer_index]);
+	//GraphicsWork(dx_context, dx_window, gfx_resource);
+	ComputeWork(dx_context, compute_resource, dx_window, dx_window.m_buffers[g_current_buffer_index]);
 	dx_window.EndFrame(dx_context);
 }
 
@@ -461,8 +460,8 @@ void CreateComputeResources(DXContext& dx_context, const DXCompiler& dx_compiler
 {
 	dx_compiler.Compile(dx_context.GetDevice(), &resource.m_compute_shader, "ComputeShader.hlsl", ShaderType::COMPUTE_SHADER);
 
-	resource.m_gpu_resource.SetResourceInfo(D3D12_HEAP_TYPE_DEFAULT, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, dx_window.GetWidth(), dx_window.GetHeight(), DXGI_FORMAT_R8G8B8A8_UINT);
-	resource.m_gpu_resource.CreateResource(dx_context, "GPU resource");
+//	resource.m_gpu_resource.SetResourceInfo(D3D12_HEAP_TYPE_DEFAULT, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, dx_window.GetWidth(), dx_window.GetHeight(), DXGI_FORMAT_R8G8B8A8_UINT);
+//	resource.m_gpu_resource.CreateResource(dx_context, "GPU resource");
 
 	// Root signature embed in the shader already
 	dx_context.GetDevice()->CreateRootSignature(0, resource.m_compute_shader->GetBufferPointer(), resource.m_compute_shader->GetBufferSize(), IID_PPV_ARGS(&resource.m_compute_root_signature)) >> CHK;
@@ -532,17 +531,20 @@ void CreateComputeResources(DXContext& dx_context, const DXCompiler& dx_compiler
 	Microsoft::WRL::ComPtr<ID3D12StateObjectProperties1> state_object_properties;
 	resource.m_compute_so.As(&state_object_properties) >> CHK;
 	resource.m_program_id = state_object_properties->GetProgramIdentifier(compute_wname.c_str());
-
-	dx_context.CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 1, "Descriptor Heap UAV", resource.m_descriptor_heap);
 }
 
 void ComputeWork
 (
 	DXContext& dx_context, 
 	ComputeResources& compute_resource, 
+	DXWindow& dx_window,
 	DXResource& output_resource
 )
 {
+	// TODO allocator
+	compute_resource.m_gpu_resource.SetResourceInfo(D3D12_HEAP_TYPE_DEFAULT, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, dx_window.GetWidth(), dx_window.GetHeight(), DXGI_FORMAT_R8G8B8A8_UINT);
+	compute_resource.m_gpu_resource.CreateResource(dx_context, "GPU resource");
+
 	// Compute Work
 	// Transition to UAV
 	dx_context.Transition(D3D12_RESOURCE_STATE_UNORDERED_ACCESS, compute_resource.m_gpu_resource);
@@ -573,10 +575,11 @@ void ComputeWork
 			.PlaneSlice = 0,
 		},
 	};
-	dx_context.GetDevice()->CreateUnorderedAccessView(compute_resource.m_gpu_resource.m_resource.Get(), nullptr, &UAV_desc, dx_context.GetDescriptorHandle(compute_resource.m_descriptor_heap, 0));
+	DXUAV uav{};
+	dx_context.CreateUAV(compute_resource.m_gpu_resource, &UAV_desc, uav);
 	// Set descriptor table
-	dx_context.GetCommandListGraphics()->SetDescriptorHeaps(1, compute_resource.m_descriptor_heap.m_heap.GetAddressOf());
-	dx_context.GetCommandListGraphics()->SetComputeRootDescriptorTable(0, compute_resource.m_descriptor_heap.m_heap->GetGPUDescriptorHandleForHeapStart());
+	dx_context.GetCommandListGraphics()->SetDescriptorHeaps(1, dx_context.m_resources_descriptor_heap.m_heap.GetAddressOf());
+	dx_context.GetCommandListGraphics()->SetComputeRootDescriptorTable(0, uav.m_gpu_descriptor_handle);
 
 	//dx_context.GetCommandListGraphics()->SetComputeRootUnorderedAccessView(0, compute_resource.m_gpu_resource.m_resource->GetGPUVirtualAddress());
 	uint32 dispatch_x = ceil(compute_resource.m_gpu_resource.m_width / 8.0f);

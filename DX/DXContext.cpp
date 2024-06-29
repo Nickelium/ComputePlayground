@@ -272,6 +272,11 @@ void DXContext::Init()
 	NAME_DX_OBJECT(m_device_removed_fence.m_gpu, "Device removed fence");
 
 	CacheDescriptorSizes();
+	//const uint32 max_allowed_cbv_srv_uav_descriptors = 1000000;
+	const uint32 max_allowed_cbv_srv_uav_descriptors = 10;
+	CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, max_allowed_cbv_srv_uav_descriptors, "Resources Descriptor Heap", m_resources_descriptor_heap);
+	const uint32 max_allowed_sampler_descriptors = 2048;
+	CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER, max_allowed_sampler_descriptors, "Samplers Descriptor Heap", m_samplers_descriptor_heap);
 
 #if defined(_DEBUG)
 	LogTrace(DumpDX12Capabilities(m_device));
@@ -337,12 +342,40 @@ void DXContext::Signal(const CommandQueue& command_queue, Fence& fence, uint32 i
 	++fence.m_value;
 	fence.m_cpus[index] = fence.m_value;
 	command_queue.m_queue->Signal(fence.m_gpu.Get(), fence.m_value) >> CHK;
+	m_list_pair_fence_free_index.push_back({fence.m_value, m_free_index});
 }
 
 void DXContext::Wait(const Fence& fence, uint32 index)
 {
 	fence.m_gpu->SetEventOnCompletion(fence.m_cpus[index], fence.m_event) >> CHK;
 	WaitForSingleObject(fence.m_event, INFINITE);
+	auto it = std::find_if(m_list_pair_fence_free_index.begin(), m_list_pair_fence_free_index.end(),
+	[fence_value = fence.m_cpus[index]](std::pair<uint64, uint32> pair)
+	{
+		if (pair.first == fence_value)
+			return true;
+		return false;
+	});
+	if (it != m_list_pair_fence_free_index.end())
+	{
+		std::pair<uint64, uint32> pair = *it;
+		m_start_index = pair.second;
+
+		for (auto current = m_list_pair_fence_free_index.begin(); 
+			current != m_list_pair_fence_free_index.end();)
+		{
+			if (current->first <= fence.m_cpus[index])
+			{
+				current = m_list_pair_fence_free_index.erase(current);
+			}
+			else
+			{
+				++current;
+			}
+		}
+
+	}
+
 }
 
 void DXContext::SignalAndWait()
@@ -454,7 +487,7 @@ void DXContext::CreateDescriptorHeap
 	NAME_DX_OBJECT(out_descriptor_heap.m_heap, descriptor_heap_name);
 }
 
-D3D12_CPU_DESCRIPTOR_HANDLE DXContext::GetDescriptorHandle
+D3D12_CPU_DESCRIPTOR_HANDLE DXContext::GetCPUDescriptorHandle
 (
 	const DescriptorHeap& descriptor_heap, 
 	uint32 i
@@ -463,6 +496,19 @@ D3D12_CPU_DESCRIPTOR_HANDLE DXContext::GetDescriptorHandle
 	// Basically pointer to heap
 	D3D12_CPU_DESCRIPTOR_HANDLE first_descriptor = descriptor_heap.m_heap->GetCPUDescriptorHandleForHeapStart();
 	D3D12_CPU_DESCRIPTOR_HANDLE descriptor_handle{};
+	descriptor_handle.ptr = first_descriptor.ptr + i * descriptor_heap.m_increment_size;
+	return descriptor_handle;
+}
+
+D3D12_GPU_DESCRIPTOR_HANDLE DXContext::GetGPUDescriptorHandle
+(
+	const DescriptorHeap& descriptor_heap, 
+	uint32 i
+) const
+{
+	// Basically pointer to heap
+	D3D12_GPU_DESCRIPTOR_HANDLE first_descriptor = descriptor_heap.m_heap->GetGPUDescriptorHandleForHeapStart();
+	D3D12_GPU_DESCRIPTOR_HANDLE descriptor_handle{};
 	descriptor_handle.ptr = first_descriptor.ptr + i * descriptor_heap.m_increment_size;
 	return descriptor_handle;
 }
@@ -642,7 +688,75 @@ void DXCommand::EndFrame()
 }
 
 
-void RenderTargetDescriptorHandler::Init(DXContext& dx_context)
+void DXContext::CreateUAV
+(
+	DXResource& resource,
+	const D3D12_UNORDERED_ACCESS_VIEW_DESC *desc,
+	DXUAV& uav
+)
+{
+	uint32 number_allocated = 0;
+	if (m_start_index <= m_free_index)
+	{
+		number_allocated = m_free_index - m_start_index;
+	}
+	else
+	{
+		number_allocated = m_resources_descriptor_heap.m_number_descriptors - (m_start_index - m_free_index);
+	}
+	ASSERT(number_allocated < m_resources_descriptor_heap.m_number_descriptors);
+	uav.m_cpu_descriptor_handle = GetCPUDescriptorHandle(m_resources_descriptor_heap, m_free_index);
+	uav.m_gpu_descriptor_handle = GetGPUDescriptorHandle(m_resources_descriptor_heap, m_free_index);
+	m_device->CreateUnorderedAccessView(resource.m_resource.Get(), nullptr, desc, uav.m_cpu_descriptor_handle);
+	m_free_index = (m_free_index + 1) % m_resources_descriptor_heap.m_number_descriptors;
+}
+
+void DXContext::CreateSRV
+(
+	DXResource& resource,
+	const D3D12_SHADER_RESOURCE_VIEW_DESC* desc,
+	DXSRV& srv
+)
+{
+	uint32 number_allocated = 0;
+	if (m_start_index <= m_free_index)
+	{
+		number_allocated = m_free_index - m_start_index;
+	}
+	else
+	{
+		number_allocated = m_resources_descriptor_heap.m_number_descriptors - (m_start_index - m_free_index);
+	}
+	ASSERT(number_allocated < m_resources_descriptor_heap.m_number_descriptors);
+	srv.m_cpu_descriptor_handle = GetCPUDescriptorHandle(m_resources_descriptor_heap, m_free_index);
+	srv.m_gpu_descriptor_handle = GetGPUDescriptorHandle(m_resources_descriptor_heap, m_free_index);
+	m_device->CreateShaderResourceView(resource.m_resource.Get(), desc, srv.m_cpu_descriptor_handle);
+	m_free_index = (m_free_index + 1) % m_resources_descriptor_heap.m_number_descriptors;
+}
+
+void DXContext::CreateCBV
+(
+	const D3D12_CONSTANT_BUFFER_VIEW_DESC* desc,
+	DXCBV& cbv
+)
+{
+	uint32 number_allocated = 0;
+	if (m_start_index <= m_free_index)
+	{
+		number_allocated = m_free_index - m_start_index;
+	}
+	else
+	{
+		number_allocated = m_resources_descriptor_heap.m_number_descriptors - (m_start_index - m_free_index);
+	}
+	ASSERT(number_allocated < m_resources_descriptor_heap.m_number_descriptors);
+	cbv.m_cpu_descriptor_handle = GetCPUDescriptorHandle(m_resources_descriptor_heap, m_free_index);
+	cbv.m_gpu_descriptor_handle = GetGPUDescriptorHandle(m_resources_descriptor_heap, m_free_index);
+	m_device->CreateConstantBufferView(desc, cbv.m_cpu_descriptor_handle);
+	m_free_index = (m_free_index + 1) % m_resources_descriptor_heap.m_number_descriptors;
+}
+
+void RTVDescriptorHandler::Init(DXContext& dx_context)
 {
 	dx_context.CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_RTV, D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT, "", m_rtv_descriptor_heap);
 	dx_context.CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 1, "", m_dsv_descriptor_heap);
@@ -650,7 +764,7 @@ void RenderTargetDescriptorHandler::Init(DXContext& dx_context)
 	m_dsv_descriptor = m_dsv_descriptor_heap.m_heap->GetCPUDescriptorHandleForHeapStart();
 }
 
-void RenderTargetDescriptorHandler::OMSetRenderTargets
+void RTVDescriptorHandler::OMSetRenderTargets
 (
 	DXContext& dx_context,
 	uint32 num_rtvs,
@@ -682,7 +796,7 @@ void RenderTargetDescriptorHandler::OMSetRenderTargets
 	);
 }
 
-void RenderTargetDescriptorHandler::ClearRenderTargetView
+void RTVDescriptorHandler::ClearRenderTargetView
 (
 	DXContext& dx_context,
 	ID3D12Resource* rtv_resource,
@@ -697,7 +811,7 @@ void RenderTargetDescriptorHandler::ClearRenderTargetView
 	dx_context.GetCommandListGraphics()->ClearRenderTargetView(descriptor_handle, color, num_rects, rects);
 }
 
-void RenderTargetDescriptorHandler::ClearDepthStencilView
+void RTVDescriptorHandler::ClearDepthStencilView
 (
 	DXContext& dx_context,
 	ID3D12Resource* dsv_resource,

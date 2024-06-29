@@ -56,6 +56,10 @@ private:
 	uint32 m_frame_index{ 0 };
 };
 
+class DXUAV;
+class DXSRV;
+class DXCBV;
+
 // Store CPU / GPU descriptor handle from start
 struct DescriptorHeap
 {
@@ -94,7 +98,7 @@ struct Fence
 
 class DXContext;
 // Thin abstraction to avoid all non shader visible descriptors
-class RenderTargetDescriptorHandler
+class RTVDescriptorHandler
 {
 public:
 	void Init(DXContext& dx_context);
@@ -196,7 +200,13 @@ public:
 		DescriptorHeap& out_descriptor_heap
 	) const;
 
-	D3D12_CPU_DESCRIPTOR_HANDLE GetDescriptorHandle
+	D3D12_CPU_DESCRIPTOR_HANDLE GetCPUDescriptorHandle
+	(
+		const DescriptorHeap& descriptor_heap, 
+		uint32 i
+	) const;
+
+	D3D12_GPU_DESCRIPTOR_HANDLE GetGPUDescriptorHandle
 	(
 		const DescriptorHeap& descriptor_heap, 
 		uint32 i
@@ -271,7 +281,33 @@ public:
 	// Descriptor size is fixed per GPU
 	static uint32 s_descriptor_sizes[D3D12_DESCRIPTOR_HEAP_TYPE_NUM_TYPES];
 
-	RenderTargetDescriptorHandler m_rtv_descriptor_handler;
+	RTVDescriptorHandler m_rtv_descriptor_handler;
+	void CreateUAV
+	(
+		DXResource& resource,
+		const D3D12_UNORDERED_ACCESS_VIEW_DESC *desc,
+	    DXUAV& uav
+	);
+	void CreateSRV
+	(
+		DXResource& resource,
+		const D3D12_SHADER_RESOURCE_VIEW_DESC* desc,
+		DXSRV& srv
+	);
+	void CreateCBV
+	(
+		const D3D12_CONSTANT_BUFFER_VIEW_DESC* desc,
+		DXCBV& srv
+	);
+
+public:
+	std::vector<std::pair<uint64, uint32>> m_list_pair_fence_free_index;
+	uint32 m_start_index = 0;
+	uint32 m_free_index = 0;
+	DescriptorHeap m_resources_descriptor_heap;
+	DescriptorHeap m_samplers_descriptor_heap;
+	// TODO CBV_SRV_UAV descriptor heap array per frame
+	// TODO sampler descriptor heap array per frame
 };
 
 inline D3D12_CPU_DESCRIPTOR_HANDLE operator+(D3D12_CPU_DESCRIPTOR_HANDLE x, uint32 y)

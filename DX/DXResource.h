@@ -4,6 +4,31 @@
 #include "DXCommon.h"
 
 class DXContext;
+
+class DXDescriptor
+{
+public:
+	D3D12_CPU_DESCRIPTOR_HANDLE m_cpu_descriptor_handle;
+	D3D12_GPU_DESCRIPTOR_HANDLE m_gpu_descriptor_handle;
+};
+
+
+class DXSRV : public DXDescriptor
+{
+public:
+};
+
+class DXUAV : public DXDescriptor
+{
+public:
+};
+
+class DXCBV : public DXDescriptor
+{
+public:
+};
+
+
 class DXResource
 {
 public:
