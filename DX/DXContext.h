@@ -302,12 +302,11 @@ public:
 
 public:
 	std::vector<std::pair<uint64, uint32>> m_list_pair_fence_free_index;
+	uint32 m_last_indices[g_backbuffer_count];
 	uint32 m_start_index = 0;
 	uint32 m_free_index = 0;
 	DescriptorHeap m_resources_descriptor_heap;
 	DescriptorHeap m_samplers_descriptor_heap;
-	// TODO CBV_SRV_UAV descriptor heap array per frame
-	// TODO sampler descriptor heap array per frame
 };
 
 inline D3D12_CPU_DESCRIPTOR_HANDLE operator+(D3D12_CPU_DESCRIPTOR_HANDLE x, uint32 y)

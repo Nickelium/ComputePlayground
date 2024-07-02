@@ -289,6 +289,8 @@ extern uint32 g_current_buffer_index;
 void DXContext::InitCommandLists()
 {
 	Wait(m_fence, g_current_buffer_index);
+	m_start_index = m_last_indices[(g_current_buffer_index - 1) % g_backbuffer_count];
+
 	CommandAllocator& command_allocator = m_command_allocator_graphics[g_current_buffer_index];
 	
 	if (!m_command_list_graphics.m_is_open)
@@ -319,6 +321,8 @@ void DXContext::ExecuteCommandListGraphics()
 	m_command_list_graphics.m_is_open = false;
 	ID3D12CommandList* command_lists[] = { m_command_list_graphics.m_list.Get() };
 	m_queue_graphics.m_queue->ExecuteCommandLists(COUNT(command_lists), command_lists);
+	
+	m_last_indices[g_current_buffer_index] = m_free_index;
 }
 
 void DXContext::ExecuteCommandListCompute()
@@ -342,40 +346,12 @@ void DXContext::Signal(const CommandQueue& command_queue, Fence& fence, uint32 i
 	++fence.m_value;
 	fence.m_cpus[index] = fence.m_value;
 	command_queue.m_queue->Signal(fence.m_gpu.Get(), fence.m_value) >> CHK;
-	m_list_pair_fence_free_index.push_back({fence.m_value, m_free_index});
 }
 
 void DXContext::Wait(const Fence& fence, uint32 index)
 {
 	fence.m_gpu->SetEventOnCompletion(fence.m_cpus[index], fence.m_event) >> CHK;
 	WaitForSingleObject(fence.m_event, INFINITE);
-	auto it = std::find_if(m_list_pair_fence_free_index.begin(), m_list_pair_fence_free_index.end(),
-	[fence_value = fence.m_cpus[index]](std::pair<uint64, uint32> pair)
-	{
-		if (pair.first == fence_value)
-			return true;
-		return false;
-	});
-	if (it != m_list_pair_fence_free_index.end())
-	{
-		std::pair<uint64, uint32> pair = *it;
-		m_start_index = pair.second;
-
-		for (auto current = m_list_pair_fence_free_index.begin(); 
-			current != m_list_pair_fence_free_index.end();)
-		{
-			if (current->first <= fence.m_cpus[index])
-			{
-				current = m_list_pair_fence_free_index.erase(current);
-			}
-			else
-			{
-				++current;
-			}
-		}
-
-	}
-
 }
 
 void DXContext::SignalAndWait()
@@ -686,7 +662,6 @@ void DXCommand::EndFrame()
 
 	m_frame_index = (m_frame_index + 1) % g_backbuffer_count;
 }
-
 
 void DXContext::CreateUAV
 (

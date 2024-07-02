@@ -197,7 +197,6 @@ void DXWindow::Present(DXContext& dx_context)
 	uint32 present_flags = 0;
 	m_swap_chain->Present(vsync_interval, present_flags) >> CHK;
 	dx_context.Signal(dx_context.m_queue_graphics, dx_context.m_fence, g_current_buffer_index);
-
 	g_current_buffer_index = m_swap_chain->GetCurrentBackBufferIndex();
 }
 
