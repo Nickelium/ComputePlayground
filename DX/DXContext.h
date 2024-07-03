@@ -292,7 +292,7 @@ public:
 	void CreateCBV
 	(
 		D3D12_CONSTANT_BUFFER_VIEW_DESC desc,
-		CBV& crv
+		CBV& cbv
 	);
 
 public:

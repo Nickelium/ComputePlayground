@@ -39,6 +39,7 @@ void CreateComputeResources(DXContext& dx_context, const DXCompiler& dx_compiler
 struct GraphicsResources
 {
 	// Graphics
+	// Persistent resource
 	DXVertexBufferResource m_vertex_buffer;
 	Microsoft::WRL::ComPtr<IDxcBlob> m_vertex_shader;
 	Microsoft::WRL::ComPtr<IDxcBlob> m_pixel_shader;
@@ -67,7 +68,7 @@ void CreateGraphicsResources
 
 		const Vertex vertex_data[] =
 		{
-			{ {+0.0f, +0.25f}, {1.0f, 0.0f, 0.0f} },
+			{ {0.0f, +0.25f}, {1.0f, 0.0f, 0.0f} },
 			{ {+0.25f, -0.25f}, {0.0f, 1.0f, 0.0f} },
 			{ {-0.25f, -0.25f}, {0.0f, 0.0f, 1.0f} },
 		};
@@ -120,8 +121,10 @@ void CreateGraphicsResources
 		};
 		const D3D12_INPUT_LAYOUT_DESC layout_desc =
 		{
-			.pInputElementDescs = element_descs,
-			.NumElements = COUNT(element_descs),
+			//.pInputElementDescs = element_descs,
+			//.NumElements = COUNT(element_descs),
+			.pInputElementDescs = nullptr,
+			.NumElements = 0,
 		};
 
 		const D3D12_GRAPHICS_PIPELINE_STATE_DESC gfx_pso_desc
@@ -330,6 +333,31 @@ void GraphicsWork
 		};
 		dx_context.GetCommandListGraphics()->RSSetViewports(1, view_ports);
 		dx_context.GetCommandListGraphics()->RSSetScissorRects(1, scissor_rects);
+
+
+		
+		D3D12_SHADER_RESOURCE_VIEW_DESC desc
+		{
+			.Format = DXGI_FORMAT_UNKNOWN,
+			.ViewDimension = D3D12_SRV_DIMENSION_BUFFER,
+			.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING,
+			.Buffer =
+			{
+				.FirstElement = 0,
+				.NumElements = resource.m_vertex_buffer.m_count,
+				.StructureByteStride = resource.m_vertex_buffer.m_stride,
+				.Flags = D3D12_BUFFER_SRV_FLAG_NONE,
+			},
+		};
+
+		// Some issues with CBV + CBV requires 256 alignment
+		SRV srv{};
+		dx_context.CreateSRV
+		(
+			resource.m_vertex_buffer,
+			&desc,
+			srv
+		);
 #if defined(TEST_GENERIC_PROGRAM_GFX)
 		D3D12_SET_PROGRAM_DESC program_desc
 		{
@@ -344,9 +372,11 @@ void GraphicsWork
 		dx_context.GetCommandListGraphics()->SetPipelineState(resource.m_gfx_pso.Get());
 #endif
 		dx_context.GetCommandListGraphics()->SetGraphicsRootSignature(resource.m_gfx_root_signature.Get());
-		dx_context.GetCommandListGraphics()->IASetVertexBuffers(0, 1, &resource.m_vertex_buffer.m_vertex_buffer_view);
+		
+		uint32 bindless_index = srv.m_bindless_index;
+		dx_context.GetCommandListGraphics()->SetGraphicsRoot32BitConstants(0, 1, &bindless_index, 0);
 		dx_context.GetCommandListGraphics()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-		dx_context.GetCommandListGraphics()->DrawInstanced(resource.m_vertex_buffer.m_count, 1, 0, 0);
+		dx_context.GetCommandListGraphics()->DrawInstanced(resource.m_vertex_buffer.m_count, 16, 0, 0);
 		//dx_context.GetCommandListGraphics()->DrawInstanced(3, 1, 0, 0);
 		//dx_context.GetCommandListGraphics()->DrawIndexedInstanced(3, 1, 0, 0, 0);
 	}
@@ -361,8 +391,13 @@ void FillCommandList
 {
 	// Fill CommandList
 	dx_window.BeginFrame(dx_context);
-	//GraphicsWork(dx_context, dx_window, gfx_resource);
-	ComputeWork(dx_context, compute_resource, dx_window, dx_window.m_buffers[g_current_buffer_index]);
+
+	// Set descriptor heap before root signature, order required by spec
+	dx_context.GetCommandListGraphics()->SetDescriptorHeaps(1, dx_context.m_resources_descriptor_heap.m_heap.GetAddressOf());
+	{
+		GraphicsWork(dx_context, dx_window, gfx_resource);
+		//ComputeWork(dx_context, compute_resource, dx_window, dx_window.m_buffers[g_current_buffer_index]);
+	}
 	dx_window.EndFrame(dx_context);
 }
 
@@ -601,8 +636,6 @@ void ComputeWork
 		.bindless_index = uav.m_bindless_index
 	};
 	
-	// Set descriptor heap before root signature, order required by spec
-	dx_context.GetCommandListGraphics()->SetDescriptorHeaps(1, dx_context.m_resources_descriptor_heap.m_heap.GetAddressOf());
 	dx_context.GetCommandListGraphics()->SetComputeRootSignature(compute_resource.m_compute_root_signature.Get());
 	
 	dx_context.GetCommandListGraphics()->SetComputeRoot32BitConstants(0, 3, &cbuffer, 0);

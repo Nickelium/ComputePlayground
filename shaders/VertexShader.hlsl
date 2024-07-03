@@ -12,18 +12,22 @@ struct VSOutput
 	float3 color : COLOR;
 };
 
-[RootSignature("RootFlags(ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT)")]
-VSOutput main(in const VSInput input, uint id : SV_VERTEXID) 
+struct MyCBuffer
 {
-	VSOutput output = (VSOutput)0;
-	//if(id == 0)
-	//output.pos = float4(0.5, -0.5,0,1);
-	//if(id == 1)
-	//output.pos = float4(-0.5, 0.5,0,1);
-	//if(id == 2)
-	//output.pos = float4(-0.5, -0.5,0,1);
+	int bindless_index;
+};
 
-    output.pos = float4(input.pos, 0, 1);
+ConstantBuffer<MyCBuffer> m_cbuffer : register(b0);
+
+[RootSignature("RootFlags(CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED), RootConstants(num32BitConstants=1, b0)")]
+VSOutput main(uint vertex_id : SV_VERTEXID, uint instance_id : SV_InstanceID) 
+{
+	StructuredBuffer<VSInput> vertex_buffer = ResourceDescriptorHeap[m_cbuffer.bindless_index];
+	VSInput input = vertex_buffer[vertex_id];
+
+	VSOutput output = (VSOutput)0;
+	output.pos = float4(input.pos, 0, 1);
+	output.pos += float4(-1 + 0.25f + (instance_id % 4) * 0.5f, -0.75f + (instance_id / 4) * 0.5f, 0, 0);
     output.color = input.color;
 	return output;
 }
