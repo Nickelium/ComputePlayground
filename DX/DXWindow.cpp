@@ -190,6 +190,11 @@ void DXWindow::EndFrame(const DXContext& dx_context)
 	dx_context.Transition(D3D12_RESOURCE_STATE_PRESENT, m_buffers[g_current_buffer_index]);
 }
 
+void DXWindow::UpdateBackBufferIndex()
+{
+	g_current_buffer_index = m_swap_chain->GetCurrentBackBufferIndex();
+}
+
 void DXWindow::Present(DXContext& dx_context)
 {
 	// Sync interval [0;4] where 0 is uncapped

@@ -431,6 +431,9 @@ void RunWindowLoop(DXContext& dx_context, DXCompiler& dx_compiler, GPUCapture* g
 					{
 						dx_context.Flush(dx_window.GetBackBufferCount());
 						dx_window.Resize(dx_context);
+						// Seems like back buffer index needs to be updated on resize
+						// Always sets it back 0
+						dx_window.UpdateBackBufferIndex();
 					}
 
 					dx_context.InitCommandLists();
@@ -921,8 +924,8 @@ int main()
 	DXReportContext dx_report_context{};
 	{
 		// TODO PIX / renderdoc markers
-		GPUCapture * gpu_capture = nullptr;
-		//GPUCapture* gpu_capture = new PIXCapture();
+		//GPUCapture * gpu_capture = nullptr;
+		GPUCapture* gpu_capture = new PIXCapture();
 		//GPUCapture* gpu_capture = new RenderDocCapture();
 		
 		DXContext dx_context{};

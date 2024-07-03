@@ -95,8 +95,10 @@ public:
 	void BeginFrame(DXContext& dx_context);
 
 	void EndFrame(const DXContext& dx_context);
-
 	void Present(DXContext& dx_context);
+
+	void UpdateBackBufferIndex();
+
 
 	void Close();
 

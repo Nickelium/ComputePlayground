@@ -318,7 +318,6 @@ void DXContext::InitCommandLists()
 	}
 }
 
-// TODO command list issue on resize without gpu debugger
 void DXContext::ExecuteCommandListGraphics()
 {
 	m_command_list_graphics.m_list->Close() >> CHK;
