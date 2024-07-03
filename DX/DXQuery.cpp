@@ -338,6 +338,11 @@ bool GetEnhancedBarrierSupported(Microsoft::WRL::ComPtr<ID3D12Device> device)
 	return options.EnhancedBarriersSupported;
 }
 
+bool GetBindlessSupport(Microsoft::WRL::ComPtr<ID3D12Device> device)
+{
+	return GetResourceBindingTier(device) >= D3D12_RESOURCE_BINDING_TIER_3 && GetMaxShaderModel(device) >= D3D_SHADER_MODEL_6_6;
+}
+
 std::string DumpDX12Capabilities(Microsoft::WRL::ComPtr<ID3D12Device> device)
 {
 	std::vector<std::pair<std::string, std::string>> pair_data{};
@@ -355,6 +360,7 @@ std::string DumpDX12Capabilities(Microsoft::WRL::ComPtr<ID3D12Device> device)
 	pair_data.push_back({ "EnhancedBarrier", std::format("{0}", GetEnhancedBarrierSupported(device)) });
 	pair_data.push_back({ "WaveLaneCount", std::format("{0}", GetWaveLaneCount(device)) });
 	pair_data.push_back({ "WorkGraph", std::format("{0}", GetWorkGraphSupport(device)) });
+	pair_data.push_back({ "Bindless", std::format("{0}", GetBindlessSupport(device)) });
 
 	std::string ret{};
 	for (auto& P : pair_data)

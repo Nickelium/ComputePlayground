@@ -21,5 +21,6 @@ D3D12_VARIABLE_SHADING_RATE_TIER GetVariableShadingRateTier(Microsoft::WRL::ComP
 D3D12_MESH_SHADER_TIER GetMeshShaderTier(Microsoft::WRL::ComPtr<ID3D12Device> device);
 D3D12_SAMPLER_FEEDBACK_TIER GetSamplerFeedbackTier(Microsoft::WRL::ComPtr<ID3D12Device> device);
 bool GetEnhancedBarrierSupported(Microsoft::WRL::ComPtr<ID3D12Device> device);
+bool GetBindlessSupport(Microsoft::WRL::ComPtr<ID3D12Device> device);
 
 std::string DumpDX12Capabilities(Microsoft::WRL::ComPtr<ID3D12Device> device);

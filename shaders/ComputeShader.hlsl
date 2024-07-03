@@ -1,9 +1,16 @@
 #include "Common.hlsl"
 
-RWTexture2D<float4> m_uav : register(u0);
+//RWTexture2D<float4> m_uav : register(u0);
 
+struct MyCBuffer
+{
+	int2 resolution;
+	int bindless_index;
+};
+ConstantBuffer<MyCBuffer> m_cbuffer : register(b0);
+// TODO bindless
 // For any form of Texture2D, you need a descriptor table
-[RootSignature("RootFlags(0), DescriptorTable(UAV(u0))")]
+[RootSignature("RootFlags(CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED), RootConstants(num32BitConstants=3, b0)")]
 [numthreads(8, 8, 1)]
 void main
 (
@@ -13,6 +20,7 @@ void main
 	const uint inGroupIndex : SV_GroupIndex
 )
 {
-	float2 uv = inDispatchThreadID.xy / float2(1500.0f, 800);
+	float2 uv = inDispatchThreadID.xy / float2(m_cbuffer.resolution.x, m_cbuffer.resolution.y);
+	RWTexture2D<float4> m_uav = ResourceDescriptorHeap[m_cbuffer.bindless_index];
 	m_uav[inDispatchThreadID.xy] = float4(uv,0,1);
 }

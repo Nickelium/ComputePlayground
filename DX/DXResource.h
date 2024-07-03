@@ -10,24 +10,13 @@ class DXDescriptor
 public:
 	D3D12_CPU_DESCRIPTOR_HANDLE m_cpu_descriptor_handle;
 	D3D12_GPU_DESCRIPTOR_HANDLE m_gpu_descriptor_handle;
+
+	uint32 m_bindless_index = ~0u;
 };
 
-
-class DXSRV : public DXDescriptor
-{
-public:
-};
-
-class DXUAV : public DXDescriptor
-{
-public:
-};
-
-class DXCBV : public DXDescriptor
-{
-public:
-};
-
+using SRV = DXDescriptor;
+using UAV = DXDescriptor;
+using CBV = DXDescriptor;
 
 class DXResource
 {
@@ -66,4 +55,24 @@ public:
 
 	virtual void SetResourceInfo(D3D12_HEAP_TYPE heap_type, D3D12_RESOURCE_FLAGS resource_flags, uint32 width, uint32 height, DXGI_FORMAT format);
 	virtual void CreateResource(DXContext& dx_context, const std::string& name_resource);
+};
+
+
+extern uint32 g_current_buffer_index;
+// Ref count, deferred deletion till GPU is done using
+class ResourceHandler
+{
+public:
+	// Create Transient Resource
+	void RegisterResource(DXResource& resource)
+	{
+		m_resources[g_current_buffer_index].push_back(resource);
+	}
+
+	void FreeResources()
+	{
+		m_resources[g_current_buffer_index].clear();
+	}
+	// Create Persistent Resource
+	std::vector<DXResource> m_resources[g_backbuffer_count];
 };

@@ -1,6 +1,7 @@
 #pragma once
 #include "../core/Common.h"
 #include "DXCommon.h"
+#include "DXResource.h"
 
 struct IDXGIFactory6;
 struct IDXGIAdapter1;
@@ -56,9 +57,10 @@ private:
 	uint32 m_frame_index{ 0 };
 };
 
-class DXUAV;
-class DXSRV;
-class DXCBV;
+class DXDescriptor;
+using SRV = DXDescriptor;
+using UAV = DXDescriptor;
+using CBV = DXDescriptor;
 
 // Store CPU / GPU descriptor handle from start
 struct DescriptorHeap
@@ -180,7 +182,7 @@ public:
 	void ExecuteCommandListCompute();
 	void ExecuteCommandListCopy();
 
-	void SignalAndWait();
+	void SignalAndWait(uint32 buffer_index);
 	void Flush(uint32 flush_count);
 
 	void Transition(D3D12_RESOURCE_STATES new_resource_state, DXResource& resource) const;
@@ -210,13 +212,6 @@ public:
 	(
 		const DescriptorHeap& descriptor_heap, 
 		uint32 i
-	) const;
-
-	void CreateRTV
-	(
-		const DXResource& resource, 
-		DXGI_FORMAT dxgi_format,
-		D3D12_CPU_DESCRIPTOR_HANDLE descriptor_handle
 	) const;
 
 	void CreateCommandQueue 
@@ -286,18 +281,18 @@ public:
 	(
 		DXResource& resource,
 		const D3D12_UNORDERED_ACCESS_VIEW_DESC *desc,
-	    DXUAV& uav
+	    UAV& uav
 	);
 	void CreateSRV
 	(
 		DXResource& resource,
 		const D3D12_SHADER_RESOURCE_VIEW_DESC* desc,
-		DXSRV& srv
+		SRV& srv
 	);
 	void CreateCBV
 	(
-		const D3D12_CONSTANT_BUFFER_VIEW_DESC* desc,
-		DXCBV& srv
+		D3D12_CONSTANT_BUFFER_VIEW_DESC desc,
+		CBV& crv
 	);
 
 public:
@@ -307,6 +302,8 @@ public:
 	uint32 m_free_index = 0;
 	DescriptorHeap m_resources_descriptor_heap;
 	DescriptorHeap m_samplers_descriptor_heap;
+
+	ResourceHandler m_resource_handler;
 };
 
 inline D3D12_CPU_DESCRIPTOR_HANDLE operator+(D3D12_CPU_DESCRIPTOR_HANDLE x, uint32 y)

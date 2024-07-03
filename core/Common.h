@@ -38,3 +38,13 @@ namespace std
 #include "Types.h"
 #include "Logger.h"
 #include "MemoryReporting.h"
+
+inline uint32 Align(uint32 x, uint32 align)
+{
+	return (x + align - 1) & ~(align - 1);
+}
+
+inline uint32 DivideRoundUp(uint32 numerator, uint32 denominator)
+{
+	return (numerator + denominator - 1) / denominator;
+}

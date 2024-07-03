@@ -19,8 +19,6 @@ DISABLE_OPTIMISATIONS()
 struct ComputeResources
 {
 	// Compute
-	DXTextureResource m_gpu_resource;
-	DXResource m_cpu_resource;
 	Microsoft::WRL::ComPtr<IDxcBlob> m_compute_shader;
 	Microsoft::WRL::ComPtr<ID3D12RootSignature> m_compute_root_signature;
 	
@@ -439,8 +437,6 @@ void RunWindowLoop(DXContext& dx_context, DXCompiler& dx_compiler, GPUCapture* g
 					FillCommandList(dx_context, dx_window, gfx_resource, compute_resource);
 					dx_context.ExecuteCommandListGraphics();
 					dx_window.Present(dx_context);
-					// Work around of UAV resource still in flight
-					dx_context.Flush(1);
 				}
 				if (capture)
 				{
@@ -541,16 +537,35 @@ void ComputeWork
 	DXResource& output_resource
 )
 {
-	// TODO allocator
-	compute_resource.m_gpu_resource.SetResourceInfo(D3D12_HEAP_TYPE_DEFAULT, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, dx_window.GetWidth(), dx_window.GetHeight(), DXGI_FORMAT_R8G8B8A8_UINT);
-	compute_resource.m_gpu_resource.CreateResource(dx_context, "GPU resource");
+	DXTextureResource gpu_resource;
+	gpu_resource.SetResourceInfo(D3D12_HEAP_TYPE_DEFAULT, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, dx_window.GetWidth(), dx_window.GetHeight(), DXGI_FORMAT_R8G8B8A8_UINT);
+	gpu_resource.CreateResource(dx_context, "GPU resource");
+	dx_context.m_resource_handler.RegisterResource(gpu_resource);
+
+//	DXResource buffer_resource;
+	struct MyCBuffer
+	{
+		uint2 resolution;
+		uint32 bindless_index;
+	}; 
+
+//	uint32 bytes = Align(sizeof(MyCBuffer), 256);
+//	buffer_resource.SetResourceInfo(D3D12_HEAP_TYPE_DEFAULT, D3D12_RESOURCE_FLAG_NONE, bytes);
+//	buffer_resource.CreateResource(dx_context, "Buffer resource");
+//	dx_context.m_resource_handler.RegisterResource(buffer_resource);
+//	CBV cbv;
+//	D3D12_CONSTANT_BUFFER_VIEW_DESC desc =
+//	{
+//		.BufferLocation = buffer_resource.m_resource->GetGPUVirtualAddress(),
+//		.SizeInBytes = buffer_resource.m_size,
+//	};
+//	dx_context.CreateCBV(desc, cbv);
 
 	// Compute Work
 	// Transition to UAV
-	dx_context.Transition(D3D12_RESOURCE_STATE_UNORDERED_ACCESS, compute_resource.m_gpu_resource);
+	dx_context.Transition(D3D12_RESOURCE_STATE_UNORDERED_ACCESS, gpu_resource);
 	//dx_context.GetCommandListGraphics()->SetComputeRootSignature(compute_resource.m_compute_root_signature.Get());
 	//dx_context.GetCommandListGraphics()->SetPipelineState(resource.m_compute_pso.Get());
-	dx_context.GetCommandListGraphics()->SetComputeRootSignature(compute_resource.m_compute_root_signature.Get());
 	D3D12_SET_PROGRAM_DESC program_desc
 	{
 		.Type = D3D12_PROGRAM_TYPE_GENERIC_PIPELINE,
@@ -575,20 +590,26 @@ void ComputeWork
 			.PlaneSlice = 0,
 		},
 	};
-	DXUAV uav{};
-	dx_context.CreateUAV(compute_resource.m_gpu_resource, &UAV_desc, uav);
-	// Set descriptor table
+	UAV uav{};
+	dx_context.CreateUAV(gpu_resource, &UAV_desc, uav);
+	MyCBuffer cbuffer
+	{
+		.resolution = {(uint32)gpu_resource.m_resource_desc.Width, (uint32)gpu_resource.m_resource_desc.Height},
+		.bindless_index = uav.m_bindless_index
+	};
+	
+	// Set descriptor heap before root signature, order required by spec
 	dx_context.GetCommandListGraphics()->SetDescriptorHeaps(1, dx_context.m_resources_descriptor_heap.m_heap.GetAddressOf());
-	dx_context.GetCommandListGraphics()->SetComputeRootDescriptorTable(0, uav.m_gpu_descriptor_handle);
-
-	//dx_context.GetCommandListGraphics()->SetComputeRootUnorderedAccessView(0, compute_resource.m_gpu_resource.m_resource->GetGPUVirtualAddress());
-	uint32 dispatch_x = ceil(compute_resource.m_gpu_resource.m_width / 8.0f);
-	uint32 dispatch_y = ceil(compute_resource.m_gpu_resource.m_height / 8.0f);
+	dx_context.GetCommandListGraphics()->SetComputeRootSignature(compute_resource.m_compute_root_signature.Get());
+	
+	dx_context.GetCommandListGraphics()->SetComputeRoot32BitConstants(0, 3, &cbuffer, 0);
+	uint32 dispatch_x = DivideRoundUp(gpu_resource.m_width, 8);
+	uint32 dispatch_y = DivideRoundUp(gpu_resource.m_height, 8);
 	dx_context.GetCommandListGraphics()->Dispatch(dispatch_x, dispatch_y, 1);
 	// Transition to Copy Src
 	dx_context.Transition(D3D12_RESOURCE_STATE_COPY_DEST, output_resource);
-	dx_context.Transition(D3D12_RESOURCE_STATE_COPY_SOURCE, compute_resource.m_gpu_resource);
-	dx_context.GetCommandListGraphics()->CopyResource(output_resource.m_resource.Get(), compute_resource.m_gpu_resource.m_resource.Get());
+	dx_context.Transition(D3D12_RESOURCE_STATE_COPY_SOURCE, gpu_resource);
+	dx_context.GetCommandListGraphics()->CopyResource(output_resource.m_resource.Get(), gpu_resource.m_resource.Get());
 	//dx_context.GetCommandListGraphics()->CopyResource(compute_resource.m_cpu_resource.m_resource.Get(), compute_resource.m_gpu_resource.m_resource.Get());
 	dx_context.Transition(D3D12_RESOURCE_STATE_RENDER_TARGET, output_resource);
 }
@@ -900,8 +921,8 @@ int main()
 	DXReportContext dx_report_context{};
 	{
 		// TODO PIX / renderdoc markers
-		//GPUCapture * gpu_capture = nullptr;
-		GPUCapture* gpu_capture = new PIXCapture();
+		GPUCapture * gpu_capture = nullptr;
+		//GPUCapture* gpu_capture = new PIXCapture();
 		//GPUCapture* gpu_capture = new RenderDocCapture();
 		
 		DXContext dx_context{};

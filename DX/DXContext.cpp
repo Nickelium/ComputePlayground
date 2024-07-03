@@ -289,7 +289,10 @@ extern uint32 g_current_buffer_index;
 void DXContext::InitCommandLists()
 {
 	Wait(m_fence, g_current_buffer_index);
-	m_start_index = m_last_indices[(g_current_buffer_index - 1) % g_backbuffer_count];
+	// Free old descriptors
+	m_start_index = m_last_indices[g_current_buffer_index];
+	// Free old transient resources
+	m_resource_handler.FreeResources();
 
 	CommandAllocator& command_allocator = m_command_allocator_graphics[g_current_buffer_index];
 	
@@ -315,6 +318,7 @@ void DXContext::InitCommandLists()
 	}
 }
 
+// TODO command list issue on resize without gpu debugger
 void DXContext::ExecuteCommandListGraphics()
 {
 	m_command_list_graphics.m_list->Close() >> CHK;
@@ -354,18 +358,19 @@ void DXContext::Wait(const Fence& fence, uint32 index)
 	WaitForSingleObject(fence.m_event, INFINITE);
 }
 
-void DXContext::SignalAndWait()
+void DXContext::SignalAndWait(uint32 buffer_index)
 {
-	Signal(m_queue_graphics, m_fence, g_current_buffer_index);
-	Wait(m_fence, g_current_buffer_index);
+	Signal(m_queue_graphics, m_fence, buffer_index);
+	Wait(m_fence, buffer_index);
 }
 
 // Wait all GPU operations completed
 void DXContext::Flush(uint32 flush_count)
 {
+	ASSERT(flush_count <= g_backbuffer_count);
 	for (uint32 i = 0; i < flush_count; ++i)
 	{
-		SignalAndWait();
+		SignalAndWait(i);
 	}
 }
 
@@ -487,26 +492,6 @@ D3D12_GPU_DESCRIPTOR_HANDLE DXContext::GetGPUDescriptorHandle
 	D3D12_GPU_DESCRIPTOR_HANDLE descriptor_handle{};
 	descriptor_handle.ptr = first_descriptor.ptr + i * descriptor_heap.m_increment_size;
 	return descriptor_handle;
-}
-
-void DXContext::CreateRTV
-(
-	const DXResource& resource, 
-	DXGI_FORMAT dxgi_format,
-	D3D12_CPU_DESCRIPTOR_HANDLE descriptor_handle
-) const
-{
-	D3D12_RENDER_TARGET_VIEW_DESC rtv_desc
-	{
-		.Format = dxgi_format,
-		.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D,
-		.Texture2D =
-		{
-			.MipSlice = 0,
-			.PlaneSlice = 0,
-		},
-	};
-	m_device->CreateRenderTargetView(resource.m_resource.Get(), &rtv_desc, descriptor_handle);
 }
 
 void DXContext::CreateCommandQueue 
@@ -667,7 +652,7 @@ void DXContext::CreateUAV
 (
 	DXResource& resource,
 	const D3D12_UNORDERED_ACCESS_VIEW_DESC *desc,
-	DXUAV& uav
+	UAV& uav
 )
 {
 	uint32 number_allocated = 0;
@@ -682,6 +667,7 @@ void DXContext::CreateUAV
 	ASSERT(number_allocated < m_resources_descriptor_heap.m_number_descriptors);
 	uav.m_cpu_descriptor_handle = GetCPUDescriptorHandle(m_resources_descriptor_heap, m_free_index);
 	uav.m_gpu_descriptor_handle = GetGPUDescriptorHandle(m_resources_descriptor_heap, m_free_index);
+	uav.m_bindless_index = m_free_index;
 	m_device->CreateUnorderedAccessView(resource.m_resource.Get(), nullptr, desc, uav.m_cpu_descriptor_handle);
 	m_free_index = (m_free_index + 1) % m_resources_descriptor_heap.m_number_descriptors;
 }
@@ -690,7 +676,7 @@ void DXContext::CreateSRV
 (
 	DXResource& resource,
 	const D3D12_SHADER_RESOURCE_VIEW_DESC* desc,
-	DXSRV& srv
+	SRV& srv
 )
 {
 	uint32 number_allocated = 0;
@@ -705,16 +691,20 @@ void DXContext::CreateSRV
 	ASSERT(number_allocated < m_resources_descriptor_heap.m_number_descriptors);
 	srv.m_cpu_descriptor_handle = GetCPUDescriptorHandle(m_resources_descriptor_heap, m_free_index);
 	srv.m_gpu_descriptor_handle = GetGPUDescriptorHandle(m_resources_descriptor_heap, m_free_index);
+	srv.m_bindless_index = m_free_index;
 	m_device->CreateShaderResourceView(resource.m_resource.Get(), desc, srv.m_cpu_descriptor_handle);
 	m_free_index = (m_free_index + 1) % m_resources_descriptor_heap.m_number_descriptors;
 }
 
 void DXContext::CreateCBV
 (
-	const D3D12_CONSTANT_BUFFER_VIEW_DESC* desc,
-	DXCBV& cbv
+	D3D12_CONSTANT_BUFFER_VIEW_DESC desc,
+	CBV& cbv
 )
 {
+	// Constantbuffer requires 256 bytes align by spec
+	ASSERT(desc.SizeInBytes == Align(desc.SizeInBytes, 256));
+
 	uint32 number_allocated = 0;
 	if (m_start_index <= m_free_index)
 	{
@@ -727,7 +717,8 @@ void DXContext::CreateCBV
 	ASSERT(number_allocated < m_resources_descriptor_heap.m_number_descriptors);
 	cbv.m_cpu_descriptor_handle = GetCPUDescriptorHandle(m_resources_descriptor_heap, m_free_index);
 	cbv.m_gpu_descriptor_handle = GetGPUDescriptorHandle(m_resources_descriptor_heap, m_free_index);
-	m_device->CreateConstantBufferView(desc, cbv.m_cpu_descriptor_handle);
+	cbv.m_bindless_index = m_free_index;
+	m_device->CreateConstantBufferView(&desc, cbv.m_cpu_descriptor_handle);
 	m_free_index = (m_free_index + 1) % m_resources_descriptor_heap.m_number_descriptors;
 }
 
