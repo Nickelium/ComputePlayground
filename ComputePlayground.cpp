@@ -234,8 +234,8 @@ void FillCommandList
 	// Set descriptor heap before root signature, order required by spec
 	dx_context.GetCommandListGraphics()->SetDescriptorHeaps(1, dx_context.m_resources_descriptor_heap.m_heap.GetAddressOf());
 	{
-		GraphicsWork(dx_context, dx_window, gfx_resource);
-		//ComputeWork(dx_context, compute_resource, dx_window, dx_window.m_buffers[g_current_buffer_index]);
+		//GraphicsWork(dx_context, dx_window, gfx_resource);
+		ComputeWork(dx_context, compute_resource, dx_window, dx_window.m_buffers[g_current_buffer_index]);
 	}
 	dx_window.EndFrame(dx_context);
 }
@@ -331,7 +331,7 @@ void RunWindowLoop(DXContext& dx_context, DXCompiler& dx_compiler, GPUCapture* g
 #pragma region COMPUTE
 void CreateComputeResources(DXContext& dx_context, const DXCompiler& dx_compiler, DXWindow& dx_window, ComputeResources& resource)
 {
-	dx_compiler.Compile(dx_context.GetDevice(), &resource.m_compute_shader, "ComputeShader.hlsl", ShaderType::COMPUTE_SHADER, "mainCS");
+	dx_compiler.Compile(dx_context.GetDevice(), &resource.m_compute_shader, "ComputeShader.hlsl", ShaderType::COMPUTE_SHADER);
 
 	// Root signature embed in the shader already
 	dx_context.GetDevice()->CreateRootSignature(0, resource.m_compute_shader->GetBufferPointer(), resource.m_compute_shader->GetBufferSize(), IID_PPV_ARGS(&resource.m_compute_root_signature)) >> CHK;
@@ -352,7 +352,7 @@ void CreateComputeResources(DXContext& dx_context, const DXCompiler& dx_compiler
 	std::wstring compute_wname = std::to_wstring(compute_name);
 
 	// Need to export entry point with generic program
-	std::wstring computeshader_entrypoint = L"mainCS";
+	std::wstring computeshader_entrypoint = L"main";
 	LPCWSTR exports[] =
 	{
 		computeshader_entrypoint.c_str(),
