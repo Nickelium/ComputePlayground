@@ -46,6 +46,7 @@ struct GraphicsResources
 	Microsoft::WRL::ComPtr<IDxcBlob> m_pixel_shader;
 	Microsoft::WRL::ComPtr<ID3D12RootSignature> m_gfx_root_signature;
 
+	// State object needs to be alive for the id to work
 	Microsoft::WRL::ComPtr<ID3D12StateObject> m_gfx_so;
 	D3D12_PROGRAM_IDENTIFIER m_program_id;
 };
@@ -103,7 +104,10 @@ void CreateGraphicsResources
 		std::wstring graphics_wname = std::to_wstring(graphics_name);
 
 		// Need to export entry point with generic program
-		std::wstring vertexshader_entrypoint = L"main";
+		// Entry point needs to be differentiate between VS and PS
+		std::wstring common_entrypoint = L"main";
+		std::wstring vertexshader_entrypoint = L"mainVS";
+		std::wstring pixelshader_entrypoint = L"mainPS";
 
 		CD3DX12_STATE_OBJECT_DESC cstate_object_desc;
 		cstate_object_desc.SetStateObjectType(D3D12_STATE_OBJECT_TYPE_EXECUTABLE);
@@ -115,7 +119,7 @@ void CreateGraphicsResources
 			.BytecodeLength = resource.m_vertex_shader->GetBufferSize(), 
 		};
 		vs_subobj->SetDXILLibrary(&vs_byte_code);
-		vs_subobj->DefineExport(L"mainVS", L"main");
+		vs_subobj->DefineExport(vertexshader_entrypoint.c_str(), common_entrypoint.c_str());
 		CD3DX12_DXIL_LIBRARY_SUBOBJECT* ps_subobj = cstate_object_desc.CreateSubobject<CD3DX12_DXIL_LIBRARY_SUBOBJECT>();
 		D3D12_SHADER_BYTECODE ps_byte_code
 		{
@@ -123,7 +127,7 @@ void CreateGraphicsResources
 			.BytecodeLength = resource.m_pixel_shader->GetBufferSize(), 
 		};
 		ps_subobj->SetDXILLibrary(&ps_byte_code);
-		ps_subobj->DefineExport(L"mainPS", L"main");
+		ps_subobj->DefineExport(pixelshader_entrypoint.c_str(), common_entrypoint.c_str());
 		CD3DX12_PRIMITIVE_TOPOLOGY_SUBOBJECT* topology_subobj = cstate_object_desc.CreateSubobject<CD3DX12_PRIMITIVE_TOPOLOGY_SUBOBJECT>();
 		topology_subobj->SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
 		CD3DX12_RENDER_TARGET_FORMATS_SUBOBJECT* rt_subobj = cstate_object_desc.CreateSubobject<CD3DX12_RENDER_TARGET_FORMATS_SUBOBJECT>();
@@ -132,13 +136,13 @@ void CreateGraphicsResources
 
 		CD3DX12_GENERIC_PROGRAM_SUBOBJECT* generic_subobj = cstate_object_desc.CreateSubobject<CD3DX12_GENERIC_PROGRAM_SUBOBJECT>();
 		generic_subobj->SetProgramName(graphics_wname.c_str());
-		generic_subobj->AddExport(L"mainVS");
-		generic_subobj->AddExport(L"mainPS");
+		generic_subobj->AddExport(vertexshader_entrypoint.c_str());
+		generic_subobj->AddExport(pixelshader_entrypoint.c_str());
 		generic_subobj->AddSubobject(*topology_subobj);
 		generic_subobj->AddSubobject(*rt_subobj);
 		CD3DX12_GLOBAL_ROOT_SIGNATURE_SUBOBJECT* global_rootsignature_subobj = cstate_object_desc.CreateSubobject<CD3DX12_GLOBAL_ROOT_SIGNATURE_SUBOBJECT>();
 		global_rootsignature_subobj->SetRootSignature(resource.m_gfx_root_signature.Get());
-
+		// TODO: CD3DX12 cause PIX to fail on CreateSO
 		dx_context.GetDevice()->CreateStateObject(cstate_object_desc, IID_PPV_ARGS(&resource.m_gfx_so)) >> CHK;
 		NAME_DX_OBJECT(resource.m_gfx_so, "Graphics State Object");
 
@@ -234,8 +238,8 @@ void FillCommandList
 	// Set descriptor heap before root signature, order required by spec
 	dx_context.GetCommandListGraphics()->SetDescriptorHeaps(1, dx_context.m_resources_descriptor_heap.m_heap.GetAddressOf());
 	{
-		//GraphicsWork(dx_context, dx_window, gfx_resource);
 		ComputeWork(dx_context, compute_resource, dx_window, dx_window.m_buffers[g_current_buffer_index]);
+		GraphicsWork(dx_context, dx_window, gfx_resource);
 	}
 	dx_window.EndFrame(dx_context);
 }
@@ -337,65 +341,26 @@ void CreateComputeResources(DXContext& dx_context, const DXCompiler& dx_compiler
 	dx_context.GetDevice()->CreateRootSignature(0, resource.m_compute_shader->GetBufferPointer(), resource.m_compute_shader->GetBufferSize(), IID_PPV_ARGS(&resource.m_compute_root_signature)) >> CHK;
 	NAME_DX_OBJECT(resource.m_compute_root_signature, "Compute RootSignature");
 
-	D3D12_DXIL_LIBRARY_DESC sub_object_library =
-	{
-		.DXILLibrary =
-		{
-			.pShaderBytecode = resource.m_compute_shader->GetBufferPointer(),
-			.BytecodeLength = resource.m_compute_shader->GetBufferSize(),
-		},
-		.NumExports = 0,
-		.pExports = nullptr,
-	};
-
 	std::string compute_name{ "Compute" };
 	std::wstring compute_wname = std::to_wstring(compute_name);
 
-	// Need to export entry point with generic program
-	std::wstring computeshader_entrypoint = L"main";
-	LPCWSTR exports[] =
-	{
-		computeshader_entrypoint.c_str(),
-	};
+	CD3DX12_STATE_OBJECT_DESC cstate_object_desc;
+	cstate_object_desc.SetStateObjectType(D3D12_STATE_OBJECT_TYPE_EXECUTABLE);
 
-	D3D12_GENERIC_PROGRAM_DESC sub_object_generic_program
+	CD3DX12_DXIL_LIBRARY_SUBOBJECT* cs_subobj = cstate_object_desc.CreateSubobject<CD3DX12_DXIL_LIBRARY_SUBOBJECT>();
+	D3D12_SHADER_BYTECODE cs_byte_code
 	{
-		.ProgramName = compute_wname.c_str(),
-		.NumExports = COUNT(exports),
-		.pExports = exports,
-		.NumSubobjects = 0,
-		.ppSubobjects = nullptr,
+		.pShaderBytecode = resource.m_compute_shader->GetBufferPointer(), 
+		.BytecodeLength = resource.m_compute_shader->GetBufferSize(), 
 	};
+	cs_subobj->SetDXILLibrary(&cs_byte_code);
+	CD3DX12_GENERIC_PROGRAM_SUBOBJECT* generic_subobj = cstate_object_desc.CreateSubobject<CD3DX12_GENERIC_PROGRAM_SUBOBJECT>();
+	generic_subobj->SetProgramName(compute_wname.c_str());
+	generic_subobj->AddExport(L"main");
+	//CD3DX12_GLOBAL_ROOT_SIGNATURE_SUBOBJECT* global_rootsignature_subobj = cstate_object_desc.CreateSubobject<CD3DX12_GLOBAL_ROOT_SIGNATURE_SUBOBJECT>();
+	//global_rootsignature_subobj->SetRootSignature(resource.m_compute_root_signature.Get());
 
-	D3D12_GLOBAL_ROOT_SIGNATURE sub_object_lobal_rootsignature
-	{
-		.pGlobalRootSignature = resource.m_compute_root_signature.Get(),
-	};
-
-	std::vector<D3D12_STATE_SUBOBJECT> state_subobjects =
-	{
-		{
-			.Type = D3D12_STATE_SUBOBJECT_TYPE_DXIL_LIBRARY,
-			.pDesc = &sub_object_library,
-		},
-		{
-			.Type = D3D12_STATE_SUBOBJECT_TYPE_GENERIC_PROGRAM,
-			.pDesc = &sub_object_generic_program,
-		},
-//		{
-//			.Type = D3D12_STATE_SUBOBJECT_TYPE_GLOBAL_ROOT_SIGNATURE,
-//			.pDesc = &sub_object_lobal_rootsignature,
-//		},
-	};
-
-	D3D12_STATE_OBJECT_DESC state_object_desc =
-	{
-		.Type = D3D12_STATE_OBJECT_TYPE_EXECUTABLE,
-		.NumSubobjects = (uint32)state_subobjects.size(),
-		.pSubobjects = state_subobjects.data()
-	};
-
-	dx_context.GetDevice()->CreateStateObject(&state_object_desc, IID_PPV_ARGS(&resource.m_compute_so)) >> CHK;
+	dx_context.GetDevice()->CreateStateObject(cstate_object_desc, IID_PPV_ARGS(&resource.m_compute_so)) >> CHK;
 	NAME_DX_OBJECT(resource.m_compute_so, "Compute State Object");
 
 	Microsoft::WRL::ComPtr<ID3D12StateObjectProperties1> state_object_properties;
@@ -777,8 +742,8 @@ int main()
 	DXReportContext dx_report_context{};
 	{
 		// TODO PIX / renderdoc markers
-		GPUCapture * gpu_capture = nullptr;
-		//GPUCapture* gpu_capture = new PIXCapture();
+		//GPUCapture * gpu_capture = nullptr;
+		GPUCapture* gpu_capture = new PIXCapture();
 		//GPUCapture* gpu_capture = new RenderDocCapture();
 		
 		DXContext dx_context{};
