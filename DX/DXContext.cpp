@@ -147,13 +147,7 @@ void DXContext::Init()
 	m_adapter->GetDesc2(&adapter_desc) >> CHK;
 	LogTrace(std::to_string(adapter_desc.Description));
 
-	// node_index 0 because single GPU
-	const uint32 node_index{0};
-	// Local means non-system main memory, non CPU RAM, aka VRAM
-	const DXGI_MEMORY_SEGMENT_GROUP memory_segment_group{ DXGI_MEMORY_SEGMENT_GROUP_LOCAL};
-	DXGI_QUERY_VIDEO_MEMORY_INFO video_memory_info{};
-	m_adapter->QueryVideoMemoryInfo(node_index, memory_segment_group, &video_memory_info) >> CHK;
-	//video_memory_info.Budget >> 30;
+	LogTrace("Current VRAM usage: {0}", GetVRAMUsage(m_adapter));
 
 	D3D_FEATURE_LEVEL max_feature_level = GetMaxFeatureLevel(m_adapter);
 	D3D12CreateDevice(m_adapter.Get(), max_feature_level, IID_PPV_ARGS(&m_device)) >> CHK;
@@ -545,16 +539,21 @@ DXReportContext::~DXReportContext()
 	ReportLDO();
 }
 
-void DXReportContext::SetDevice(Microsoft::WRL::ComPtr<ID3D12Device> device)
+void DXReportContext::SetDevice(Microsoft::WRL::ComPtr<ID3D12Device> device, Microsoft::WRL::ComPtr<IDXGIAdapter> adapter)
 {
 	// Query fails if debug layer disabled
 	HRESULT result = device.As(&m_debug_device);
 	UNUSED(result);
+	adapter.As(&m_adapter) >> CHK;
 }
 
-void DXReportContext::ReportLDO() const
+void DXReportContext::ReportLDO()
 {
 #if defined(_DEBUG)
+
+	LogTrace("Current VRAM usage: {0}", GetVRAMUsage(m_adapter));
+	m_adapter.Reset();
+
 	if (m_debug_device)
 	{
 		OutputDebugStringW(std::to_wstring("Report Live D3D12 Objects:\n").c_str());

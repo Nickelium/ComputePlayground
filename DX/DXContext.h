@@ -28,11 +28,12 @@ public:
 	~DXReportContext();
 
 	// Keeps device alive to report then free
-	void SetDevice(Microsoft::WRL::ComPtr<ID3D12Device> device);
+	void SetDevice(Microsoft::WRL::ComPtr<ID3D12Device> device, Microsoft::WRL::ComPtr<IDXGIAdapter> adapter);
 private:
 	// ReportLiveDeviceObjects, ref count 1 is normal since debug_device is the last one
-	void ReportLDO() const;
+	void ReportLDO();
 	Microsoft::WRL::ComPtr<ID3D12DebugDevice2> m_debug_device;
+	Microsoft::WRL::ComPtr<IDXGIAdapter4> m_adapter;
 };
 
 // Structure for a single thread to submit
@@ -241,7 +242,7 @@ public:
 
 private:
 	void Init();
-
+public:
 	Microsoft::WRL::ComPtr<IDXGIFactory7> m_factory;
 	Microsoft::WRL::ComPtr<IDXGIAdapter4> m_adapter; // GPU
 	Microsoft::WRL::ComPtr<ID3D12Device14> m_device;

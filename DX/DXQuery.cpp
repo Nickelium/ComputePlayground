@@ -343,6 +343,17 @@ bool GetBindlessSupport(Microsoft::WRL::ComPtr<ID3D12Device> device)
 	return GetResourceBindingTier(device) >= D3D12_RESOURCE_BINDING_TIER_3 && GetMaxShaderModel(device) >= D3D_SHADER_MODEL_6_6;
 }
 
+uint64 GetVRAMUsage(Microsoft::WRL::ComPtr<IDXGIAdapter4> adapter)
+{
+	// node_index 0 because single GPU
+	const uint32 node_index{0};
+	// Local means non-system main memory, non CPU RAM, aka VRAM
+	const DXGI_MEMORY_SEGMENT_GROUP memory_segment_group{ DXGI_MEMORY_SEGMENT_GROUP_LOCAL};
+	DXGI_QUERY_VIDEO_MEMORY_INFO video_memory_info{};
+	adapter->QueryVideoMemoryInfo(node_index, memory_segment_group, &video_memory_info) >> CHK;
+	return video_memory_info.CurrentUsage;
+}
+
 std::string DumpDX12Capabilities(Microsoft::WRL::ComPtr<ID3D12Device> device)
 {
 	std::vector<std::pair<std::string, std::string>> pair_data{};

@@ -2,6 +2,7 @@
 
 #include "../core/Common.h"
 
+#include <d3dx12/d3dx12_state_object.h>
 #include <d3d12.h> // D3D12
 #include <dxgi1_6.h> // DXGI
 
@@ -32,3 +33,7 @@ struct HRSourceLocation
 };
 
 void operator>>(HRSourceLocation hrSourceLocation, CheckToken);
+
+inline int64 ToKB(int64 bytes) { return bytes >> 10; }
+inline int64 ToMB(int64 bytes) { return bytes >> 20; }
+inline int64 ToGB(int64 bytes) { return bytes >> 30; }

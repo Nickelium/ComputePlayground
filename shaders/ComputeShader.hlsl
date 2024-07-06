@@ -12,7 +12,7 @@ ConstantBuffer<MyCBuffer> m_cbuffer : register(b0);
 // For any form of Texture2D, you need a descriptor table
 [RootSignature("RootFlags(CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED), RootConstants(num32BitConstants=3, b0)")]
 [numthreads(8, 8, 1)]
-void main
+void mainCS
 (
 	const uint3 inGroupThreadID : SV_GroupThreadID,
 	const uint3 inGroupID : SV_GroupID,

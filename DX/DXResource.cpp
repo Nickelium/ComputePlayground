@@ -1,5 +1,6 @@
 #include "DXResource.h"
 #include "DXContext.h"
+#include "DXQuery.h"
 
 void DXResource::SetResourceInfo(D3D12_HEAP_TYPE heap_type, D3D12_RESOURCE_FLAGS resource_flags, uint32 size)
 {

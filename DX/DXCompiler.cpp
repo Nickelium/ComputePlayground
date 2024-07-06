@@ -37,7 +37,7 @@ void DXCompiler::Init(const std::string& directory)
 	m_utils->CreateDefaultIncludeHandler(&m_include_handler);
 }
 
-void DXCompiler::Compile(Microsoft::WRL::ComPtr<ID3D12Device> device, Microsoft::WRL::ComPtr<IDxcBlob>* outShaderBlob, const std::string& shaderFile, const ShaderType shaderType) const
+void DXCompiler::Compile(Microsoft::WRL::ComPtr<ID3D12Device> device, Microsoft::WRL::ComPtr<IDxcBlob>* outShaderBlob, const std::string& shaderFile, const ShaderType shaderType, const std::string& entry_point) const
 {
 	Microsoft::WRL::ComPtr<IDxcBlobEncoding> shaderSource{};
 	const std::string shaderFullPath = m_directory + "\\" + shaderFile;
@@ -48,7 +48,7 @@ void DXCompiler::Compile(Microsoft::WRL::ComPtr<ID3D12Device> device, Microsoft:
 
 	std::vector<std::string> compile_arguments{};
 	compile_arguments.push_back("-E "); // Entry point name
-	compile_arguments.push_back("main");
+	compile_arguments.push_back(entry_point);
 	compile_arguments.push_back("-T"); // Target profile 
 	std::string shader_type_model_string = GetShaderTypeString(shaderType);
 

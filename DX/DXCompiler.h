@@ -21,7 +21,7 @@ class DXCompiler
 {
 public:
 	DXCompiler(const std::string& directory);
-	void Compile(Microsoft::WRL::ComPtr<ID3D12Device> device, Microsoft::WRL::ComPtr<IDxcBlob>* out_shader_blob, const std::string& shader_path, const ShaderType shader_type) const;
+	void Compile(Microsoft::WRL::ComPtr<ID3D12Device> device, Microsoft::WRL::ComPtr<IDxcBlob>* out_shader_blob, const std::string& shader_path, const ShaderType shader_type, const std::string& entry_point = "main") const;
 private:
 	void Init(const std::string& directory);
 	
