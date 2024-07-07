@@ -200,6 +200,8 @@ void DXWindow::Present(DXContext& dx_context)
 	// Sync interval [0;4] where 0 is uncapped
 	uint32 vsync_interval = 0;
 	uint32 present_flags = 0;
+	// TODO: issue on ctrl alt del
+	// https://gamedev.stackexchange.com/questions/187425/how-to-disable-present-function-when-window-is-invisible-to-user-win32-dxgi
 	m_swap_chain->Present(vsync_interval, present_flags) >> CHK;
 	dx_context.Signal(dx_context.m_queue_graphics, dx_context.m_fence, g_current_buffer_index);
 	g_current_buffer_index = m_swap_chain->GetCurrentBackBufferIndex();

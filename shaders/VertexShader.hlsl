@@ -27,7 +27,9 @@ VSOutput main(uint vertex_id : SV_VERTEXID, uint instance_id : SV_InstanceID)
 
 	VSOutput output = (VSOutput)0;
 	output.pos = float4(input.pos, 0, 1);
+	output.pos.xy /= 6;
 	output.pos += float4(-1 + 0.25f + (instance_id % 4) * 0.5f, -0.75f + (instance_id / 4) * 0.5f, 0, 0);
+	
     output.color = input.color;
 	return output;
 }

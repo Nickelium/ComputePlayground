@@ -14,6 +14,8 @@
 AGILITY_SDK_DECLARE()
 
 DISABLE_OPTIMISATIONS()
+#include <chrono>
+std::chrono::steady_clock::time_point start_time;
 
 #pragma region GRAPHICS
 struct ComputeResources
@@ -140,6 +142,7 @@ void CreateGraphicsResources
 		generic_subobj->AddExport(pixelshader_entrypoint.c_str());
 		generic_subobj->AddSubobject(*topology_subobj);
 		generic_subobj->AddSubobject(*rt_subobj);
+		// Seem like the SO still need RS, even when its embedded in the shader, in contrast to PSO
 		CD3DX12_GLOBAL_ROOT_SIGNATURE_SUBOBJECT* global_rootsignature_subobj = cstate_object_desc.CreateSubobject<CD3DX12_GLOBAL_ROOT_SIGNATURE_SUBOBJECT>();
 		global_rootsignature_subobj->SetRootSignature(resource.m_gfx_root_signature.Get());
 		// TODO: CD3DX12 cause PIX to fail on CreateSO
@@ -337,7 +340,7 @@ void CreateComputeResources(DXContext& dx_context, const DXCompiler& dx_compiler
 {
 	dx_compiler.Compile(dx_context.GetDevice(), &resource.m_compute_shader, "ComputeShader.hlsl", ShaderType::COMPUTE_SHADER);
 
-	// Root signature embed in the shader already
+	// Root signature embed in the shader
 	dx_context.GetDevice()->CreateRootSignature(0, resource.m_compute_shader->GetBufferPointer(), resource.m_compute_shader->GetBufferSize(), IID_PPV_ARGS(&resource.m_compute_root_signature)) >> CHK;
 	NAME_DX_OBJECT(resource.m_compute_root_signature, "Compute RootSignature");
 
@@ -357,9 +360,7 @@ void CreateComputeResources(DXContext& dx_context, const DXCompiler& dx_compiler
 	CD3DX12_GENERIC_PROGRAM_SUBOBJECT* generic_subobj = cstate_object_desc.CreateSubobject<CD3DX12_GENERIC_PROGRAM_SUBOBJECT>();
 	generic_subobj->SetProgramName(compute_wname.c_str());
 	generic_subobj->AddExport(L"main");
-	//CD3DX12_GLOBAL_ROOT_SIGNATURE_SUBOBJECT* global_rootsignature_subobj = cstate_object_desc.CreateSubobject<CD3DX12_GLOBAL_ROOT_SIGNATURE_SUBOBJECT>();
-	//global_rootsignature_subobj->SetRootSignature(resource.m_compute_root_signature.Get());
-
+	// Apparently works without linking SO with RS, though RS is embedded in shader already but seem to be needed for graphics SO
 	dx_context.GetDevice()->CreateStateObject(cstate_object_desc, IID_PPV_ARGS(&resource.m_compute_so)) >> CHK;
 	NAME_DX_OBJECT(resource.m_compute_so, "Compute State Object");
 
@@ -384,6 +385,7 @@ void ComputeWork
 	struct MyCBuffer
 	{
 		uint2 resolution;
+		float32 iTime;
 		uint32 bindless_index;
 	}; 
 
@@ -416,15 +418,20 @@ void ComputeWork
 	};
 	UAV uav{};
 	dx_context.CreateUAV(gpu_resource, &UAV_desc, uav);
+	auto current_time = std::chrono::high_resolution_clock::now();
+	auto diff_seconds = (float32)std::chrono::duration_cast<std::chrono::milliseconds>(current_time - start_time).count();
+	diff_seconds /= 1000;
+
 	MyCBuffer cbuffer
 	{
 		.resolution = {(uint32)gpu_resource.m_resource_desc.Width, (uint32)gpu_resource.m_resource_desc.Height},
+		.iTime = diff_seconds,
 		.bindless_index = uav.m_bindless_index
 	};
 	
 	dx_context.GetCommandListGraphics()->SetComputeRootSignature(compute_resource.m_compute_root_signature.Get());
 	
-	dx_context.GetCommandListGraphics()->SetComputeRoot32BitConstants(0, 3, &cbuffer, 0);
+	dx_context.GetCommandListGraphics()->SetComputeRoot32BitConstants(0, sizeof(MyCBuffer) / 4, &cbuffer, 0);
 	uint32 dispatch_x = DivideRoundUp(gpu_resource.m_width, 8);
 	uint32 dispatch_y = DivideRoundUp(gpu_resource.m_height, 8);
 	dx_context.GetCommandListGraphics()->Dispatch(dispatch_x, dispatch_y, 1);
@@ -491,56 +498,23 @@ void CreateWorkGraphResource
 		.BytecodeLength = resource.m_workgraph_shader->GetBufferSize()
 	};
 
-	dx_context.GetDevice()->CreateRootSignature(0, byte_code.pShaderBytecode, byte_code.BytecodeLength, /*L"globalRS",*/ IID_PPV_ARGS(&resource.m_workgraph_root_signature)) >> CHK;
+	dx_context.GetDevice()->CreateRootSignature(0, byte_code.pShaderBytecode, byte_code.BytecodeLength, IID_PPV_ARGS(&resource.m_workgraph_root_signature)) >> CHK;
 	NAME_DX_OBJECT(resource.m_workgraph_root_signature, "Global RootSignature");
 
-	D3D12_DXIL_LIBRARY_DESC sub_object_library =
-	{
-		.DXILLibrary = byte_code,
-		.NumExports = 0,
-		.pExports = nullptr,
-	};
+	CD3DX12_STATE_OBJECT_DESC cstate_object_desc;
+	cstate_object_desc.SetStateObjectType(D3D12_STATE_OBJECT_TYPE_EXECUTABLE);
+
+	CD3DX12_DXIL_LIBRARY_SUBOBJECT* cs_subobj = cstate_object_desc.CreateSubobject<CD3DX12_DXIL_LIBRARY_SUBOBJECT>();
+	cs_subobj->SetDXILLibrary(&byte_code);
+	CD3DX12_WORK_GRAPH_SUBOBJECT* workgraph_subobj = cstate_object_desc.CreateSubobject<CD3DX12_WORK_GRAPH_SUBOBJECT>();
 	std::string work_graph_name{ "WorkGraph" };
 	std::wstring work_graph_wname = std::to_wstring(work_graph_name);
-	D3D12_WORK_GRAPH_DESC sub_object_work_graph
-	{
-		.ProgramName = work_graph_wname.c_str(),
-		.Flags = D3D12_WORK_GRAPH_FLAG_INCLUDE_ALL_AVAILABLE_NODES,
-		.NumEntrypoints = 0,
-		.pEntrypoints = nullptr,
-		.NumExplicitlyDefinedNodes = 0,
-		.pExplicitlyDefinedNodes = nullptr,
-	};
-
-	D3D12_GLOBAL_ROOT_SIGNATURE sub_object_global_rootsignature
-	{
-		.pGlobalRootSignature = resource.m_workgraph_root_signature.Get(),
-	};
-
-	std::vector<D3D12_STATE_SUBOBJECT> state_subobjects =
-	{
-		{
-			.Type = D3D12_STATE_SUBOBJECT_TYPE_DXIL_LIBRARY,
-			.pDesc = &sub_object_library,
-		},
-		{
-			.Type = D3D12_STATE_SUBOBJECT_TYPE_WORK_GRAPH,
-			.pDesc = &sub_object_work_graph,
-		},
-		{
-			.Type = D3D12_STATE_SUBOBJECT_TYPE_GLOBAL_ROOT_SIGNATURE,
-			.pDesc = &sub_object_global_rootsignature,
-		}, // Even though global rootsignature is embed in the shader, still needs to mark as subobject to the stateobject
-	};
-
-	D3D12_STATE_OBJECT_DESC state_object_desc =
-	{
-		.Type = D3D12_STATE_OBJECT_TYPE_EXECUTABLE,
-		.NumSubobjects = (uint32)state_subobjects.size(),
-		.pSubobjects = state_subobjects.data()
-	};
-
-	dx_context.GetDevice()->CreateStateObject(&state_object_desc, IID_PPV_ARGS(&resource.m_workgraph_so)) >> CHK;
+	workgraph_subobj->SetProgramName(work_graph_wname.c_str());
+	workgraph_subobj->IncludeAllAvailableNodes();
+	// Apparently meeds linking SO with RS, though RS is embedded in shader already but seem to be needed for graphics SO
+	CD3DX12_GLOBAL_ROOT_SIGNATURE_SUBOBJECT* rootsignature_subobj = cstate_object_desc.CreateSubobject<CD3DX12_GLOBAL_ROOT_SIGNATURE_SUBOBJECT>();
+	rootsignature_subobj->SetRootSignature(resource.m_workgraph_root_signature.Get());
+	dx_context.GetDevice()->CreateStateObject(cstate_object_desc, IID_PPV_ARGS(&resource.m_workgraph_so)) >> CHK;
 	NAME_DX_OBJECT(resource.m_workgraph_so, "Workgraph State Object");
 
 	// These are not subtypes but you can QueryInterface as how ComPtr works apparently
@@ -737,13 +711,15 @@ void RunTest()
 #pragma endregion
 int main()
 {
+	start_time = std::chrono::high_resolution_clock::now();
+
 	MemoryTrack();
 
 	DXReportContext dx_report_context{};
 	{
 		// TODO PIX / renderdoc markers
-		//GPUCapture * gpu_capture = nullptr;
-		GPUCapture* gpu_capture = new PIXCapture();
+		GPUCapture * gpu_capture = nullptr;
+		//GPUCapture* gpu_capture = new PIXCapture();
 		//GPUCapture* gpu_capture = new RenderDocCapture();
 		
 		DXContext dx_context{};
