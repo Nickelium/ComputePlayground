@@ -9,7 +9,7 @@ struct MyCBuffer
 
 ConstantBuffer<MyCBuffer> m_cbuffer : register(b0);
 
-//#define CHEAP_STAR
+#define CHEAP_STAR
 
 float cheap_star(float2 uv, float anim)
 {
@@ -27,7 +27,6 @@ float4 animate_star(float2 uv, float iTime)
 	return float4(cheap_star(uv, anim) * float3(0.35,0.2,0.15), 1.0);
 }
 
-// For any form of Texture2D, you need a descriptor table
 [RootSignature("RootFlags(CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED), RootConstants(num32BitConstants=4, b0)")]
 [numthreads(8, 8, 1)]
 void main
@@ -44,7 +43,7 @@ void main
 #if defined(CHEAP_STAR)
 	out_color = animate_star(uv, m_cbuffer.iTime);
 #else
-	out_color = float4(sin(m_cbuffer.iTime), cos(uv.y), 0, 1);
+	out_color = float4((sin(m_cbuffer.iTime * 1.5) + 1) * 0.25 + uv.x, (cos(m_cbuffer.iTime * 2) + 1) * 0.125 + uv.y, 0, 1);
 #endif
 	m_uav[inDispatchThreadID.xy] = out_color;
 }
