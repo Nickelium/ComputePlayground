@@ -104,7 +104,7 @@ public:
 
 	void Update();
 
-	void Resize(const DXContext& dx_context);
+	void Resize();
 
 	void SetWindowModeRequest(WindowMode window_mode);
 	WindowMode GetWindowModeRequest() const;

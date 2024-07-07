@@ -244,7 +244,7 @@ void DXWindow::Update()
 	}
 }
 
-void DXWindow::Resize(const DXContext& dx_context)
+void DXWindow::Resize()
 {
 	RECT rt{};
 	if (GetClientRect(m_handle, &rt))

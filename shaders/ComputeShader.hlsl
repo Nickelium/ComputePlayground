@@ -1,5 +1,12 @@
 #include "Common.hlsl"
-
+// TODO shader assert readback
+// TODO shader printf readback
+//https://therealmjp.github.io/posts/hlsl-printf/
+// TODO shader printf GPU
+// TODO shader unit test readback
+// TODO shader debug draw
+//https://www.gijskaerts.com/wordpress/?p=190
+// TODO ImGui
 struct MyCBuffer
 {
 	int2 resolution;

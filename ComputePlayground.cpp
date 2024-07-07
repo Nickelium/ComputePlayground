@@ -37,7 +37,7 @@ void ComputeWork
 	DXResource& output_resource
 );
 
-void CreateComputeResources(DXContext& dx_context, const DXCompiler& dx_compiler, DXWindow& dx_window, ComputeResources& resource);
+void CreateComputeResources(DXContext& dx_context, const DXCompiler& dx_compiler, ComputeResources& resource);
 
 struct GraphicsResources
 {
@@ -266,7 +266,7 @@ void RunWindowLoop(DXContext& dx_context, DXCompiler& dx_compiler, GPUCapture* g
 			GraphicsResources gfx_resource{};
 			CreateGraphicsResources(dx_context, dx_compiler, dx_window, gfx_resource);
 			ComputeResources compute_resource{};
-			CreateComputeResources(dx_context, dx_compiler, dx_window, compute_resource);
+			CreateComputeResources(dx_context, dx_compiler, compute_resource);
 			while (!dx_window.ShouldClose())
 			{
 				// Process window message
@@ -311,7 +311,7 @@ void RunWindowLoop(DXContext& dx_context, DXCompiler& dx_compiler, GPUCapture* g
 					if (dx_window.ShouldResize())
 					{
 						dx_context.Flush(dx_window.GetBackBufferCount());
-						dx_window.Resize(dx_context);
+						dx_window.Resize();
 						// Seems like back buffer index needs to be updated on resize
 						// Always sets it back 0
 						dx_window.UpdateBackBufferIndex();
@@ -336,7 +336,7 @@ void RunWindowLoop(DXContext& dx_context, DXCompiler& dx_compiler, GPUCapture* g
 #pragma endregion
 
 #pragma region COMPUTE
-void CreateComputeResources(DXContext& dx_context, const DXCompiler& dx_compiler, DXWindow& dx_window, ComputeResources& resource)
+void CreateComputeResources(DXContext& dx_context, const DXCompiler& dx_compiler, ComputeResources& resource)
 {
 	dx_compiler.Compile(dx_context.GetDevice(), &resource.m_compute_shader, "ComputeShader.hlsl", ShaderType::COMPUTE_SHADER);
 
@@ -443,7 +443,7 @@ void ComputeWork
 	dx_context.Transition(D3D12_RESOURCE_STATE_RENDER_TARGET, output_resource);
 }
 
-void RunComputeWork(DXContext& dx_context, DXCompiler& dx_compiler)
+void RunComputeWork(DXContext& dx_context)
 {
 	dx_context.InitCommandLists();
 	//ComputeWork(dx_context, resource);
@@ -735,7 +735,7 @@ int main()
 
 		RunWindowLoop(dx_context, dx_compiler, gpu_capture);
 		//gpu_capture->StartCapture();
-		//RunComputeWork(dx_context, dx_compiler);
+		//RunComputeWork(dx_context);
 		//gpu_capture->EndCapture();
 		//gpu_capture->OpenCapture();
 		//RunTest();
