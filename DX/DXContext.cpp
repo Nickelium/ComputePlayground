@@ -147,7 +147,7 @@ void DXContext::Init()
 	m_adapter->GetDesc2(&adapter_desc) >> CHK;
 	LogTrace(std::to_string(adapter_desc.Description));
 
-	LogTrace("Current VRAM usage: {0}", GetVRAMUsage(m_adapter));
+	LogTrace("VRAM usage: {0} MB", ToMB(GetVRAMUsage(m_adapter)));
 
 	D3D_FEATURE_LEVEL max_feature_level = GetMaxFeatureLevel(m_adapter);
 	D3D12CreateDevice(m_adapter.Get(), max_feature_level, IID_PPV_ARGS(&m_device)) >> CHK;
@@ -551,7 +551,7 @@ void DXReportContext::ReportLDO()
 {
 #if defined(_DEBUG)
 
-	LogTrace("Current VRAM usage: {0}", GetVRAMUsage(m_adapter));
+	LogTrace("VRAM usage: {0} MB", ToMB(GetVRAMUsage(m_adapter)));
 	m_adapter.Reset();
 
 	if (m_debug_device)
