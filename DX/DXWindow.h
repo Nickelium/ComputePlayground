@@ -149,7 +149,7 @@ private:
 
 	Microsoft::WRL::ComPtr<IDXGISwapChain4> m_swap_chain;
 public:
-	std::vector<DXResource> m_buffers;
+	std::vector<DXTextureResource> m_buffers;
 private:
 	uint32 m_width;
 	uint32 m_height;

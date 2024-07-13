@@ -152,6 +152,8 @@ void DXWindow::Init
 	ApplyWindowStyle();
 	ApplyWindowMode();
 	CreateSwapChain(dx_context);
+	GetBuffers();
+	UpdateBackBufferIndex();
 
 	Microsoft::WRL::ComPtr<IDXGIFactory1> factory{};
 	m_swap_chain->GetParent(IID_PPV_ARGS(&factory)) >> CHK;
@@ -159,8 +161,6 @@ void DXWindow::Init
 
 	// Disable ALT ENTER to disable exclusive fullscreen, we handle switching ourselves
 	factory->MakeWindowAssociation(m_handle, DXGI_MWA_NO_ALT_ENTER) >> CHK;
-	
-	GetBuffers();
 }
 
 DXGI_FORMAT GetBackBufferFormat(bool hdr);
@@ -204,7 +204,7 @@ void DXWindow::Present(DXContext& dx_context)
 	// https://gamedev.stackexchange.com/questions/187425/how-to-disable-present-function-when-window-is-invisible-to-user-win32-dxgi
 	m_swap_chain->Present(vsync_interval, present_flags) >> CHK;
 	dx_context.Signal(dx_context.m_queue_graphics, dx_context.m_fence, g_current_buffer_index);
-	g_current_buffer_index = m_swap_chain->GetCurrentBackBufferIndex();
+	UpdateBackBufferIndex();
 }
 
 void DXWindow::Close()
@@ -488,6 +488,22 @@ void DXWindow::GetBuffers()
 		m_swap_chain->GetBuffer(i, IID_PPV_ARGS(&m_buffers[i].m_resource)) >> CHK;
 		std::string str = "Backbuffer " + std::to_string(i);
 		NAME_DX_OBJECT(m_buffers[i].m_resource, str.c_str());
+		
+		// Manually set because swapchain is a special resource
+		m_buffers[i].m_width = m_width;
+		m_buffers[i].m_height = m_height;
+		m_buffers[i].m_format = GetFormat();
+		m_buffers[i].m_size = m_width * m_height;
+		m_buffers[i].m_resource_desc =
+		{
+			.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D,
+			.Alignment = 0,
+			.Width = m_width,
+			.Height= m_height,
+			.DepthOrArraySize = 1,
+			.MipLevels = 1,
+			.Format = GetFormat(),
+		};
 	}
 }
 

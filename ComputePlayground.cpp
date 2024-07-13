@@ -48,6 +48,7 @@ struct GraphicsResources
 	Microsoft::WRL::ComPtr<IDxcBlob> m_pixel_shader;
 	Microsoft::WRL::ComPtr<ID3D12RootSignature> m_gfx_root_signature;
 
+	Microsoft::WRL::ComPtr<ID3D12PipelineState> m_gfx_pso;
 	// State object needs to be alive for the id to work
 	Microsoft::WRL::ComPtr<ID3D12StateObject> m_gfx_so;
 	D3D12_PROGRAM_IDENTIFIER m_program_id;
@@ -101,7 +102,120 @@ void CreateGraphicsResources
 		// Same rootsignature for VS and PS
 		dx_context.GetDevice()->CreateRootSignature(0, resource.m_vertex_shader->GetBufferPointer(), resource.m_vertex_shader->GetBufferSize(), IID_PPV_ARGS(&resource.m_gfx_root_signature)) >> CHK;
 		NAME_DX_OBJECT(resource.m_gfx_root_signature, "Graphics RootSignature");
+//#define USE_PSO
+#if defined(USE_PSO)
+		const D3D12_INPUT_LAYOUT_DESC layout_desc =
+		{
+			.pInputElementDescs = nullptr,
+			.NumElements = 0,
+		};
 
+		const D3D12_GRAPHICS_PIPELINE_STATE_DESC gfx_pso_desc
+		{
+			/*root signature already embed in shader*/
+			.pRootSignature = nullptr,
+			.VS =
+			{
+				.pShaderBytecode = resource.m_vertex_shader->GetBufferPointer(),
+				.BytecodeLength = resource.m_vertex_shader->GetBufferSize(),
+			},
+			.PS =
+			{
+				.pShaderBytecode = resource.m_pixel_shader->GetBufferPointer(),
+				.BytecodeLength = resource.m_pixel_shader->GetBufferSize(),
+			},
+			.DS = nullptr,
+			.HS = nullptr,
+			.GS = nullptr,
+			.StreamOutput =
+			{
+				.pSODeclaration = nullptr,
+				.NumEntries = 0,
+				.pBufferStrides = nullptr,
+				.NumStrides = 0,
+				.RasterizedStream = 0,
+			},
+			.BlendState =
+			{
+				.AlphaToCoverageEnable = false,
+				.IndependentBlendEnable = false,
+				.RenderTarget =
+				{
+					{
+						.BlendEnable = false,
+						.LogicOpEnable = false,
+						.SrcBlend = D3D12_BLEND_ZERO,
+						.DestBlend = D3D12_BLEND_ZERO,
+						.BlendOp = D3D12_BLEND_OP_ADD,
+						.SrcBlendAlpha = D3D12_BLEND_ZERO,
+						.DestBlendAlpha = D3D12_BLEND_ZERO,
+						.BlendOpAlpha = D3D12_BLEND_OP_ADD,
+						.LogicOp = D3D12_LOGIC_OP_NOOP,
+						.RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL,
+					},
+				},
+			},
+			.SampleMask = 0xFFFFFFFF,
+			.RasterizerState =
+			{
+				.FillMode = D3D12_FILL_MODE_SOLID,
+				.CullMode = D3D12_CULL_MODE_NONE,
+				.FrontCounterClockwise = false,
+				.DepthBias = 0,
+				.DepthBiasClamp = 0.0f,
+				.SlopeScaledDepthBias = 0.0f,
+				.DepthClipEnable = false,
+				.MultisampleEnable = false,
+				.AntialiasedLineEnable = false,
+				.ForcedSampleCount = 0,
+			},
+			.DepthStencilState =
+			{
+				.DepthEnable = false,
+				.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO,
+				.DepthFunc = D3D12_COMPARISON_FUNC_ALWAYS,
+				.StencilEnable = false,
+				.StencilReadMask = 0,
+				.StencilWriteMask = 0,
+				.FrontFace =
+				{
+					.StencilFailOp = D3D12_STENCIL_OP_KEEP,
+					.StencilDepthFailOp = D3D12_STENCIL_OP_KEEP,
+					.StencilPassOp = D3D12_STENCIL_OP_KEEP,
+					.StencilFunc = D3D12_COMPARISON_FUNC_ALWAYS,
+				},
+				.BackFace =
+				{
+					.StencilFailOp = D3D12_STENCIL_OP_KEEP,
+					.StencilDepthFailOp = D3D12_STENCIL_OP_KEEP,
+					.StencilPassOp = D3D12_STENCIL_OP_KEEP,
+					.StencilFunc = D3D12_COMPARISON_FUNC_ALWAYS,
+				},
+			},
+			.InputLayout = layout_desc,
+			//.IBStripCutValue = nullptr,
+			.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE,
+			.NumRenderTargets = 1,
+			.RTVFormats =
+			{
+				dx_window.GetFormat(),
+			},
+			.DSVFormat = DXGI_FORMAT_UNKNOWN,
+			.SampleDesc =
+			{
+				.Count = 1,
+				.Quality = 0,
+			},
+			.NodeMask = 0,
+			.CachedPSO =
+			{
+				.pCachedBlob = nullptr,
+				.CachedBlobSizeInBytes = D3D12_PIPELINE_STATE_FLAG_NONE,
+			},
+			.Flags = D3D12_PIPELINE_STATE_FLAG_NONE,
+		};
+		dx_context.GetDevice()->CreateGraphicsPipelineState(&gfx_pso_desc, IID_PPV_ARGS(&resource.m_gfx_pso)) >> CHK;
+#else
 		std::string graphics_name{ "Graphics" };
 		std::wstring graphics_wname = std::to_wstring(graphics_name);
 
@@ -152,6 +266,7 @@ void CreateGraphicsResources
 		Microsoft::WRL::ComPtr<ID3D12StateObjectProperties1> state_object_properties;
 		resource.m_gfx_so.As(&state_object_properties) >> CHK;
 		resource.m_program_id = state_object_properties->GetProgramIdentifier(graphics_wname.c_str());
+#endif
 	}
 }
 
@@ -208,6 +323,11 @@ void GraphicsWork
 			&desc,
 			srv
 		);
+
+		dx_context.GetCommandListGraphics()->SetGraphicsRootSignature(resource.m_gfx_root_signature.Get());
+#if defined(USE_PSO)
+		dx_context.GetCommandListGraphics()->SetPipelineState(resource.m_gfx_pso.Get());
+#else
 		D3D12_SET_PROGRAM_DESC program_desc
 		{
 			.Type = D3D12_PROGRAM_TYPE_GENERIC_PIPELINE,
@@ -216,9 +336,8 @@ void GraphicsWork
 				.ProgramIdentifier = resource.m_program_id,
 			},
 		};
-		dx_context.GetCommandListGraphics()->SetGraphicsRootSignature(resource.m_gfx_root_signature.Get());
 		dx_context.GetCommandListGraphics()->SetProgram(&program_desc);
-		
+#endif
 		uint32 bindless_index = srv.m_bindless_index;
 		dx_context.GetCommandListGraphics()->SetGraphicsRoot32BitConstants(0, 1, &bindless_index, 0);
 		dx_context.GetCommandListGraphics()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
@@ -378,7 +497,7 @@ void ComputeWork
 )
 {
 	DXTextureResource gpu_resource;
-	gpu_resource.SetResourceInfo(D3D12_HEAP_TYPE_DEFAULT, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, dx_window.GetWidth(), dx_window.GetHeight(), DXGI_FORMAT_R8G8B8A8_UINT);
+	gpu_resource.SetResourceInfo(D3D12_HEAP_TYPE_DEFAULT, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, dx_window.GetWidth(), dx_window.GetHeight(), output_resource.m_resource_desc.Format);
 	gpu_resource.CreateResource(dx_context, "GPU resource");
 	dx_context.m_resource_handler.RegisterResource(gpu_resource);
 
@@ -407,8 +526,7 @@ void ComputeWork
 	// Populate descriptor
 	D3D12_UNORDERED_ACCESS_VIEW_DESC UAV_desc
 	{
-		.Format = DXGI_FORMAT_R8G8B8A8_UNORM,
-		//.Format = compute_resource.m_gpu_resource.m_format,
+		.Format = gpu_resource.m_format,
 		.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D,
 		.Texture2D =
 		{
@@ -439,14 +557,11 @@ void ComputeWork
 	dx_context.Transition(D3D12_RESOURCE_STATE_COPY_DEST, output_resource);
 	dx_context.Transition(D3D12_RESOURCE_STATE_COPY_SOURCE, gpu_resource);
 	dx_context.GetCommandListGraphics()->CopyResource(output_resource.m_resource.Get(), gpu_resource.m_resource.Get());
-	//dx_context.GetCommandListGraphics()->CopyResource(compute_resource.m_cpu_resource.m_resource.Get(), compute_resource.m_gpu_resource.m_resource.Get());
-	dx_context.Transition(D3D12_RESOURCE_STATE_RENDER_TARGET, output_resource);
 }
 
 void RunComputeWork(DXContext& dx_context)
 {
 	dx_context.InitCommandLists();
-	//ComputeWork(dx_context, resource);
 	dx_context.ExecuteCommandListGraphics();
 
 #if defined(TEST_READBACK_COMPUTE)
@@ -718,8 +833,9 @@ int main()
 	DXReportContext dx_report_context{};
 	{
 		// TODO PIX / renderdoc markers
-		GPUCapture * gpu_capture = nullptr;
-		//GPUCapture* gpu_capture = new PIXCapture();
+		//GPUCapture * gpu_capture = nullptr;
+		GPUCapture* gpu_capture = new PIXCapture();
+		// RenderDoc doesnt support WorkGraph and newer interfaces
 		//GPUCapture* gpu_capture = new RenderDocCapture();
 		
 		DXContext dx_context{};
