@@ -57,7 +57,7 @@ struct GraphicsResources
 void CreateGraphicsResources
 (
 	DXContext& dx_context, const DXCompiler& dx_compiler, const DXWindow& dx_window, 
-	GraphicsResources& resource
+	GraphicsResources& resource, bool use_old_pso
 )
 {
 	dx_compiler.Compile(dx_context.GetDevice(), &resource.m_vertex_shader, "VertexShader.hlsl", ShaderType::VERTEX_SHADER);
@@ -102,178 +102,183 @@ void CreateGraphicsResources
 		// Same rootsignature for VS and PS
 		dx_context.GetDevice()->CreateRootSignature(0, resource.m_vertex_shader->GetBufferPointer(), resource.m_vertex_shader->GetBufferSize(), IID_PPV_ARGS(&resource.m_gfx_root_signature)) >> CHK;
 		NAME_DX_OBJECT(resource.m_gfx_root_signature, "Graphics RootSignature");
-//#define USE_PSO
-#if defined(USE_PSO)
-		const D3D12_INPUT_LAYOUT_DESC layout_desc =
-		{
-			.pInputElementDescs = nullptr,
-			.NumElements = 0,
-		};
 
-		const D3D12_GRAPHICS_PIPELINE_STATE_DESC gfx_pso_desc
+		if (use_old_pso)
 		{
-			/*root signature already embed in shader*/
-			.pRootSignature = nullptr,
-			.VS =
+			const D3D12_INPUT_LAYOUT_DESC layout_desc =
+			{
+				.pInputElementDescs = nullptr,
+				.NumElements = 0,
+			};
+
+			const D3D12_GRAPHICS_PIPELINE_STATE_DESC gfx_pso_desc
+			{
+				/*root signature already embed in shader*/
+				.pRootSignature = nullptr,
+				.VS =
+				{
+					.pShaderBytecode = resource.m_vertex_shader->GetBufferPointer(),
+					.BytecodeLength = resource.m_vertex_shader->GetBufferSize(),
+				},
+				.PS =
+				{
+					.pShaderBytecode = resource.m_pixel_shader->GetBufferPointer(),
+					.BytecodeLength = resource.m_pixel_shader->GetBufferSize(),
+				},
+				.DS = nullptr,
+				.HS = nullptr,
+				.GS = nullptr,
+				.StreamOutput =
+				{
+					.pSODeclaration = nullptr,
+					.NumEntries = 0,
+					.pBufferStrides = nullptr,
+					.NumStrides = 0,
+					.RasterizedStream = 0,
+				},
+				.BlendState =
+				{
+					.AlphaToCoverageEnable = false,
+					.IndependentBlendEnable = false,
+					.RenderTarget =
+					{
+						{
+							.BlendEnable = false,
+							.LogicOpEnable = false,
+							.SrcBlend = D3D12_BLEND_ZERO,
+							.DestBlend = D3D12_BLEND_ZERO,
+							.BlendOp = D3D12_BLEND_OP_ADD,
+							.SrcBlendAlpha = D3D12_BLEND_ZERO,
+							.DestBlendAlpha = D3D12_BLEND_ZERO,
+							.BlendOpAlpha = D3D12_BLEND_OP_ADD,
+							.LogicOp = D3D12_LOGIC_OP_NOOP,
+							.RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL,
+						},
+					},
+				},
+				.SampleMask = 0xFFFFFFFF,
+				.RasterizerState =
+				{
+					.FillMode = D3D12_FILL_MODE_SOLID,
+					.CullMode = D3D12_CULL_MODE_NONE,
+					.FrontCounterClockwise = false,
+					.DepthBias = 0,
+					.DepthBiasClamp = 0.0f,
+					.SlopeScaledDepthBias = 0.0f,
+					.DepthClipEnable = false,
+					.MultisampleEnable = false,
+					.AntialiasedLineEnable = false,
+					.ForcedSampleCount = 0,
+				},
+				.DepthStencilState =
+				{
+					.DepthEnable = false,
+					.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO,
+					.DepthFunc = D3D12_COMPARISON_FUNC_ALWAYS,
+					.StencilEnable = false,
+					.StencilReadMask = 0,
+					.StencilWriteMask = 0,
+					.FrontFace =
+					{
+						.StencilFailOp = D3D12_STENCIL_OP_KEEP,
+						.StencilDepthFailOp = D3D12_STENCIL_OP_KEEP,
+						.StencilPassOp = D3D12_STENCIL_OP_KEEP,
+						.StencilFunc = D3D12_COMPARISON_FUNC_ALWAYS,
+					},
+					.BackFace =
+					{
+						.StencilFailOp = D3D12_STENCIL_OP_KEEP,
+						.StencilDepthFailOp = D3D12_STENCIL_OP_KEEP,
+						.StencilPassOp = D3D12_STENCIL_OP_KEEP,
+						.StencilFunc = D3D12_COMPARISON_FUNC_ALWAYS,
+					},
+				},
+				.InputLayout = layout_desc,
+				//.IBStripCutValue = nullptr,
+				.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE,
+				.NumRenderTargets = 1,
+				.RTVFormats =
+				{
+					dx_window.GetFormat(),
+				},
+				.DSVFormat = DXGI_FORMAT_UNKNOWN,
+				.SampleDesc =
+				{
+					.Count = 1,
+					.Quality = 0,
+				},
+				.NodeMask = 0,
+				.CachedPSO =
+				{
+					.pCachedBlob = nullptr,
+					.CachedBlobSizeInBytes = D3D12_PIPELINE_STATE_FLAG_NONE,
+				},
+				.Flags = D3D12_PIPELINE_STATE_FLAG_NONE,
+			};
+			dx_context.GetDevice()->CreateGraphicsPipelineState(&gfx_pso_desc, IID_PPV_ARGS(&resource.m_gfx_pso)) >> CHK;
+		}
+		else
+		{
+			std::string graphics_name { "Graphics" };
+			std::wstring graphics_wname = std::to_wstring(graphics_name);
+
+			// Need to export entry point with generic program
+			// Entry point needs to be differentiate between VS and PS
+			std::wstring common_entrypoint = L"main";
+			std::wstring vertexshader_entrypoint = L"mainVS";
+			std::wstring pixelshader_entrypoint = L"mainPS";
+
+			CD3DX12_STATE_OBJECT_DESC cstate_object_desc;
+			cstate_object_desc.SetStateObjectType(D3D12_STATE_OBJECT_TYPE_EXECUTABLE);
+
+			CD3DX12_DXIL_LIBRARY_SUBOBJECT* vs_subobj = cstate_object_desc.CreateSubobject<CD3DX12_DXIL_LIBRARY_SUBOBJECT>();
+			D3D12_SHADER_BYTECODE vs_byte_code
 			{
 				.pShaderBytecode = resource.m_vertex_shader->GetBufferPointer(),
 				.BytecodeLength = resource.m_vertex_shader->GetBufferSize(),
-			},
-			.PS =
+			};
+			vs_subobj->SetDXILLibrary(&vs_byte_code);
+			vs_subobj->DefineExport(vertexshader_entrypoint.c_str(), common_entrypoint.c_str());
+			CD3DX12_DXIL_LIBRARY_SUBOBJECT* ps_subobj = cstate_object_desc.CreateSubobject<CD3DX12_DXIL_LIBRARY_SUBOBJECT>();
+			D3D12_SHADER_BYTECODE ps_byte_code
 			{
 				.pShaderBytecode = resource.m_pixel_shader->GetBufferPointer(),
 				.BytecodeLength = resource.m_pixel_shader->GetBufferSize(),
-			},
-			.DS = nullptr,
-			.HS = nullptr,
-			.GS = nullptr,
-			.StreamOutput =
-			{
-				.pSODeclaration = nullptr,
-				.NumEntries = 0,
-				.pBufferStrides = nullptr,
-				.NumStrides = 0,
-				.RasterizedStream = 0,
-			},
-			.BlendState =
-			{
-				.AlphaToCoverageEnable = false,
-				.IndependentBlendEnable = false,
-				.RenderTarget =
-				{
-					{
-						.BlendEnable = false,
-						.LogicOpEnable = false,
-						.SrcBlend = D3D12_BLEND_ZERO,
-						.DestBlend = D3D12_BLEND_ZERO,
-						.BlendOp = D3D12_BLEND_OP_ADD,
-						.SrcBlendAlpha = D3D12_BLEND_ZERO,
-						.DestBlendAlpha = D3D12_BLEND_ZERO,
-						.BlendOpAlpha = D3D12_BLEND_OP_ADD,
-						.LogicOp = D3D12_LOGIC_OP_NOOP,
-						.RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL,
-					},
-				},
-			},
-			.SampleMask = 0xFFFFFFFF,
-			.RasterizerState =
-			{
-				.FillMode = D3D12_FILL_MODE_SOLID,
-				.CullMode = D3D12_CULL_MODE_NONE,
-				.FrontCounterClockwise = false,
-				.DepthBias = 0,
-				.DepthBiasClamp = 0.0f,
-				.SlopeScaledDepthBias = 0.0f,
-				.DepthClipEnable = false,
-				.MultisampleEnable = false,
-				.AntialiasedLineEnable = false,
-				.ForcedSampleCount = 0,
-			},
-			.DepthStencilState =
-			{
-				.DepthEnable = false,
-				.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO,
-				.DepthFunc = D3D12_COMPARISON_FUNC_ALWAYS,
-				.StencilEnable = false,
-				.StencilReadMask = 0,
-				.StencilWriteMask = 0,
-				.FrontFace =
-				{
-					.StencilFailOp = D3D12_STENCIL_OP_KEEP,
-					.StencilDepthFailOp = D3D12_STENCIL_OP_KEEP,
-					.StencilPassOp = D3D12_STENCIL_OP_KEEP,
-					.StencilFunc = D3D12_COMPARISON_FUNC_ALWAYS,
-				},
-				.BackFace =
-				{
-					.StencilFailOp = D3D12_STENCIL_OP_KEEP,
-					.StencilDepthFailOp = D3D12_STENCIL_OP_KEEP,
-					.StencilPassOp = D3D12_STENCIL_OP_KEEP,
-					.StencilFunc = D3D12_COMPARISON_FUNC_ALWAYS,
-				},
-			},
-			.InputLayout = layout_desc,
-			//.IBStripCutValue = nullptr,
-			.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE,
-			.NumRenderTargets = 1,
-			.RTVFormats =
-			{
-				dx_window.GetFormat(),
-			},
-			.DSVFormat = DXGI_FORMAT_UNKNOWN,
-			.SampleDesc =
-			{
-				.Count = 1,
-				.Quality = 0,
-			},
-			.NodeMask = 0,
-			.CachedPSO =
-			{
-				.pCachedBlob = nullptr,
-				.CachedBlobSizeInBytes = D3D12_PIPELINE_STATE_FLAG_NONE,
-			},
-			.Flags = D3D12_PIPELINE_STATE_FLAG_NONE,
-		};
-		dx_context.GetDevice()->CreateGraphicsPipelineState(&gfx_pso_desc, IID_PPV_ARGS(&resource.m_gfx_pso)) >> CHK;
-#else
-		std::string graphics_name{ "Graphics" };
-		std::wstring graphics_wname = std::to_wstring(graphics_name);
+			};
+			ps_subobj->SetDXILLibrary(&ps_byte_code);
+			ps_subobj->DefineExport(pixelshader_entrypoint.c_str(), common_entrypoint.c_str());
+			CD3DX12_PRIMITIVE_TOPOLOGY_SUBOBJECT* topology_subobj = cstate_object_desc.CreateSubobject<CD3DX12_PRIMITIVE_TOPOLOGY_SUBOBJECT>();
+			topology_subobj->SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
+			CD3DX12_RENDER_TARGET_FORMATS_SUBOBJECT* rt_subobj = cstate_object_desc.CreateSubobject<CD3DX12_RENDER_TARGET_FORMATS_SUBOBJECT>();
+			rt_subobj->SetNumRenderTargets(1);
+			rt_subobj->SetRenderTargetFormat(0, dx_window.GetFormat());
 
-		// Need to export entry point with generic program
-		// Entry point needs to be differentiate between VS and PS
-		std::wstring common_entrypoint = L"main";
-		std::wstring vertexshader_entrypoint = L"mainVS";
-		std::wstring pixelshader_entrypoint = L"mainPS";
+			CD3DX12_GENERIC_PROGRAM_SUBOBJECT* generic_subobj = cstate_object_desc.CreateSubobject<CD3DX12_GENERIC_PROGRAM_SUBOBJECT>();
+			generic_subobj->SetProgramName(graphics_wname.c_str());
+			generic_subobj->AddExport(vertexshader_entrypoint.c_str());
+			generic_subobj->AddExport(pixelshader_entrypoint.c_str());
+			generic_subobj->AddSubobject(*topology_subobj);
+			generic_subobj->AddSubobject(*rt_subobj);
+			// Seem like the SO still need RS, even when its embedded in the shader, in contrast to PSO
+			CD3DX12_GLOBAL_ROOT_SIGNATURE_SUBOBJECT* global_rootsignature_subobj = cstate_object_desc.CreateSubobject<CD3DX12_GLOBAL_ROOT_SIGNATURE_SUBOBJECT>();
+			global_rootsignature_subobj->SetRootSignature(resource.m_gfx_root_signature.Get());
+			// TODO: CD3DX12 cause PIX to fail on CreateSO
+			dx_context.GetDevice()->CreateStateObject(cstate_object_desc, IID_PPV_ARGS(&resource.m_gfx_so)) >> CHK;
+			NAME_DX_OBJECT(resource.m_gfx_so, "Graphics State Object");
 
-		CD3DX12_STATE_OBJECT_DESC cstate_object_desc;
-		cstate_object_desc.SetStateObjectType(D3D12_STATE_OBJECT_TYPE_EXECUTABLE);
-
-		CD3DX12_DXIL_LIBRARY_SUBOBJECT* vs_subobj = cstate_object_desc.CreateSubobject<CD3DX12_DXIL_LIBRARY_SUBOBJECT>();
-		D3D12_SHADER_BYTECODE vs_byte_code
-		{
-			.pShaderBytecode = resource.m_vertex_shader->GetBufferPointer(), 
-			.BytecodeLength = resource.m_vertex_shader->GetBufferSize(), 
-		};
-		vs_subobj->SetDXILLibrary(&vs_byte_code);
-		vs_subobj->DefineExport(vertexshader_entrypoint.c_str(), common_entrypoint.c_str());
-		CD3DX12_DXIL_LIBRARY_SUBOBJECT* ps_subobj = cstate_object_desc.CreateSubobject<CD3DX12_DXIL_LIBRARY_SUBOBJECT>();
-		D3D12_SHADER_BYTECODE ps_byte_code
-		{
-			.pShaderBytecode = resource.m_pixel_shader->GetBufferPointer(), 
-			.BytecodeLength = resource.m_pixel_shader->GetBufferSize(), 
-		};
-		ps_subobj->SetDXILLibrary(&ps_byte_code);
-		ps_subobj->DefineExport(pixelshader_entrypoint.c_str(), common_entrypoint.c_str());
-		CD3DX12_PRIMITIVE_TOPOLOGY_SUBOBJECT* topology_subobj = cstate_object_desc.CreateSubobject<CD3DX12_PRIMITIVE_TOPOLOGY_SUBOBJECT>();
-		topology_subobj->SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
-		CD3DX12_RENDER_TARGET_FORMATS_SUBOBJECT* rt_subobj = cstate_object_desc.CreateSubobject<CD3DX12_RENDER_TARGET_FORMATS_SUBOBJECT>();
-		rt_subobj->SetNumRenderTargets(1);
-		rt_subobj->SetRenderTargetFormat(0, dx_window.GetFormat());
-
-		CD3DX12_GENERIC_PROGRAM_SUBOBJECT* generic_subobj = cstate_object_desc.CreateSubobject<CD3DX12_GENERIC_PROGRAM_SUBOBJECT>();
-		generic_subobj->SetProgramName(graphics_wname.c_str());
-		generic_subobj->AddExport(vertexshader_entrypoint.c_str());
-		generic_subobj->AddExport(pixelshader_entrypoint.c_str());
-		generic_subobj->AddSubobject(*topology_subobj);
-		generic_subobj->AddSubobject(*rt_subobj);
-		// Seem like the SO still need RS, even when its embedded in the shader, in contrast to PSO
-		CD3DX12_GLOBAL_ROOT_SIGNATURE_SUBOBJECT* global_rootsignature_subobj = cstate_object_desc.CreateSubobject<CD3DX12_GLOBAL_ROOT_SIGNATURE_SUBOBJECT>();
-		global_rootsignature_subobj->SetRootSignature(resource.m_gfx_root_signature.Get());
-		// TODO: CD3DX12 cause PIX to fail on CreateSO
-		dx_context.GetDevice()->CreateStateObject(cstate_object_desc, IID_PPV_ARGS(&resource.m_gfx_so)) >> CHK;
-		NAME_DX_OBJECT(resource.m_gfx_so, "Graphics State Object");
-
-		Microsoft::WRL::ComPtr<ID3D12StateObjectProperties1> state_object_properties;
-		resource.m_gfx_so.As(&state_object_properties) >> CHK;
-		resource.m_program_id = state_object_properties->GetProgramIdentifier(graphics_wname.c_str());
-#endif
+			Microsoft::WRL::ComPtr<ID3D12StateObjectProperties1> state_object_properties;
+			resource.m_gfx_so.As(&state_object_properties) >> CHK;
+			resource.m_program_id = state_object_properties->GetProgramIdentifier(graphics_wname.c_str());
+		}
 	}
 }
 
 void GraphicsWork
 (
 	DXContext& dx_context, DXWindow& dx_window, 
-	GraphicsResources& resource
+	GraphicsResources& resource, 
+	DXTextureResource& output_resource,
+	bool use_old_pso
 )
 {
 	// Draw Work
@@ -325,22 +330,40 @@ void GraphicsWork
 		);
 
 		dx_context.GetCommandListGraphics()->SetGraphicsRootSignature(resource.m_gfx_root_signature.Get());
-#if defined(USE_PSO)
-		dx_context.GetCommandListGraphics()->SetPipelineState(resource.m_gfx_pso.Get());
-#else
-		D3D12_SET_PROGRAM_DESC program_desc
+		if (use_old_pso)
 		{
-			.Type = D3D12_PROGRAM_TYPE_GENERIC_PIPELINE,
-			.GenericPipeline =
+			dx_context.GetCommandListGraphics()->SetPipelineState(resource.m_gfx_pso.Get());
+		}
+		else
+		{
+			D3D12_SET_PROGRAM_DESC program_desc
 			{
-				.ProgramIdentifier = resource.m_program_id,
-			},
-		};
-		dx_context.GetCommandListGraphics()->SetProgram(&program_desc);
-#endif
+				.Type = D3D12_PROGRAM_TYPE_GENERIC_PIPELINE,
+				.GenericPipeline =
+				{
+					.ProgramIdentifier = resource.m_program_id,
+				},
+			};
+			dx_context.GetCommandListGraphics()->SetProgram(&program_desc);
+		}
 		uint32 bindless_index = srv.m_bindless_index;
 		dx_context.GetCommandListGraphics()->SetGraphicsRoot32BitConstants(0, 1, &bindless_index, 0);
 		dx_context.GetCommandListGraphics()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+		// transition
+		
+		dx_context.Transition(D3D12_RESOURCE_STATE_RENDER_TARGET, output_resource);
+		D3D12_RENDER_TARGET_VIEW_DESC rtv_desc
+		{
+			.Format = output_resource.m_format,
+			.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D,
+			.Texture2D =
+			{
+				.MipSlice = 0,
+				.PlaneSlice = 0,
+			},
+		};
+		ID3D12Resource* d3d12_ouput_resource = output_resource.m_resource.Get();
+		dx_context.OMSetRenderTargets(1, &d3d12_ouput_resource, &rtv_desc, nullptr, nullptr);
 		dx_context.GetCommandListGraphics()->DrawInstanced(resource.m_vertex_buffer.m_count, 16, 0, 0);
 		//dx_context.GetCommandListGraphics()->DrawInstanced(3, 1, 0, 0);
 		//dx_context.GetCommandListGraphics()->DrawIndexedInstanced(3, 1, 0, 0, 0);
@@ -351,7 +374,8 @@ void FillCommandList
 (
 	DXContext& dx_context, DXWindow& dx_window, 
 	GraphicsResources& gfx_resource,
-	ComputeResources& compute_resource
+	ComputeResources& compute_resource,
+	bool use_old_pso
 )
 {
 	// Fill CommandList
@@ -361,7 +385,7 @@ void FillCommandList
 	dx_context.GetCommandListGraphics()->SetDescriptorHeaps(1, dx_context.m_resources_descriptor_heap.m_heap.GetAddressOf());
 	{
 		ComputeWork(dx_context, compute_resource, dx_window, dx_window.m_buffers[g_current_buffer_index]);
-		GraphicsWork(dx_context, dx_window, gfx_resource);
+		GraphicsWork(dx_context, dx_window, gfx_resource, dx_window.m_buffers[g_current_buffer_index], use_old_pso);
 	}
 	dx_window.EndFrame(dx_context);
 }
@@ -383,7 +407,8 @@ void RunWindowLoop(DXContext& dx_context, DXCompiler& dx_compiler, GPUCapture* g
 		DXWindow dx_window(dx_context, window_manager, window_desc);
 		{
 			GraphicsResources gfx_resource{};
-			CreateGraphicsResources(dx_context, dx_compiler, dx_window, gfx_resource);
+			bool uses_pix = dynamic_cast<PIXCapture*>(gpu_capture);
+			CreateGraphicsResources(dx_context, dx_compiler, dx_window, gfx_resource, uses_pix);
 			ComputeResources compute_resource{};
 			CreateComputeResources(dx_context, dx_compiler, compute_resource);
 			while (!dx_window.ShouldClose())
@@ -436,10 +461,14 @@ void RunWindowLoop(DXContext& dx_context, DXCompiler& dx_compiler, GPUCapture* g
 						dx_window.UpdateBackBufferIndex();
 					}
 
-					dx_context.InitCommandLists();
-					FillCommandList(dx_context, dx_window, gfx_resource, compute_resource);
-					dx_context.ExecuteCommandListGraphics();
-					dx_window.Present(dx_context);
+					{
+						//PIXScopedEvent(dx_context.GetCommandListGraphics(), 0, "My Frame");
+						
+						dx_context.InitCommandLists();
+						FillCommandList(dx_context, dx_window, gfx_resource, compute_resource, uses_pix);
+						dx_context.ExecuteCommandListGraphics();
+						dx_window.Present(dx_context);
+					}
 				}
 				if (capture)
 				{

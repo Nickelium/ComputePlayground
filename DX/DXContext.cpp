@@ -101,9 +101,24 @@ namespace
 
 void OnDeviceRemoved(PVOID context, BOOLEAN)
 {
+	// Data to pass is limited so we dont pass ComPtr
 	ID3D12Device* removed_device = static_cast<ID3D12Device*>(context);
-	HRESULT removed_reason = removed_device->GetDeviceRemovedReason();
-	std::string removed_reason_string = RemapHResult(removed_reason );
+	Microsoft::WRL::ComPtr<ID3D12Device> device = removed_device;
+	HRESULT removed_reason = device->GetDeviceRemovedReason();
+	std::string removed_reason_string = RemapHResult(removed_reason);
+	
+	if (removed_reason != S_OK)
+	{
+		// DRED
+		Microsoft::WRL::ComPtr<ID3D12DeviceRemovedExtendedData> dred{};
+		device->QueryInterface(IID_PPV_ARGS(&dred));
+		D3D12_DRED_AUTO_BREADCRUMBS_OUTPUT dred_autobreadcrumbs_output{};
+		D3D12_DRED_PAGE_FAULT_OUTPUT dred_page_fault_output{};
+		dred->GetAutoBreadcrumbsOutput(&dred_autobreadcrumbs_output) >> CHK;
+		dred->GetPageFaultAllocationOutput(&dred_page_fault_output) >> CHK;
+		ASSERT(false);
+	}
+
 	ASSERT(removed_reason == S_OK);
 	LogTrace(removed_reason_string);
 }
@@ -125,6 +140,15 @@ void DXContext::Init()
 		d3d12_debug->SetEnableGPUBasedValidation(true);
 		//d3d12_debug->SetEnableAutoName(true);
 		d3d12_debug->SetEnableSynchronizedCommandQueueValidation(true);
+	}
+
+	{
+		// DRED: Auto WriteBufferImmediate (aka auto bread crumbs) & force GPU page fault instead of reading zeros
+		Microsoft::WRL::ComPtr<ID3D12DeviceRemovedExtendedDataSettings> pDredSettings{};
+		D3D12GetDebugInterface(IID_PPV_ARGS(&pDredSettings)) >> CHK;
+		// Turn on AutoBreadcrumbs and Page Fault reporting
+		pDredSettings->SetAutoBreadcrumbsEnablement(D3D12_DRED_ENABLEMENT_FORCED_ON);
+		pDredSettings->SetPageFaultEnablement(D3D12_DRED_ENABLEMENT_FORCED_ON);
 	}
 #endif
 
@@ -629,7 +653,6 @@ void DXCommand::BeginFrame()
 	// Free commandlist
 	m_command_list->Reset(command_allocator.Get(), nullptr) >> CHK;
 	// Command recording
-	// ..
 }
 
 void DXCommand::EndFrame()

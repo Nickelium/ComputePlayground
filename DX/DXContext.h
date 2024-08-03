@@ -296,6 +296,11 @@ public:
 		CBV& cbv
 	);
 
+	// Buffers for UAV and SRV
+	void CreateTypeBuffer();
+	void CreateStructuredBuffer();
+	void CreateByteBuffer();
+
 public:
 	std::vector<std::pair<uint64, uint32>> m_list_pair_fence_free_index;
 	uint32 m_last_indices[g_backbuffer_count];

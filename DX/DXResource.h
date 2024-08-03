@@ -14,6 +14,33 @@ public:
 	uint32 m_bindless_index = ~0u;
 };
 
+class TypedBufferView
+{
+	D3D12_UAV_DIMENSION m_view_dimension = D3D12_UAV_DIMENSION_BUFFER;
+	constexpr static uint32 s_stride = 0;
+	DXGI_FORMAT m_format;
+	D3D12_BUFFER_SRV_FLAGS m_flags_srv = D3D12_BUFFER_SRV_FLAG_NONE;
+	D3D12_BUFFER_UAV_FLAGS m_flags_uav = D3D12_BUFFER_UAV_FLAG_NONE;
+};
+template<typename T>
+class StructuredBufferView
+{
+	D3D12_UAV_DIMENSION m_view_dimension = D3D12_UAV_DIMENSION_BUFFER;
+	// bytes
+	constexpr static uint32 s_stride = sizeof(T);
+	DXGI_FORMAT m_format = DXGI_FORMAT_UNKNOWN;
+	D3D12_BUFFER_SRV_FLAGS m_flags_srv = D3D12_BUFFER_SRV_FLAG_NONE;
+	D3D12_BUFFER_UAV_FLAGS m_flags_uav = D3D12_BUFFER_UAV_FLAG_NONE;
+};
+class ByteBufferView
+{
+	D3D12_UAV_DIMENSION m_view_dimension = D3D12_UAV_DIMENSION_BUFFER;
+	constexpr static uint32 s_stride = 0;
+	DXGI_FORMAT m_format = DXGI_FORMAT_R32_TYPELESS;
+	D3D12_BUFFER_SRV_FLAGS m_flags_srv = D3D12_BUFFER_SRV_FLAG_RAW;
+	D3D12_BUFFER_UAV_FLAGS m_flags_uav = D3D12_BUFFER_UAV_FLAG_RAW;
+};
+
 using SRV = DXDescriptor;
 using UAV = DXDescriptor;
 using CBV = DXDescriptor;

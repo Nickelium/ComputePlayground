@@ -331,7 +331,7 @@ D3D12_SAMPLER_FEEDBACK_TIER GetSamplerFeedbackTier(Microsoft::WRL::ComPtr<ID3D12
 	return options.SamplerFeedbackTier;
 }
 
-bool GetEnhancedBarrierSupported(Microsoft::WRL::ComPtr<ID3D12Device> device)
+bool GetEnhancedBarrierSupport(Microsoft::WRL::ComPtr<ID3D12Device> device)
 {
 	D3D12_FEATURE_DATA_D3D12_OPTIONS12 options{};
 	device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS12, &options, sizeof(options)) >> CHK;
@@ -341,6 +341,13 @@ bool GetEnhancedBarrierSupported(Microsoft::WRL::ComPtr<ID3D12Device> device)
 bool GetBindlessSupport(Microsoft::WRL::ComPtr<ID3D12Device> device)
 {
 	return GetResourceBindingTier(device) >= D3D12_RESOURCE_BINDING_TIER_3 && GetMaxShaderModel(device) >= D3D_SHADER_MODEL_6_6;
+}
+
+bool GetGPUUploadSupport(Microsoft::WRL::ComPtr<ID3D12Device> device)
+{
+	D3D12_FEATURE_DATA_D3D12_OPTIONS16 options{};
+	device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS16, &options, sizeof(options)) >> CHK;
+	return options.GPUUploadHeapSupported;
 }
 
 uint64 GetVRAMUsage(Microsoft::WRL::ComPtr<IDXGIAdapter4> adapter)
@@ -368,10 +375,11 @@ std::string DumpDX12Capabilities(Microsoft::WRL::ComPtr<ID3D12Device> device)
 	pair_data.push_back({ "VariableShadingRateTier", std::format("{0}", (uint32)GetVariableShadingRateTier(device)) });
 	pair_data.push_back({ "MeshShaderTier", std::format("{0}", (uint32)GetMeshShaderTier(device)) });
 	pair_data.push_back({ "SamplerFeedbackTier", std::format("{0}", (uint32)GetSamplerFeedbackTier(device)) });
-	pair_data.push_back({ "EnhancedBarrier", std::format("{0}", GetEnhancedBarrierSupported(device)) });
+	pair_data.push_back({ "EnhancedBarrier", std::format("{0}", GetEnhancedBarrierSupport(device)) });
 	pair_data.push_back({ "WaveLaneCount", std::format("{0}", GetWaveLaneCount(device)) });
 	pair_data.push_back({ "WorkGraph", std::format("{0}", GetWorkGraphSupport(device)) });
 	pair_data.push_back({ "Bindless", std::format("{0}", GetBindlessSupport(device)) });
+	pair_data.push_back({ "GPU Upload", std::format("{0}", GetGPUUploadSupport(device)) });
 
 	std::string ret{};
 	for (auto& P : pair_data)

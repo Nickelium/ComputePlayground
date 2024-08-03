@@ -2,6 +2,7 @@
 #include "DXContext.h"
 #include "DXQuery.h"
 
+// Note that D3D12_HEAP_TYPE_GPU_UPLOAD doesnt work on warp
 void DXResource::SetResourceInfo(D3D12_HEAP_TYPE heap_type, D3D12_RESOURCE_FLAGS resource_flags, uint32 size)
 {
 	m_size = size;
