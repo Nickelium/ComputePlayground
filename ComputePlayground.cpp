@@ -307,14 +307,7 @@ void GraphicsWork
 		dx_context.GetCommandListGraphics()->RSSetScissorRects(1, scissor_rects);
 		
 		D3D12_SHADER_RESOURCE_VIEW_DESC desc = GetStructuredBufferSRVDesc(resource.m_vertex_buffer.m_count, resource.m_vertex_buffer.m_stride);
-
-		SRV srv{};
-		dx_context.CreateSRV
-		(
-			resource.m_vertex_buffer,
-			&desc,
-			srv
-		);
+		SRV srv = dx_context.CreateSRV(resource.m_vertex_buffer, desc);
 
 		dx_context.GetCommandListGraphics()->SetGraphicsRootSignature(resource.m_gfx_root_signature.Get());
 		if (use_old_pso)
@@ -538,12 +531,9 @@ void ComputeWork
 	};
 	dx_context.GetCommandListGraphics()->SetProgram(&program_desc);
 
-	// TODO resource with RTV / SRV / UAV
-	// Populate descriptor
 	D3D12_UNORDERED_ACCESS_VIEW_DESC UAV_desc = GetTexture2DUAVDesc(gpu_resource.m_format);
+	UAV uav = dx_context.CreateUAV(gpu_resource, UAV_desc);
 	
-	UAV uav{};
-	dx_context.CreateUAV(gpu_resource, &UAV_desc, uav);
 	auto current_time = std::chrono::high_resolution_clock::now();
 	auto diff_seconds = (float32)std::chrono::duration_cast<std::chrono::milliseconds>(current_time - start_time).count();
 	diff_seconds /= 1000;
@@ -676,7 +666,7 @@ void RunWorkGraph(DXContext& dx_context, DXCompiler& dx_compiler, bool is_pix_ru
 	D3D12_GPU_VIRTUAL_ADDRESS_RANGE backing_memory{};
 	if (resource.m_scratch_buffer.m_resource)
 	{
-		backing_memory.SizeInBytes = resource.m_scratch_buffer.m_size;
+		backing_memory.SizeInBytes = resource.m_scratch_buffer.m_size_in_bytes;
 		backing_memory.StartAddress = resource.m_scratch_buffer.m_resource->GetGPUVirtualAddress();
 	}
 

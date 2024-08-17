@@ -278,25 +278,10 @@ public:
 	static uint32 s_descriptor_sizes[D3D12_DESCRIPTOR_HEAP_TYPE_NUM_TYPES];
 
 	RTVDescriptorHandler m_rtv_descriptor_handler;
-	void CreateUAV
-	(
-		DXResource& resource,
-		const D3D12_UNORDERED_ACCESS_VIEW_DESC *desc,
-	    UAV& uav
-	);
-
-	void CreateSRV
-	(
-		DXResource& resource,
-		const D3D12_SHADER_RESOURCE_VIEW_DESC* desc,
-		SRV& srv
-	);
-
-	void CreateCBV
-	(
-		D3D12_CONSTANT_BUFFER_VIEW_DESC desc,
-		CBV& cbv
-	);
+	
+	UAV CreateUAV(const DXResource& resource, const D3D12_UNORDERED_ACCESS_VIEW_DESC& desc);
+	SRV CreateSRV(const DXResource& resource, const D3D12_SHADER_RESOURCE_VIEW_DESC& desc);
+	CBV CreateCBV(const DXResource& resource);
 
 	// Buffers for UAV and SRV
 	void CreateTypeBuffer();

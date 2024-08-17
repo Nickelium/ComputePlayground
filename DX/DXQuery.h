@@ -11,6 +11,8 @@ std::string GetShaderModelString(const D3D_SHADER_MODEL& shader_model);
 
 bool IsDXGIFormatSupported(Microsoft::WRL::ComPtr<ID3D12Device> device, const DXGI_FORMAT& format);
 std::string GetDXGIFormatString(const DXGI_FORMAT& dxgi_format);
+uint32 GetBytesFormat(DXGI_FORMAT format);
+
 
 bool GetSupportDynamicResourceBinding(Microsoft::WRL::ComPtr<ID3D12Device> device);
 D3D12_RESOURCE_BINDING_TIER GetResourceBindingTier(Microsoft::WRL::ComPtr<ID3D12Device> device);

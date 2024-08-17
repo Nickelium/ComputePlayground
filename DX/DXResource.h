@@ -26,7 +26,7 @@ using CBV = DXDescriptor;
 class DXResource
 {
 public:
-	uint32 m_size;
+	uint32 m_size_in_bytes;
 
 	D3D12_RESOURCE_STATES m_resource_state = D3D12_RESOURCE_STATE_COMMON;
 	Microsoft::WRL::ComPtr<ID3D12Resource> m_resource;

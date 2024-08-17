@@ -3,6 +3,7 @@
 #include "DXContext.h"
 #include "DXWindowManager.h"
 #include "DXResource.h"
+#include "DXQuery.h"
 #define NOMINMAX
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
@@ -493,7 +494,7 @@ void DXWindow::GetBuffers()
 		m_buffers[i].m_width = m_width;
 		m_buffers[i].m_height = m_height;
 		m_buffers[i].m_format = GetFormat();
-		m_buffers[i].m_size = m_width * m_height;
+		m_buffers[i].m_size_in_bytes = m_width * m_height * GetBytesFormat(GetFormat());
 		m_buffers[i].m_resource_desc =
 		{
 			.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D,

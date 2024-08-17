@@ -669,11 +669,10 @@ void DXCommand::EndFrame()
 	m_frame_index = (m_frame_index + 1) % g_backbuffer_count;
 }
 
-void DXContext::CreateUAV
+UAV DXContext::CreateUAV
 (
-	DXResource& resource,
-	const D3D12_UNORDERED_ACCESS_VIEW_DESC *desc,
-	UAV& uav
+	const DXResource& resource,
+	const D3D12_UNORDERED_ACCESS_VIEW_DESC& desc
 )
 {
 	uint32 number_allocated = 0;
@@ -686,19 +685,21 @@ void DXContext::CreateUAV
 		number_allocated = m_resources_descriptor_heap.m_number_descriptors - (m_start_index - m_free_index);
 	}
 	ASSERT(number_allocated < m_resources_descriptor_heap.m_number_descriptors);
-	uav.m_cpu_descriptor_handle = GetCPUDescriptorHandle(m_resources_descriptor_heap, m_free_index);
-	uav.m_gpu_descriptor_handle = GetGPUDescriptorHandle(m_resources_descriptor_heap, m_free_index);
-	uav.m_bindless_index = m_free_index;
-	m_device->CreateUnorderedAccessView(resource.m_resource.Get(), nullptr, desc, uav.m_cpu_descriptor_handle);
+	
+	UAV uav
+	{
+		.m_cpu_descriptor_handle = GetCPUDescriptorHandle(m_resources_descriptor_heap, m_free_index),
+		.m_gpu_descriptor_handle = GetGPUDescriptorHandle(m_resources_descriptor_heap, m_free_index),
+		.m_bindless_index = m_free_index,
+	};
+
+	m_device->CreateUnorderedAccessView(resource.m_resource.Get(), nullptr, &desc, uav.m_cpu_descriptor_handle);
 	m_free_index = (m_free_index + 1) % m_resources_descriptor_heap.m_number_descriptors;
+
+	return uav;
 }
 
-void DXContext::CreateSRV
-(
-	DXResource& resource,
-	const D3D12_SHADER_RESOURCE_VIEW_DESC* desc,
-	SRV& srv
-)
+SRV DXContext::CreateSRV(const DXResource& resource, const D3D12_SHADER_RESOURCE_VIEW_DESC& desc)
 {
 	uint32 number_allocated = 0;
 	if (m_start_index <= m_free_index)
@@ -710,19 +711,28 @@ void DXContext::CreateSRV
 		number_allocated = m_resources_descriptor_heap.m_number_descriptors - (m_start_index - m_free_index);
 	}
 	ASSERT(number_allocated < m_resources_descriptor_heap.m_number_descriptors);
-	srv.m_cpu_descriptor_handle = GetCPUDescriptorHandle(m_resources_descriptor_heap, m_free_index);
-	srv.m_gpu_descriptor_handle = GetGPUDescriptorHandle(m_resources_descriptor_heap, m_free_index);
-	srv.m_bindless_index = m_free_index;
-	m_device->CreateShaderResourceView(resource.m_resource.Get(), desc, srv.m_cpu_descriptor_handle);
+
+	SRV srv
+	{
+		.m_cpu_descriptor_handle = GetCPUDescriptorHandle(m_resources_descriptor_heap, m_free_index),
+		.m_gpu_descriptor_handle = GetGPUDescriptorHandle(m_resources_descriptor_heap, m_free_index),
+		.m_bindless_index = m_free_index,
+	};
+
+	m_device->CreateShaderResourceView(resource.m_resource.Get(), &desc, srv.m_cpu_descriptor_handle);
 	m_free_index = (m_free_index + 1) % m_resources_descriptor_heap.m_number_descriptors;
+
+	return srv;
 }
 
-void DXContext::CreateCBV
-(
-	D3D12_CONSTANT_BUFFER_VIEW_DESC desc,
-	CBV& cbv
-)
+CBV DXContext::CreateCBV(const DXResource& resource)
 {
+	D3D12_CONSTANT_BUFFER_VIEW_DESC desc
+	{
+		.BufferLocation = resource.m_resource->GetGPUVirtualAddress(),
+		.SizeInBytes = resource.m_size_in_bytes,
+	};
+
 	// Constantbuffer requires 256 bytes align and not more than 65536 bytes by spec
 	ASSERT(desc.SizeInBytes == Align(desc.SizeInBytes, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT));
 	static uint32 s_max_constant_buffer_size = 65536;
@@ -738,12 +748,20 @@ void DXContext::CreateCBV
 		number_allocated = m_resources_descriptor_heap.m_number_descriptors - (m_start_index - m_free_index);
 	}
 	ASSERT(number_allocated < m_resources_descriptor_heap.m_number_descriptors);
-	cbv.m_cpu_descriptor_handle = GetCPUDescriptorHandle(m_resources_descriptor_heap, m_free_index);
-	cbv.m_gpu_descriptor_handle = GetGPUDescriptorHandle(m_resources_descriptor_heap, m_free_index);
-	cbv.m_bindless_index = m_free_index;
+	
+	CBV cbv
+	{
+		.m_cpu_descriptor_handle = GetCPUDescriptorHandle(m_resources_descriptor_heap, m_free_index),
+		.m_gpu_descriptor_handle = GetGPUDescriptorHandle(m_resources_descriptor_heap, m_free_index),
+		.m_bindless_index = m_free_index,
+	};
+
 	m_device->CreateConstantBufferView(&desc, cbv.m_cpu_descriptor_handle);
 	m_free_index = (m_free_index + 1) % m_resources_descriptor_heap.m_number_descriptors;
+	
+	return cbv;
 }
+
 
 void RTVDescriptorHandler::Init(DXContext& dx_context)
 {
