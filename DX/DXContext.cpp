@@ -723,8 +723,10 @@ void DXContext::CreateCBV
 	CBV& cbv
 )
 {
-	// Constantbuffer requires 256 bytes align by spec
-	ASSERT(desc.SizeInBytes == Align(desc.SizeInBytes, 256));
+	// Constantbuffer requires 256 bytes align and not more than 65536 bytes by spec
+	ASSERT(desc.SizeInBytes == Align(desc.SizeInBytes, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT));
+	static uint32 s_max_constant_buffer_size = 65536;
+	ASSERT(desc.SizeInBytes <= s_max_constant_buffer_size);
 
 	uint32 number_allocated = 0;
 	if (m_start_index <= m_free_index)
@@ -745,8 +747,8 @@ void DXContext::CreateCBV
 
 void RTVDescriptorHandler::Init(DXContext& dx_context)
 {
-	dx_context.CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_RTV, D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT, "", m_rtv_descriptor_heap);
-	dx_context.CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 1, "", m_dsv_descriptor_heap);
+	dx_context.CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_RTV, D3D12_SIMULTANEOUS_RENDER_TARGET_COUNT, "Descriptor Heap RTV", m_rtv_descriptor_heap);
+	dx_context.CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_DSV, 1, "Descriptor Heap DSV", m_dsv_descriptor_heap);
 	m_rtv_descriptor = m_rtv_descriptor_heap.m_heap->GetCPUDescriptorHandleForHeapStart();
 	m_dsv_descriptor = m_dsv_descriptor_heap.m_heap->GetCPUDescriptorHandleForHeapStart();
 }
@@ -813,4 +815,138 @@ void RTVDescriptorHandler::ClearDepthStencilView
 	D3D12_CPU_DESCRIPTOR_HANDLE descriptor_handle = m_dsv_descriptor;
 	dx_context.GetDevice()->CreateDepthStencilView(dsv_resource, dsv_desc, descriptor_handle);
 	dx_context.GetCommandListGraphics()->ClearDepthStencilView(descriptor_handle, clear_flags, depth, stencil, num_rects, rects);
+}
+
+
+D3D12_SHADER_RESOURCE_VIEW_DESC GetTypedBufferSRVDesc(DXGI_FORMAT format, uint32 number_elements)
+{
+	return
+	{
+		.Format = format,
+		.ViewDimension = D3D12_SRV_DIMENSION_BUFFER,
+		.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING,
+		.Buffer =
+		{
+			.FirstElement = 0,
+			.NumElements = number_elements,
+			.StructureByteStride = 0,
+			.Flags = D3D12_BUFFER_SRV_FLAG_NONE,
+		},
+	};
+}
+
+D3D12_UNORDERED_ACCESS_VIEW_DESC GetTypedBufferUAVDesc(DXGI_FORMAT format, uint32 number_elements)
+{
+	return
+	{
+		.Format = format,
+		.ViewDimension = D3D12_UAV_DIMENSION_BUFFER,
+		.Buffer =
+		{
+			.FirstElement = 0,
+			.NumElements = number_elements,
+			.StructureByteStride = 0,
+			.CounterOffsetInBytes = 0,
+			.Flags = D3D12_BUFFER_UAV_FLAG_NONE,
+		},
+	};
+}
+
+D3D12_SHADER_RESOURCE_VIEW_DESC GetTexture2DSRVDesc(DXGI_FORMAT format)
+{
+	return
+	{
+		.Format = format,
+		.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D,
+		.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING,
+		.Texture2D =
+		{
+			.MostDetailedMip = 0,
+			.MipLevels = 1, 
+			.PlaneSlice = 0,
+			.ResourceMinLODClamp = 0,
+		},
+	};
+}
+
+D3D12_UNORDERED_ACCESS_VIEW_DESC GetTexture2DUAVDesc(DXGI_FORMAT format)
+{
+	return
+	{
+		.Format = format,
+		.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D,
+		.Texture2D =
+		{
+			.MipSlice = 0, 
+			.PlaneSlice = 0,
+		},
+	};
+}
+
+D3D12_SHADER_RESOURCE_VIEW_DESC GetStructuredBufferSRVDesc(uint32 number_elements, uint32 stride)
+{
+	return
+	{
+		.Format = DXGI_FORMAT_UNKNOWN,
+		.ViewDimension = D3D12_SRV_DIMENSION_BUFFER,
+		.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING,
+		.Buffer =
+		{
+			.FirstElement = 0,
+			.NumElements = number_elements,
+			.StructureByteStride = stride,
+			.Flags = D3D12_BUFFER_SRV_FLAG_NONE,
+		},
+	};
+}
+
+D3D12_UNORDERED_ACCESS_VIEW_DESC GetStructuredBufferUAVDesc(uint32 number_elements, uint32 stride)
+{
+	return
+	{
+		.Format = DXGI_FORMAT_UNKNOWN,
+		.ViewDimension = D3D12_UAV_DIMENSION_BUFFER,
+		.Buffer =
+		{
+			.FirstElement = 0,
+			.NumElements = number_elements,
+			.StructureByteStride = stride,
+			.CounterOffsetInBytes = 0,
+			.Flags = D3D12_BUFFER_UAV_FLAG_NONE,
+		},
+	};
+}
+
+D3D12_SHADER_RESOURCE_VIEW_DESC GetByteBufferSRVDesc(uint32 number_bytes)
+{
+	return
+	{
+		.Format = DXGI_FORMAT_R32_TYPELESS,
+		.ViewDimension = D3D12_SRV_DIMENSION_BUFFER,
+		.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING,
+		.Buffer =
+		{
+			.FirstElement = 0,
+			.NumElements = DivideRoundUp(number_bytes, sizeof(uint32)),
+			.StructureByteStride = 0,
+			.Flags = D3D12_BUFFER_SRV_FLAG_RAW,
+		},
+	};
+}
+
+D3D12_UNORDERED_ACCESS_VIEW_DESC GetByteBufferUAVDesc(uint32 number_bytes)
+{
+	return 
+	{
+		.Format = DXGI_FORMAT_R32_TYPELESS,
+		.ViewDimension = D3D12_UAV_DIMENSION_BUFFER,
+		.Buffer =
+		{
+			.FirstElement = 0,
+			.NumElements = DivideRoundUp(number_bytes, sizeof(uint32)),
+			.StructureByteStride = 0,
+			.CounterOffsetInBytes = 0,
+			.Flags = D3D12_BUFFER_UAV_FLAG_RAW,
+		},
+	};
 }

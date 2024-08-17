@@ -306,21 +306,8 @@ void GraphicsWork
 		dx_context.GetCommandListGraphics()->RSSetViewports(1, view_ports);
 		dx_context.GetCommandListGraphics()->RSSetScissorRects(1, scissor_rects);
 		
-		D3D12_SHADER_RESOURCE_VIEW_DESC desc
-		{
-			.Format = DXGI_FORMAT_UNKNOWN,
-			.ViewDimension = D3D12_SRV_DIMENSION_BUFFER,
-			.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING,
-			.Buffer =
-			{
-				.FirstElement = 0,
-				.NumElements = resource.m_vertex_buffer.m_count,
-				.StructureByteStride = resource.m_vertex_buffer.m_stride,
-				.Flags = D3D12_BUFFER_SRV_FLAG_NONE,
-			},
-		};
+		D3D12_SHADER_RESOURCE_VIEW_DESC desc = GetStructuredBufferSRVDesc(resource.m_vertex_buffer.m_count, resource.m_vertex_buffer.m_stride);
 
-		// Some issues with CBV, requires 256 alignment
 		SRV srv{};
 		dx_context.CreateSRV
 		(
@@ -553,16 +540,8 @@ void ComputeWork
 
 	// TODO resource with RTV / SRV / UAV
 	// Populate descriptor
-	D3D12_UNORDERED_ACCESS_VIEW_DESC UAV_desc
-	{
-		.Format = gpu_resource.m_format,
-		.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D,
-		.Texture2D =
-		{
-			.MipSlice = 0,
-			.PlaneSlice = 0,
-		},
-	};
+	D3D12_UNORDERED_ACCESS_VIEW_DESC UAV_desc = GetTexture2DUAVDesc(gpu_resource.m_format);
+	
 	UAV uav{};
 	dx_context.CreateUAV(gpu_resource, &UAV_desc, uav);
 	auto current_time = std::chrono::high_resolution_clock::now();

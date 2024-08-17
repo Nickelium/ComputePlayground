@@ -284,12 +284,14 @@ public:
 		const D3D12_UNORDERED_ACCESS_VIEW_DESC *desc,
 	    UAV& uav
 	);
+
 	void CreateSRV
 	(
 		DXResource& resource,
 		const D3D12_SHADER_RESOURCE_VIEW_DESC* desc,
 		SRV& srv
 	);
+
 	void CreateCBV
 	(
 		D3D12_CONSTANT_BUFFER_VIEW_DESC desc,
@@ -322,3 +324,28 @@ inline D3D12_CPU_DESCRIPTOR_HANDLE operator+(uint32 x, D3D12_CPU_DESCRIPTOR_HAND
 	return y + x;
 }
 
+// Textures are always typed
+// Ex. Use in HLSL: Texture2D<float3> with ex. DXGI_FORMAT_R32G32B32_FLOAT
+D3D12_SHADER_RESOURCE_VIEW_DESC GetTexture2DSRVDesc(DXGI_FORMAT format);
+// Ex. Use in HLSL: RWTexture2D<unorm float> with ex. R8_UNORM / R16_UNORM
+D3D12_UNORDERED_ACCESS_VIEW_DESC GetTexture2DUAVDesc(DXGI_FORMAT format);
+
+
+// Ex. Use in HLSL: Buffer<float3>
+D3D12_SHADER_RESOURCE_VIEW_DESC GetTypedBufferSRVDesc(DXGI_FORMAT format, uint32 number_elements);
+
+// Ex1. Use in HLSL: RWBuffer<float3> with ex. DXGI_FORMAT_R32G32B32_FLOAT
+// Ex1. Use in HLSL: RWBuffer<unorm float> with ex. R8_UNORM / R16_UNORM
+D3D12_UNORDERED_ACCESS_VIEW_DESC GetTypedBufferUAVDesc(DXGI_FORMAT format, uint32 number_elements);
+
+// Ex. StructuredBuffer<MyStruct>
+D3D12_SHADER_RESOURCE_VIEW_DESC GetStructuredBufferSRVDesc(uint32 number_elements, uint32 stride);
+
+// Ex. RWStructuredBuffer<MyStruct>
+D3D12_UNORDERED_ACCESS_VIEW_DESC GetStructuredBufferUAVDesc(uint32 number_elements, uint32 stride);
+
+// Ex. ByteAddressBuffer 
+D3D12_SHADER_RESOURCE_VIEW_DESC GetByteBufferSRVDesc(uint32 number_bytes);
+
+// Ex. RWByteAddressBuffer
+D3D12_UNORDERED_ACCESS_VIEW_DESC GetByteBufferUAVDesc(uint32 number_bytes);

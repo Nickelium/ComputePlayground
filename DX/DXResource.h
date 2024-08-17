@@ -14,33 +14,11 @@ public:
 	uint32 m_bindless_index = ~0u;
 };
 
-class TypedBufferView
-{
-	D3D12_UAV_DIMENSION m_view_dimension = D3D12_UAV_DIMENSION_BUFFER;
-	constexpr static uint32 s_stride = 0;
-	DXGI_FORMAT m_format;
-	D3D12_BUFFER_SRV_FLAGS m_flags_srv = D3D12_BUFFER_SRV_FLAG_NONE;
-	D3D12_BUFFER_UAV_FLAGS m_flags_uav = D3D12_BUFFER_UAV_FLAG_NONE;
-};
-template<typename T>
-class StructuredBufferView
-{
-	D3D12_UAV_DIMENSION m_view_dimension = D3D12_UAV_DIMENSION_BUFFER;
-	// bytes
-	constexpr static uint32 s_stride = sizeof(T);
-	DXGI_FORMAT m_format = DXGI_FORMAT_UNKNOWN;
-	D3D12_BUFFER_SRV_FLAGS m_flags_srv = D3D12_BUFFER_SRV_FLAG_NONE;
-	D3D12_BUFFER_UAV_FLAGS m_flags_uav = D3D12_BUFFER_UAV_FLAG_NONE;
-};
-class ByteBufferView
-{
-	D3D12_UAV_DIMENSION m_view_dimension = D3D12_UAV_DIMENSION_BUFFER;
-	constexpr static uint32 s_stride = 0;
-	DXGI_FORMAT m_format = DXGI_FORMAT_R32_TYPELESS;
-	D3D12_BUFFER_SRV_FLAGS m_flags_srv = D3D12_BUFFER_SRV_FLAG_RAW;
-	D3D12_BUFFER_UAV_FLAGS m_flags_uav = D3D12_BUFFER_UAV_FLAG_RAW;
-};
 
+// Use CBV for faster loads when using uniform indexing access pattern acrosss wave
+// It uses on NVIDIA a hardware cache but CBV has 256 alignment requirements due to some older GPUs
+// Also CBV has max size of 64kB
+// SRV has less penalty with different access pattern
 using SRV = DXDescriptor;
 using UAV = DXDescriptor;
 using CBV = DXDescriptor;
@@ -83,7 +61,6 @@ public:
 	virtual void SetResourceInfo(D3D12_HEAP_TYPE heap_type, D3D12_RESOURCE_FLAGS resource_flags, uint32 width, uint32 height, DXGI_FORMAT format);
 	virtual void CreateResource(DXContext& dx_context, const std::string& name_resource);
 };
-
 
 extern uint32 g_current_buffer_index;
 // Ref count, deferred deletion till GPU is done using
