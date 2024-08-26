@@ -182,8 +182,6 @@ void DXWindow::BeginFrame(DXContext& dx_context)
 		},
 	};
 	dx_context.ClearRenderTargetView(m_buffers[g_current_buffer_index].m_resource.Get(), &rtv_desc, color, 0, nullptr);
-	//ID3D12Resource* resource = m_buffers[g_current_buffer_index].m_resource.Get();
-	//dx_context.OMSetRenderTargets(1, &resource, &rtv_desc, nullptr, nullptr);
 }
 
 void DXWindow::EndFrame(const DXContext& dx_context)
