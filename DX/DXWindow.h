@@ -139,9 +139,9 @@ private:
 	void GetBuffers();
 
 	void ReleaseBuffers();
-
+public:
 	HWND m_handle;
-
+private:
 	bool m_should_resize = false;
 
 	WindowMode m_window_mode;

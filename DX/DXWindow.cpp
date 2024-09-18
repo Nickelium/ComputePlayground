@@ -61,6 +61,11 @@
 //	return nullptr;
 //}
 
+//#include "imgui/backends/imgui_impl_win32.h"
+// Forward declare message handler from imgui_impl_win32.cpp
+extern LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
+
+
 // Global across all windows
 LRESULT DXWindow::OnWindowMessage(HWND handle, UINT msg, WPARAM wParam, LPARAM lParam)
 {
@@ -82,6 +87,9 @@ LRESULT DXWindow::OnWindowMessage(HWND handle, UINT msg, WPARAM wParam, LPARAM l
 		const LONG_PTR ptr = GetWindowLongPtr(handle, GWLP_USERDATA);
 		pWindow = reinterpret_cast<DXWindow*>(ptr);
 	}
+
+	if (ImGui_ImplWin32_WndProcHandler(handle, msg, wParam, lParam))
+		return true;
 
 	switch (msg)
 	{

@@ -255,8 +255,9 @@ private:
 	CommandQueue m_queue_compute;
 	// Copy
 	CommandQueue m_queue_copy;
-	
+public:
 	CommandList m_command_list_graphics;
+private:
 	std::vector<CommandAllocator> m_command_allocator_graphics;
 
 	CommandList m_command_list_compute;
@@ -279,14 +280,11 @@ public:
 
 	RTVDescriptorHandler m_rtv_descriptor_handler;
 	
+	void DescriptorAllocateCheck();
+	void DescriptorAllocate(D3D12_CPU_DESCRIPTOR_HANDLE& cpu_descriptor, D3D12_GPU_DESCRIPTOR_HANDLE& gpu_descriptor, uint32& bindless_index);
 	UAV CreateUAV(const DXResource& resource, const D3D12_UNORDERED_ACCESS_VIEW_DESC& desc);
 	SRV CreateSRV(const DXResource& resource, const D3D12_SHADER_RESOURCE_VIEW_DESC& desc);
 	CBV CreateCBV(const DXResource& resource);
-
-	// Buffers for UAV and SRV
-	void CreateTypeBuffer();
-	void CreateStructuredBuffer();
-	void CreateByteBuffer();
 
 public:
 	std::vector<std::pair<uint64, uint32>> m_list_pair_fence_free_index;

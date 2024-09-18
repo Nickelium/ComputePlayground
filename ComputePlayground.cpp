@@ -1,7 +1,7 @@
 // ImGui new operator clash with something?
-//#include "imgui/imgui.h"
-//#include "imgui/backends/imgui_impl_win32.h"
-//#include "imgui/backends/imgui_impl_dx12.h"
+#include "imgui/imgui.h"
+#include "imgui/backends/imgui_impl_win32.h"
+#include "imgui/backends/imgui_impl_dx12.h"
 
 #include "core/Common.h"
 #include "DX/DXCommon.h"
@@ -392,40 +392,28 @@ void RunWindowLoop(DXContext& dx_context, DXCompiler& dx_compiler, GPUCapture* g
 		};
 		DXWindow dx_window(dx_context, window_manager, window_desc);
 
-		{
-			{
-				// Setup Platform/Renderer backends
-//				ImGui_ImplWin32_Init(dx_window.m_handle));
-//				ImGui_ImplDX12_Init(dx_context.GetDevice().Get(), g_backbuffer_count, dx,
-//				//	YOUR_SRV_DESC_HEAP,
-//				//	// You'll need to designate a descriptor from your descriptor heap for Dear ImGui to use internally for its font texture's SRV
-//				//	YOUR_CPU_DESCRIPTOR_HANDLE_FOR_FONT_SRV,
-//				//	YOUR_GPU_DESCRIPTOR_HANDLE_FOR_FONT_SRV);
-//
-//				// (Your code process and dispatch Win32 messages)
-//				// Start the Dear ImGui frame
-//                ImGui_ImplDX12_NewFrame();
-//				ImGui_ImplWin32_NewFrame();
-//				ImGui::NewFrame();
-//				ImGui::ShowDemoWindow(); // Show demo window! :)
-//
-//				// Rendering
-//				// (Your code clears your framebuffer, renders your other stuff etc.)
-//				ImGui::Render();
-//				ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), YOUR_DX12_COMMAND_LIST);
-//				// (Your code calls ExecuteCommandLists, swapchain's Present(), etc.)
-//
-//				extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
-//				if (ImGui_ImplWin32_WndProcHandler(hWnd, msg, wParam, lParam))
-//					return true;
-//				//(Your code process Windows messages.)
-//
-//				ImGui_ImplDX12_Shutdown();
-//				ImGui_ImplWin32_Shutdown();
-//				ImGui::DestroyContext();
-			}
-		}
+		DescriptorHeap imgui_descriptor_heap{};
+		dx_context.CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 1, "ImGui descriptor heap", imgui_descriptor_heap);
+		D3D12_CPU_DESCRIPTOR_HANDLE cpu_descriptor = dx_context.GetCPUDescriptorHandle(imgui_descriptor_heap, 0);
+		D3D12_GPU_DESCRIPTOR_HANDLE gpu_descriptor = dx_context.GetGPUDescriptorHandle(imgui_descriptor_heap, 0);
 
+		{
+			// Setup Dear ImGui context
+			IMGUI_CHECKVERSION();
+			ImGui::CreateContext();
+			ImGuiIO& io = ImGui::GetIO();
+			io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
+			io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
+			//io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;         // IF using Docking Branch
+
+			// Setup Platform/Renderer backends
+			ImGui_ImplWin32_Init(dx_window.m_handle);
+			ImGui_ImplDX12_Init(dx_context.GetDevice().Get(), g_backbuffer_count, DXGI_FORMAT_R8G8B8A8_UNORM,
+			imgui_descriptor_heap.m_heap.Get(),
+			// You'll need to designate a descriptor from your descriptor heap for Dear ImGui to use internally for its font texture's SRV
+			cpu_descriptor,
+			gpu_descriptor);
+		}
 
 		{
 			GraphicsResources gfx_resource{};
@@ -437,7 +425,14 @@ void RunWindowLoop(DXContext& dx_context, DXCompiler& dx_compiler, GPUCapture* g
 			{
 				// Process window message
 				dx_window.Update();
-					
+			
+				// (Your code process and dispatch Win32 messages)
+				// Start the Dear ImGui frame
+				ImGui_ImplDX12_NewFrame();
+				ImGui_ImplWin32_NewFrame();
+				ImGui::NewFrame();
+				ImGui::ShowDemoWindow(); // Show demo window! :)
+
 				// Key input handling of application
 				static bool prev_F1_pressed = false;
 				bool capture = false;
@@ -488,6 +483,17 @@ void RunWindowLoop(DXContext& dx_context, DXCompiler& dx_compiler, GPUCapture* g
 						
 						dx_context.InitCommandLists();
 						FillCommandList(dx_context, dx_window, gfx_resource, compute_resource, uses_pix);
+						
+						// Rendering
+						// (Your code clears your framebuffer, renders your other stuff etc.)
+						dx_context.Transition(D3D12_RESOURCE_STATE_RENDER_TARGET, dx_window.m_buffers[g_current_buffer_index]);
+						ImGui::Render();
+						dx_context.GetCommandListGraphics()->SetDescriptorHeaps(1, imgui_descriptor_heap.m_heap.GetAddressOf());
+						ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), dx_context.GetCommandListGraphics().Get());
+						// (Your code calls ExecuteCommandLists, swapchain's Present(), etc.)
+						dx_context.Transition(D3D12_RESOURCE_STATE_PRESENT, dx_window.m_buffers[g_current_buffer_index]);
+
+
 						dx_context.ExecuteCommandListGraphics();
 						dx_window.Present(dx_context);
 					}
@@ -500,6 +506,12 @@ void RunWindowLoop(DXContext& dx_context, DXCompiler& dx_compiler, GPUCapture* g
 
 			}
 			dx_context.Flush(dx_window.GetBackBufferCount());
+		}
+
+		{
+			ImGui_ImplDX12_Shutdown();
+			ImGui_ImplWin32_Shutdown();
+			ImGui::DestroyContext();
 		}
 	}
 }
@@ -866,14 +878,6 @@ void RunTest()
 #pragma endregion
 int main()
 {
-	// Setup Dear ImGui context
-	//IMGUI_CHECKVERSION();
-	//ImGui::CreateContext();
-	//ImGuiIO& io = ImGui::GetIO();
-	//io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
-	//io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
-	//io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;         // IF using Docking Branch
-
 	start_time = std::chrono::high_resolution_clock::now();
 
 	MemoryTrack();
