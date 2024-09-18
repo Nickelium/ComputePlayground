@@ -1,6 +1,6 @@
 #include "DXCommon.h"
 // Note: Requires C++23
-#include <stacktrace> 
+//#include <stacktrace> 
 
 CheckToken CHK = CheckToken{};
 
@@ -20,8 +20,8 @@ void operator>>(const HRSourceLocation hr_source_location, const CheckToken chk_
 			std::string(hr_source_location.m_source_location.function_name()) + " line " +
 			std::to_string(hr_source_location.m_source_location.line());
 
-		auto trace = std::stacktrace::current();
-		LogError(std::to_string(trace));
+		//auto trace = std::stacktrace::current();
+		//LogError(std::to_string(trace));
 		LogError(line_string);
 		LogError("Error Code " + std::to_string(hr_source_location.m_hr) + ": " + error_code_string);
 		ASSERT(false);

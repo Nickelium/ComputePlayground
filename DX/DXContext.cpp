@@ -481,7 +481,7 @@ void DXContext::CreateDescriptorHeap
 	out_descriptor_heap.m_heap_type = descriptor_heap_type;
 	out_descriptor_heap.m_number_descriptors = number_descriptors;
 	out_descriptor_heap.m_increment_size = s_descriptor_sizes[(uint32)out_descriptor_heap.m_heap_type];
-
+	UNUSED(descriptor_heap_name);
 	NAME_DX_OBJECT(out_descriptor_heap.m_heap, descriptor_heap_name);
 }
 
