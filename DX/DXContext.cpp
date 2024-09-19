@@ -9,7 +9,7 @@
 #endif
 
 DXContext::DXContext() :
-	m_use_warp(true)
+	m_use_warp(false)
 #if defined(_DEBUG)
 	,
 	m_callback_handle(0)
@@ -165,6 +165,17 @@ void DXContext::Init()
 	else
 	{
 		m_factory->EnumAdapterByGpuPreference(0, DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE, IID_PPV_ARGS(&m_adapter)) >> CHK;
+	}
+
+	// TODO all warps??
+	IDXGIAdapter* ad = nullptr;
+	for (UINT i = 0;
+		m_factory->EnumAdapters(i, &ad) != DXGI_ERROR_NOT_FOUND;
+		++i)
+	{
+		DXGI_ADAPTER_DESC adapter_desc;
+		ad->GetDesc(&adapter_desc) >> CHK;
+		LogTrace(std::to_string(adapter_desc.Description));
 	}
 
 	DXGI_ADAPTER_DESC2 adapter_desc;

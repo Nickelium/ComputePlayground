@@ -2,6 +2,17 @@
 #include "../DX/DXCommon.h"
 #include <filesystem>
 
+const std::string& g_capture_relative_path = ".\\captures\\";
+
+void CreateCapturePath()
+{
+	if (!std::filesystem::exists(g_capture_relative_path))
+	{
+		bool create_success = std::filesystem::create_directory(g_capture_relative_path);
+		ASSERT(create_success);
+	}
+}
+
 std::string GetNewestCaptureName(const std::string& capture_relative_path, const std::string& capture_template_name, const std::string& capture_extension)
 {
 	std::string identifier = "";
@@ -65,10 +76,11 @@ void PIXCapture::StartCapture()
 {
 	if (m_pix_module)
 	{
-		const std::string& pix_relative_path = ".\\captures\\";
+		CreateCapturePath();
+
 		const std::string& pix_template_name = "pix_capture";
 		const std::string& pix_extension = ".wpix";
-		m_pix_absolute_path = GetNewestCaptureName(pix_relative_path, pix_template_name, pix_extension);
+		m_pix_absolute_path = GetNewestCaptureName(g_capture_relative_path, pix_template_name, pix_extension);
 		const std::wstring& pix_absolute_path_wstring = std::to_wstring(m_pix_absolute_path);
 		//PIXGpuCaptureNextFrames(pix_absolute_path_wstring.c_str(), 1) >> CHK;
 		PIXCaptureParameters captureParameters =
@@ -214,10 +226,11 @@ void RenderDocCapture::EndCapture()
 	const std::string full_path_template = file_path_template + name_template;
 	m_renderdoc_api->SetCaptureFilePathTemplate(full_path_template.c_str());
 
-	const std::string& renderdoc_relative_path = ".\\captures\\";
+	CreateCapturePath();
+
 	const std::string& renderdoc_template_name = name_template + "_capture";
 	const std::string& renderdoc_extension = ".rdc";
-	m_renderdoc_absolute_path = GetNewestCaptureName(renderdoc_relative_path, renderdoc_template_name, renderdoc_extension);
+	m_renderdoc_absolute_path = GetNewestCaptureName(g_capture_relative_path, renderdoc_template_name, renderdoc_extension);
 
 	if (m_renderdoc_api)
 	{

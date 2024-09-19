@@ -371,7 +371,7 @@ void FillCommandList
 	dx_context.GetCommandListGraphics()->SetDescriptorHeaps(1, dx_context.m_resources_descriptor_heap.m_heap.GetAddressOf());
 	{
 		ComputeWork(dx_context, compute_resource, dx_window, dx_window.m_buffers[g_current_buffer_index]);
-		GraphicsWork(dx_context, dx_window, gfx_resource, dx_window.m_buffers[g_current_buffer_index], use_old_pso);
+		//GraphicsWork(dx_context, dx_window, gfx_resource, dx_window.m_buffers[g_current_buffer_index], use_old_pso);
 	}
 	dx_window.EndFrame(dx_context);
 }
@@ -421,6 +421,91 @@ void RunWindowLoop(DXContext& dx_context, DXCompiler& dx_compiler, GPUCapture* g
 			CreateGraphicsResources(dx_context, dx_compiler, dx_window, gfx_resource, uses_pix);
 			ComputeResources compute_resource{};
 			CreateComputeResources(dx_context, dx_compiler, compute_resource);
+
+			// Indirect buffers
+			Microsoft::WRL::ComPtr<IDxcBlob> indirect_shader{};
+			dx_compiler.Compile(dx_context.GetDevice(), &indirect_shader, "IndirectShader.hlsl", ShaderType::COMPUTE_SHADER);
+
+			Microsoft::WRL::ComPtr<ID3D12RootSignature> indirect_root_signature{};
+			// Root signature embed in the shader
+			dx_context.GetDevice()->CreateRootSignature(0, indirect_shader->GetBufferPointer(), indirect_shader->GetBufferSize(), IID_PPV_ARGS(&indirect_root_signature)) >> CHK;
+			NAME_DX_OBJECT(indirect_root_signature, "Indirect RootSignature");
+
+			std::string indirect_name{ "Indirect" };
+			std::wstring indirect_wname = std::to_wstring(indirect_name);
+
+			CD3DX12_STATE_OBJECT_DESC cstate_object_desc;
+			cstate_object_desc.SetStateObjectType(D3D12_STATE_OBJECT_TYPE_EXECUTABLE);
+
+			CD3DX12_DXIL_LIBRARY_SUBOBJECT* cs_subobj = cstate_object_desc.CreateSubobject<CD3DX12_DXIL_LIBRARY_SUBOBJECT>();
+			D3D12_SHADER_BYTECODE cs_byte_code
+			{
+				.pShaderBytecode = indirect_shader->GetBufferPointer(),
+				.BytecodeLength = indirect_shader->GetBufferSize(),
+			};
+			cs_subobj->SetDXILLibrary(&cs_byte_code);
+			CD3DX12_GENERIC_PROGRAM_SUBOBJECT* generic_subobj = cstate_object_desc.CreateSubobject<CD3DX12_GENERIC_PROGRAM_SUBOBJECT>();
+			generic_subobj->SetProgramName(indirect_wname.c_str());
+			generic_subobj->AddExport(L"main");
+			// Apparently works without linking SO with RS, though RS is embedded in shader already but seem to be needed for graphics SO
+			Microsoft::WRL::ComPtr<ID3D12StateObject> indirect_so{};
+			dx_context.GetDevice()->CreateStateObject(cstate_object_desc, IID_PPV_ARGS(&indirect_so)) >> CHK;
+			NAME_DX_OBJECT(indirect_so, "Indirect State Object");
+
+			Microsoft::WRL::ComPtr<ID3D12StateObjectProperties1> state_object_properties;
+			indirect_so.As(&state_object_properties) >> CHK;
+			D3D12_PROGRAM_IDENTIFIER indirect_program_id = state_object_properties->GetProgramIdentifier(indirect_wname.c_str());
+			
+			//////////////////////////////////////////////////////////////////////////
+			// Indirect Vertex buffers
+			Microsoft::WRL::ComPtr<IDxcBlob> vertex_indirect_shader{};
+			dx_compiler.Compile(dx_context.GetDevice(), &vertex_indirect_shader, "FillVertexBufferShader.hlsl", ShaderType::COMPUTE_SHADER);
+
+			Microsoft::WRL::ComPtr<ID3D12RootSignature> vertex_indirect_root_signature{};
+			// Root signature embed in the shader
+			dx_context.GetDevice()->CreateRootSignature(0, vertex_indirect_shader->GetBufferPointer(), vertex_indirect_shader->GetBufferSize(), IID_PPV_ARGS(&vertex_indirect_root_signature)) >> CHK;
+			NAME_DX_OBJECT(indirect_root_signature, "Indirect RootSignature");
+
+			std::string vertex_indirect_name{ "Vertex Indirect" };
+			std::wstring vertex_indirect_wname = std::to_wstring(vertex_indirect_name);
+
+			CD3DX12_STATE_OBJECT_DESC vertex_cstate_object_desc;
+			vertex_cstate_object_desc.SetStateObjectType(D3D12_STATE_OBJECT_TYPE_EXECUTABLE);
+
+			CD3DX12_DXIL_LIBRARY_SUBOBJECT* vertex_cs_subobj = vertex_cstate_object_desc.CreateSubobject<CD3DX12_DXIL_LIBRARY_SUBOBJECT>();
+			D3D12_SHADER_BYTECODE vertex_cs_byte_code
+			{
+				.pShaderBytecode = vertex_indirect_shader->GetBufferPointer(),
+				.BytecodeLength = vertex_indirect_shader->GetBufferSize(),
+			};
+			vertex_cs_subobj->SetDXILLibrary(&vertex_cs_byte_code);
+			CD3DX12_GENERIC_PROGRAM_SUBOBJECT* vertex_generic_subobj = vertex_cstate_object_desc.CreateSubobject<CD3DX12_GENERIC_PROGRAM_SUBOBJECT>();
+			vertex_generic_subobj->SetProgramName(vertex_indirect_wname.c_str());
+			vertex_generic_subobj->AddExport(L"main");
+			// Apparently works without linking SO with RS, though RS is embedded in shader already but seem to be needed for graphics SO
+			Microsoft::WRL::ComPtr<ID3D12StateObject> vertex_indirect_so{};
+			dx_context.GetDevice()->CreateStateObject(vertex_cstate_object_desc, IID_PPV_ARGS(&vertex_indirect_so)) >> CHK;
+			NAME_DX_OBJECT(vertex_indirect_so, "Vertex Indirect State Object");
+
+			Microsoft::WRL::ComPtr<ID3D12StateObjectProperties1> vertex_state_object_properties;
+			vertex_indirect_so.As(&vertex_state_object_properties) >> CHK;
+			D3D12_PROGRAM_IDENTIFIER vertex_indirect_program_id = vertex_state_object_properties->GetProgramIdentifier(vertex_indirect_wname.c_str());
+			
+			D3D12_INDIRECT_ARGUMENT_DESC indirect_desc
+			{
+				.Type = D3D12_INDIRECT_ARGUMENT_TYPE_DRAW,
+			};
+			D3D12_COMMAND_SIGNATURE_DESC command_signature_desc
+			{
+				.ByteStride = sizeof(D3D12_DRAW_ARGUMENTS),
+				.NumArgumentDescs = 1,
+				.pArgumentDescs = &indirect_desc,
+				.NodeMask = 0,
+			};
+			Microsoft::WRL::ComPtr<ID3D12CommandSignature> command_signature{};
+			dx_context.GetDevice()->CreateCommandSignature(&command_signature_desc, nullptr, IID_PPV_ARGS(&command_signature)) >> CHK;
+			NAME_DX_OBJECT(command_signature, "Command Signature");
+
 			while (!dx_window.ShouldClose())
 			{
 				// Process window message
@@ -484,6 +569,177 @@ void RunWindowLoop(DXContext& dx_context, DXCompiler& dx_compiler, GPUCapture* g
 						dx_context.InitCommandLists();
 						FillCommandList(dx_context, dx_window, gfx_resource, compute_resource, uses_pix);
 						
+						{
+							// Indirect debug draw
+							// Create resource buffer for indirect argument
+							struct IndexedInstancedDrawArgs
+							{
+								uint32 IndexCountPerInstance;
+								uint32 InstanceCount;
+								uint32 StartIndexLocation;
+								int32  BaseVertexLocation;
+								uint32 StartInstanceLocation;
+							};
+							auto size = (uint32)sizeof(IndexedInstancedDrawArgs);
+							DXResource indirect_buffer{};
+							indirect_buffer.SetResourceInfo(D3D12_HEAP_TYPE_DEFAULT, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, size);
+							indirect_buffer.CreateResource(dx_context, "Indirect Buffer");
+							dx_context.m_resource_handler.RegisterResource(indirect_buffer);
+
+							struct MyCBuffer
+							{
+								uint32 bindless_index;
+							};
+
+							// Indirect Work
+							// Transition to UAV
+							dx_context.Transition(D3D12_RESOURCE_STATE_UNORDERED_ACCESS, indirect_buffer);
+
+							D3D12_SET_PROGRAM_DESC program_desc
+							{
+								.Type = D3D12_PROGRAM_TYPE_GENERIC_PIPELINE,
+								.GenericPipeline =
+								{
+									.ProgramIdentifier = indirect_program_id
+								},
+							};
+							dx_context.GetCommandListGraphics()->SetProgram(&program_desc);
+
+							D3D12_UNORDERED_ACCESS_VIEW_DESC UAV_desc = GetStructuredBufferUAVDesc(1, sizeof(IndexedInstancedDrawArgs));
+							UAV uav = dx_context.CreateUAV(indirect_buffer, UAV_desc);
+
+							MyCBuffer cbuffer
+							{
+								.bindless_index = uav.m_bindless_index
+							};
+
+							dx_context.GetCommandListGraphics()->SetComputeRootSignature(indirect_root_signature.Get());
+
+							dx_context.GetCommandListGraphics()->SetComputeRoot32BitConstants(0, sizeof(MyCBuffer) / 4, &cbuffer, 0);
+							uint32 dispatch_x = DivideRoundUp(1, 8);
+							uint32 dispatch_y = DivideRoundUp(1, 8);
+							dx_context.GetCommandListGraphics()->Dispatch(dispatch_x, dispatch_y, 1);
+							dx_context.Transition(D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT, indirect_buffer);
+
+							// Create Vertex Buffer
+							// Run shader that fills buffer
+
+							struct Vertex
+							{
+								float2 position;
+								float3 color;
+							};
+
+							const Vertex vertex_data[] =
+							{
+								{ {0.0f, +0.25f}, {1.0f, 0.0f, 0.0f} },
+								{ {+0.25f, -0.25f}, {0.0f, 1.0f, 0.0f} },
+								{ {-0.25f, -0.25f}, {0.0f, 0.0f, 1.0f} },
+							};
+
+							DXVertexBufferResource vertex_buffer_indirect{};
+							vertex_buffer_indirect.SetResourceInfo(D3D12_HEAP_TYPE_DEFAULT, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, sizeof(vertex_data), sizeof(vertex_data[0]));
+							vertex_buffer_indirect.CreateResource(dx_context, "VertexBuffer Indirect");
+							dx_context.m_resource_handler.RegisterResource(vertex_buffer_indirect);
+
+							struct VertexMyCBuffer
+							{
+								uint32 bindless_index;
+							};
+
+							dx_context.Transition(D3D12_RESOURCE_STATE_UNORDERED_ACCESS, vertex_buffer_indirect);
+
+							D3D12_SET_PROGRAM_DESC vertex_program_desc
+							{
+								.Type = D3D12_PROGRAM_TYPE_GENERIC_PIPELINE,
+								.GenericPipeline =
+								{
+									.ProgramIdentifier = vertex_indirect_program_id
+								},
+							};
+							dx_context.GetCommandListGraphics()->SetProgram(&vertex_program_desc);
+
+							D3D12_UNORDERED_ACCESS_VIEW_DESC vertex_UAV_desc = GetStructuredBufferUAVDesc(1, sizeof(Vertex));
+							UAV vertex_uav = dx_context.CreateUAV(vertex_buffer_indirect, vertex_UAV_desc);
+
+							VertexMyCBuffer vertex_cbuffer
+							{
+								.bindless_index = vertex_uav.m_bindless_index
+							};
+
+							dx_context.GetCommandListGraphics()->SetComputeRootSignature(vertex_indirect_root_signature.Get());
+
+							dx_context.GetCommandListGraphics()->SetComputeRoot32BitConstants(0, sizeof(VertexMyCBuffer) / 4, &vertex_cbuffer, 0);
+							uint32 dispatch_x1 = DivideRoundUp(1, 8);
+							uint32 dispatch_y1 = DivideRoundUp(1, 8);
+							dx_context.GetCommandListGraphics()->Dispatch(dispatch_x1, dispatch_y1, 1);
+							dx_context.Transition(D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE, vertex_buffer_indirect);
+							
+							D3D12_VIEWPORT view_ports[] =
+							{
+								{
+									.TopLeftX = 0,
+									.TopLeftY = 0,
+									.Width = (float)dx_window.GetWidth(),
+									.Height = (float)dx_window.GetHeight(),
+									.MinDepth = 0,
+									.MaxDepth = 1,
+								}
+							};
+							D3D12_RECT scissor_rects[] =
+							{
+								{
+									.left = 0,
+									.top = 0,
+									.right = (long)dx_window.GetWidth(),
+									.bottom = (long)dx_window.GetHeight(),
+								}
+							};
+							dx_context.GetCommandListGraphics()->RSSetViewports(1, view_ports);
+							dx_context.GetCommandListGraphics()->RSSetScissorRects(1, scissor_rects);
+
+							D3D12_SHADER_RESOURCE_VIEW_DESC desc = GetStructuredBufferSRVDesc(vertex_buffer_indirect.m_count, vertex_buffer_indirect.m_stride);
+							SRV srv = dx_context.CreateSRV(vertex_buffer_indirect, desc);
+
+							dx_context.GetCommandListGraphics()->SetGraphicsRootSignature(gfx_resource.m_gfx_root_signature.Get());
+							
+							if (uses_pix)
+							{
+								dx_context.GetCommandListGraphics()->SetPipelineState(gfx_resource.m_gfx_pso.Get());
+							}
+							else
+							{
+								D3D12_SET_PROGRAM_DESC program_desc
+								{
+									.Type = D3D12_PROGRAM_TYPE_GENERIC_PIPELINE,
+									.GenericPipeline =
+									{
+										.ProgramIdentifier = gfx_resource.m_program_id,
+									},
+								};
+								dx_context.GetCommandListGraphics()->SetProgram(&program_desc);
+							}
+							uint32 bindless_index = srv.m_bindless_index;
+							dx_context.GetCommandListGraphics()->SetGraphicsRoot32BitConstants(0, 1, &bindless_index, 0);
+							dx_context.GetCommandListGraphics()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+							// transition
+
+							dx_context.Transition(D3D12_RESOURCE_STATE_RENDER_TARGET, dx_window.m_buffers[g_current_buffer_index]);
+							D3D12_RENDER_TARGET_VIEW_DESC rtv_desc
+							{
+								.Format = dx_window.m_buffers[g_current_buffer_index].m_format,
+								.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D,
+								.Texture2D =
+								{
+									.MipSlice = 0,
+									.PlaneSlice = 0,
+								},
+							};
+							ID3D12Resource* d3d12_ouput_resource = dx_window.m_buffers[g_current_buffer_index].m_resource.Get();
+							dx_context.OMSetRenderTargets(1, &d3d12_ouput_resource, &rtv_desc, nullptr, nullptr);
+							dx_context.GetCommandListGraphics()->ExecuteIndirect(command_signature.Get() , 1, indirect_buffer.m_resource.Get(), 0, nullptr, 0);
+						}
+
 						// Rendering
 						// (Your code clears your framebuffer, renders your other stuff etc.)
 						dx_context.Transition(D3D12_RESOURCE_STATE_RENDER_TARGET, dx_window.m_buffers[g_current_buffer_index]);
@@ -885,8 +1141,8 @@ int main()
 	DXReportContext dx_report_context{};
 	{
 		// TODO PIX / renderdoc markers
-		//GPUCapture * gpu_capture = nullptr;
-		GPUCapture* gpu_capture = new PIXCapture();
+		GPUCapture * gpu_capture = nullptr;
+		//GPUCapture* gpu_capture = new PIXCapture();
 		// RenderDoc doesnt support WorkGraph and newer interfaces
 		//GPUCapture* gpu_capture = new RenderDocCapture();
 
@@ -897,7 +1153,7 @@ int main()
 		//gpu_capture->StartCapture();
 		do
 		{
-			RunWorkGraph(dx_context, dx_compiler, dynamic_cast<PIXCapture*>(gpu_capture) != nullptr);
+			//RunWorkGraph(dx_context, dx_compiler, dynamic_cast<PIXCapture*>(gpu_capture) != nullptr);
 		}while (false);
 		//gpu_capture->EndCapture();
 		//gpu_capture->OpenCapture();

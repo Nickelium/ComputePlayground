@@ -6,7 +6,7 @@
 // TODO shader unit test readback
 // TODO shader debug draw
 //https://www.gijskaerts.com/wordpress/?p=190
-// TODO ImGui
+
 struct MyCBuffer
 {
 	int2 resolution;
