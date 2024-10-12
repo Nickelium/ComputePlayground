@@ -82,6 +82,8 @@
     <None Include="shaders\PixelShader.hlsl" />
     <None Include="shaders\VertexShader.hlsl" />
     <None Include="shaders\WorkGraphShader.hlsl" />
+    <None Include="shaders\IndirectShader.hlsl" />
+    <None Include="shaders\FillVertexBufferShader.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="DX\DXCompiler.h">
