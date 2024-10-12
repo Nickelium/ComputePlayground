@@ -8,6 +8,8 @@
 #include <dxgidebug.h>
 #endif
 
+#include <map>
+
 DXContext::DXContext() :
 	m_use_warp(true)
 #if defined(_DEBUG)
@@ -99,6 +101,164 @@ namespace
 	}
 }
 
+static const std::map<D3D12_AUTO_BREADCRUMB_OP, std::string> g_breadcrumb_operation_map_string =
+{
+	{ D3D12_AUTO_BREADCRUMB_OP_SETMARKER, "Set Marker" },
+	{ D3D12_AUTO_BREADCRUMB_OP_BEGINEVENT, "Begin Event" },
+	{ D3D12_AUTO_BREADCRUMB_OP_ENDEVENT, "End Event" },
+	{ D3D12_AUTO_BREADCRUMB_OP_DRAWINSTANCED, "Draw Instanced" },
+	{ D3D12_AUTO_BREADCRUMB_OP_DRAWINDEXEDINSTANCED, "Draw Indexed Instanced" },
+	{ D3D12_AUTO_BREADCRUMB_OP_EXECUTEINDIRECT, "Execute Indirect" },
+	{ D3D12_AUTO_BREADCRUMB_OP_DISPATCH, "Dispatch" },
+	{ D3D12_AUTO_BREADCRUMB_OP_COPYBUFFERREGION, "Copy Buffer Region" },
+	{ D3D12_AUTO_BREADCRUMB_OP_COPYTEXTUREREGION, "Copy Texture Region" },
+	{ D3D12_AUTO_BREADCRUMB_OP_COPYRESOURCE, "Copy Resource" },
+	{ D3D12_AUTO_BREADCRUMB_OP_COPYTILES, "Copy Tiles" },
+	{ D3D12_AUTO_BREADCRUMB_OP_RESOLVESUBRESOURCE, "Resolve SubResource" },
+	{ D3D12_AUTO_BREADCRUMB_OP_CLEARRENDERTARGETVIEW, "Clear RTV" },
+	{ D3D12_AUTO_BREADCRUMB_OP_CLEARUNORDEREDACCESSVIEW, "Clear UAV" },
+	{ D3D12_AUTO_BREADCRUMB_OP_CLEARDEPTHSTENCILVIEW, "Clear DSV" },
+	{ D3D12_AUTO_BREADCRUMB_OP_RESOURCEBARRIER, "Resource Barrier" },
+	{ D3D12_AUTO_BREADCRUMB_OP_EXECUTEBUNDLE, "Execute Bundle" },
+	{ D3D12_AUTO_BREADCRUMB_OP_PRESENT, "Present" },
+	{ D3D12_AUTO_BREADCRUMB_OP_RESOLVEQUERYDATA, "Resolve Query Data" },
+	{ D3D12_AUTO_BREADCRUMB_OP_BEGINSUBMISSION, "Begin Submission" },
+	{ D3D12_AUTO_BREADCRUMB_OP_ENDSUBMISSION, "End Submission" },
+	{ D3D12_AUTO_BREADCRUMB_OP_DECODEFRAME, "Decode Frame" },
+	{ D3D12_AUTO_BREADCRUMB_OP_PROCESSFRAMES, "Process Frames" },
+	{ D3D12_AUTO_BREADCRUMB_OP_ATOMICCOPYBUFFERUINT, "Atomic Copy Buffer uint" },
+	{ D3D12_AUTO_BREADCRUMB_OP_ATOMICCOPYBUFFERUINT64, "Atomic Copy Buffer uint64" },
+	{ D3D12_AUTO_BREADCRUMB_OP_RESOLVESUBRESOURCEREGION, "Resolve Subresource Region" },
+	{ D3D12_AUTO_BREADCRUMB_OP_WRITEBUFFERIMMEDIATE, "Write Buffer Immediate" },
+	{ D3D12_AUTO_BREADCRUMB_OP_DECODEFRAME1, "Decpde Frame 1" },
+	{ D3D12_AUTO_BREADCRUMB_OP_SETPROTECTEDRESOURCESESSION, "Set Protected Resource Session" },
+	{ D3D12_AUTO_BREADCRUMB_OP_DECODEFRAME2, "Decode Frame 2" },
+	{ D3D12_AUTO_BREADCRUMB_OP_PROCESSFRAMES1, "Process Frames 1" },
+	{ D3D12_AUTO_BREADCRUMB_OP_BUILDRAYTRACINGACCELERATIONSTRUCTURE, "Build ACC" },
+	{ D3D12_AUTO_BREADCRUMB_OP_EMITRAYTRACINGACCELERATIONSTRUCTUREPOSTBUILDINFO, "Emit ACC PostBuild Info" },
+	{ D3D12_AUTO_BREADCRUMB_OP_COPYRAYTRACINGACCELERATIONSTRUCTURE, "Copy ACC" },
+	{ D3D12_AUTO_BREADCRUMB_OP_DISPATCHRAYS, "Dispatch Rays" },
+	{ D3D12_AUTO_BREADCRUMB_OP_INITIALIZEMETACOMMAND, "Initialize Meta Command" },
+	{ D3D12_AUTO_BREADCRUMB_OP_EXECUTEMETACOMMAND, "Execute Meta Command" },
+	{ D3D12_AUTO_BREADCRUMB_OP_ESTIMATEMOTION, "Estimate Motion" },
+	{ D3D12_AUTO_BREADCRUMB_OP_RESOLVEMOTIONVECTORHEAP	, "Resolve Motion Vector Heap" },
+	{ D3D12_AUTO_BREADCRUMB_OP_SETPIPELINESTATE1, "Set PSO1" },
+	{ D3D12_AUTO_BREADCRUMB_OP_INITIALIZEEXTENSIONCOMMAND, "Initialize Extension Command" },
+	{ D3D12_AUTO_BREADCRUMB_OP_EXECUTEEXTENSIONCOMMAND, "Execute Extension Command" },
+	{ D3D12_AUTO_BREADCRUMB_OP_DISPATCHMESH, "Dispatch Mesh" },
+	{ D3D12_AUTO_BREADCRUMB_OP_ENCODEFRAME, "Encode Frame" },
+	{ D3D12_AUTO_BREADCRUMB_OP_RESOLVEENCODEROUTPUTMETADATA, "Resolve Encoder Output Meta Data" },
+};
+
+std::string BreadCrumbOperationString(D3D12_AUTO_BREADCRUMB_OP operation)
+{
+	auto iterator = g_breadcrumb_operation_map_string.find(operation);
+	if (iterator != g_breadcrumb_operation_map_string.cend())
+	{
+		return iterator->second;
+	}
+	ASSERT(false && "Invalid Bread Crumb Operation");
+	return "";
+}
+
+std::string BreadCrumbNodeToString(const D3D12_AUTO_BREADCRUMB_NODE* node)
+{
+	std::string output{};
+
+	std::string command_list_name = node->pCommandListDebugNameA;
+	std::string command_queue_name = node->pCommandQueueDebugNameA;
+	uint32 index = *node->pLastBreadcrumbValue;
+	output = std::format("Command List %s, on Command Queue %s", command_list_name, command_queue_name);
+	D3D12_AUTO_BREADCRUMB_OP operation = node->pCommandHistory[index];
+	std::string operation_string = BreadCrumbOperationString(operation);
+	output += std::format(", Operation %s", operation_string);
+	return output;
+}
+
+std::string BreadCrumbToString(const D3D12_DRED_AUTO_BREADCRUMBS_OUTPUT& bread_crumb)
+{
+	std::string output{};
+	const D3D12_AUTO_BREADCRUMB_NODE* bread_crumb_node = bread_crumb.pHeadAutoBreadcrumbNode;
+	while (bread_crumb_node != nullptr)
+	{
+		if (*bread_crumb_node->pLastBreadcrumbValue < bread_crumb_node->BreadcrumbCount)
+		{
+			output += BreadCrumbNodeToString(bread_crumb_node);
+			output += "\n";
+		}
+		bread_crumb_node = bread_crumb_node->pNext;
+	}
+
+	return output;
+}
+
+static const std::map<D3D12_DRED_ALLOCATION_TYPE, std::string> g_dred_allocation_type_map_string =
+{
+	{D3D12_DRED_ALLOCATION_TYPE_COMMAND_QUEUE, "Command Queue" },
+	{D3D12_DRED_ALLOCATION_TYPE_COMMAND_ALLOCATOR, "Command Allocator" },
+	{D3D12_DRED_ALLOCATION_TYPE_PIPELINE_STATE, "PSO" },
+	{D3D12_DRED_ALLOCATION_TYPE_COMMAND_LIST, "Command List" },
+	{D3D12_DRED_ALLOCATION_TYPE_FENCE, "Fence" },
+	{D3D12_DRED_ALLOCATION_TYPE_DESCRIPTOR_HEAP, "Descriptor Heap" },
+	{D3D12_DRED_ALLOCATION_TYPE_HEAP, "Heap" },
+	{D3D12_DRED_ALLOCATION_TYPE_QUERY_HEAP, "Query Heap" },
+	{D3D12_DRED_ALLOCATION_TYPE_COMMAND_SIGNATURE, "Command Signature" },
+	{D3D12_DRED_ALLOCATION_TYPE_PIPELINE_LIBRARY, "PSO Library" },
+	{D3D12_DRED_ALLOCATION_TYPE_VIDEO_DECODER, "Video Decoder" },
+	{D3D12_DRED_ALLOCATION_TYPE_VIDEO_PROCESSOR, "Video Processor" },
+	{D3D12_DRED_ALLOCATION_TYPE_RESOURCE, "Resource" },
+	{D3D12_DRED_ALLOCATION_TYPE_PASS, "Pass" },
+	{D3D12_DRED_ALLOCATION_TYPE_CRYPTOSESSION, "Crypto Session" },
+	{D3D12_DRED_ALLOCATION_TYPE_CRYPTOSESSIONPOLICY, "Crypto Session Policy" },
+	{D3D12_DRED_ALLOCATION_TYPE_PROTECTEDRESOURCESESSION, "Protected Resource Session" },
+	{D3D12_DRED_ALLOCATION_TYPE_VIDEO_DECODER_HEAP, "Video Decode Heap" },
+	{D3D12_DRED_ALLOCATION_TYPE_COMMAND_POOL, "Command Pool" },
+	{D3D12_DRED_ALLOCATION_TYPE_COMMAND_RECORDER, "Command Recorder" },
+	{D3D12_DRED_ALLOCATION_TYPE_STATE_OBJECT, "SO" },
+	{D3D12_DRED_ALLOCATION_TYPE_METACOMMAND, "Meta Command" },
+	{D3D12_DRED_ALLOCATION_TYPE_SCHEDULINGGROUP, "Scheduling Group" },
+	{D3D12_DRED_ALLOCATION_TYPE_VIDEO_MOTION_ESTIMATOR, "Video Motion Estimator" },
+	{D3D12_DRED_ALLOCATION_TYPE_VIDEO_MOTION_VECTOR_HEAP, "Video Motion Vector Heap" },
+	{D3D12_DRED_ALLOCATION_TYPE_VIDEO_EXTENSION_COMMAND, "Video Extension Command" },
+	{D3D12_DRED_ALLOCATION_TYPE_VIDEO_ENCODER, "Video Encoder" },
+	{D3D12_DRED_ALLOCATION_TYPE_VIDEO_ENCODER_HEAP, "Video Encoder Heap" },
+	{D3D12_DRED_ALLOCATION_TYPE_INVALID, "Invalid" },
+};
+
+std::string AllocationTypeString(D3D12_DRED_ALLOCATION_TYPE type)
+{
+	auto iterator = g_dred_allocation_type_map_string.find(type);
+	if (iterator != g_dred_allocation_type_map_string.cend())
+	{
+		return iterator->second;
+	}
+	ASSERT(false && "Invalid Allocation Type");
+	return "";
+}
+
+std::string AllocationNodeString(const D3D12_DRED_ALLOCATION_NODE* node)
+{
+	std::string output{};
+	while (node != nullptr)
+	{
+		std::string object_string = node->ObjectNameA;
+		std::string allocation_type_string = AllocationTypeString(node->AllocationType);
+		node = node->pNext;
+	}
+	return output;
+}
+
+std::string PageFaultToString(const D3D12_DRED_PAGE_FAULT_OUTPUT& page_fault)
+{
+	std::string output{};
+	output += std::format("Page Fault at %lld\n", page_fault.PageFaultVA);
+	output += "Active Allocations:\n";
+	output += AllocationNodeString(page_fault.pHeadExistingAllocationNode);
+	output += "\nFreed Allocations:\n";
+	output += AllocationNodeString(page_fault.pHeadRecentFreedAllocationNode);
+	return output;
+}
+
 void OnDeviceRemoved(PVOID context, BOOLEAN)
 {
 	// Data to pass is limited so we dont pass ComPtr
@@ -115,6 +275,8 @@ void OnDeviceRemoved(PVOID context, BOOLEAN)
 		D3D12_DRED_AUTO_BREADCRUMBS_OUTPUT dred_autobreadcrumbs_output{};
 		D3D12_DRED_PAGE_FAULT_OUTPUT dred_page_fault_output{};
 		dred->GetAutoBreadcrumbsOutput(&dred_autobreadcrumbs_output) >> CHK;
+		std::string breadcrumb_string = BreadCrumbToString(dred_autobreadcrumbs_output);
+		LogError("%s\n", breadcrumb_string);
 		dred->GetPageFaultAllocationOutput(&dred_page_fault_output) >> CHK;
 		ASSERT(false);
 	}
@@ -593,8 +755,6 @@ void DXReportContext::ReportLDO()
 	}
 #endif
 }
-
-#include <map>
 
 static const std::map<D3D12_COMMAND_LIST_TYPE, std::string> g_command_list_type_map_string =
 {
