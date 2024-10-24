@@ -6,6 +6,8 @@
 #include <d3d12.h> // D3D12
 #include <dxgi1_6.h> // DXGI
 
+#include <dxcapi.h> // DXC compiler
+
 // Agility SDK needs to be included in main.cpp
 #define AGILITY_SDK_DECLARE() extern "C" { __declspec(dllexport) extern const UINT D3D12SDKVersion = 613; } \
 extern "C" { __declspec(dllexport) extern const char* D3D12SDKPath = ".\\D3D12\\"; }
@@ -37,3 +39,5 @@ void operator>>(HRSourceLocation hrSourceLocation, CheckToken);
 inline int64 ToKB(int64 bytes) { return bytes >> 10; }
 inline int64 ToMB(int64 bytes) { return bytes >> 20; }
 inline int64 ToGB(int64 bytes) { return bytes >> 30; }
+
+D3D12_SHADER_BYTECODE BlobToByteCode(Microsoft::WRL::ComPtr<IDxcBlob> blob);

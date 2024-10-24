@@ -37,8 +37,13 @@ void DXCompiler::Init(const std::string& directory)
 	m_utils->CreateDefaultIncludeHandler(&m_include_handler);
 }
 
-void DXCompiler::Compile(Microsoft::WRL::ComPtr<ID3D12Device> device, Microsoft::WRL::ComPtr<IDxcBlob>* outShaderBlob, const std::string& shaderFile, const ShaderType shaderType, const std::string& entry_point) const
+Shader DXCompiler::Compile(Microsoft::WRL::ComPtr<ID3D12Device> device, const ShaderDesc& shader_desc) const
 {
+	Microsoft::WRL::ComPtr<IDxcBlob> shader_blob;
+	std::string shaderFile = shader_desc.m_file_name;
+	ShaderType shaderType = shader_desc.m_type;
+	std::string entry_point = shader_desc.m_entry_point_name;
+	
 	Microsoft::WRL::ComPtr<IDxcBlobEncoding> shaderSource{};
 	const std::string shaderFullPath = m_directory + "\\" + shaderFile;
 	m_utils->LoadFile(std::to_wstring(shaderFullPath).c_str(), nullptr, &shaderSource) >> CHK;
@@ -98,6 +103,8 @@ void DXCompiler::Compile(Microsoft::WRL::ComPtr<ID3D12Device> device, Microsoft:
 	compileResult->GetStatus(&HR) >> CHK;
 	HR >> CHK;
 
-	compileResult->GetOutput(DXC_OUT_OBJECT, __uuidof(IDxcBlob), (void**)outShaderBlob, nullptr) >> CHK;
+	compileResult->GetOutput(DXC_OUT_OBJECT, __uuidof(IDxcBlob), (void**)&shader_blob, nullptr) >> CHK;
+
+	return Shader{shader_blob, shader_desc};
 }
 

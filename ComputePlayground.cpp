@@ -27,8 +27,8 @@ std::chrono::steady_clock::time_point start_time;
 struct ComputeResources
 {
 	// Compute
-	Microsoft::WRL::ComPtr<IDxcBlob> m_compute_shader;
-	Microsoft::WRL::ComPtr<ID3D12RootSignature> m_compute_root_signature;
+	Shader m_compute_shader;
+	RootSignature m_compute_root_signature;
 	
 	// State object needs to be alive for the id to work
 	Microsoft::WRL::ComPtr<ID3D12StateObject> m_compute_so;
@@ -50,9 +50,9 @@ struct GraphicsResources
 	// Graphics
 	// Persistent resource
 	DXVertexBufferResource m_vertex_buffer;
-	Microsoft::WRL::ComPtr<IDxcBlob> m_vertex_shader;
-	Microsoft::WRL::ComPtr<IDxcBlob> m_pixel_shader;
-	Microsoft::WRL::ComPtr<ID3D12RootSignature> m_gfx_root_signature;
+	Shader m_vertex_shader;
+	Shader m_pixel_shader;
+	RootSignature m_gfx_root_signature;
 
 	Microsoft::WRL::ComPtr<ID3D12PipelineState> m_gfx_pso;
 	// State object needs to be alive for the id to work
@@ -62,12 +62,12 @@ struct GraphicsResources
 
 void CreateGraphicsResources
 (
-	DXContext& dx_context, const DXCompiler& dx_compiler, const DXWindow& dx_window, 
+	DXContext& dx_context, const DXCompiler& dx_compiler, const DXWindow& dx_window,
 	GraphicsResources& resource, bool use_old_pso
 )
 {
-	dx_compiler.Compile(dx_context.GetDevice(), &resource.m_vertex_shader, "VertexShader.hlsl", ShaderType::VERTEX_SHADER);
-	dx_compiler.Compile(dx_context.GetDevice(), &resource.m_pixel_shader, "PixelShader.hlsl", ShaderType::PIXEL_SHADER);
+	resource.m_vertex_shader = dx_compiler.Compile(dx_context.GetDevice(), { ShaderType::VERTEX_SHADER, "VertexShader.hlsl", "main" });
+	resource.m_pixel_shader = dx_compiler.Compile(dx_context.GetDevice(), {ShaderType::PIXEL_SHADER, "PixelShader.hlsl", "main" });
 
 	{
 		struct Vertex
@@ -106,8 +106,7 @@ void CreateGraphicsResources
 		dx_context.Flush(1);
 
 		// Same rootsignature for VS and PS
-		dx_context.GetDevice()->CreateRootSignature(0, resource.m_vertex_shader->GetBufferPointer(), resource.m_vertex_shader->GetBufferSize(), IID_PPV_ARGS(&resource.m_gfx_root_signature)) >> CHK;
-		NAME_DX_OBJECT(resource.m_gfx_root_signature, "Graphics RootSignature");
+		resource.m_gfx_root_signature = dx_context.CreateRS(resource.m_vertex_shader);
 
 		if (use_old_pso)
 		{
@@ -123,13 +122,13 @@ void CreateGraphicsResources
 				.pRootSignature = nullptr,
 				.VS =
 				{
-					.pShaderBytecode = resource.m_vertex_shader->GetBufferPointer(),
-					.BytecodeLength = resource.m_vertex_shader->GetBufferSize(),
+					.pShaderBytecode = resource.m_vertex_shader.m_blob->GetBufferPointer(),
+					.BytecodeLength = resource.m_vertex_shader.m_blob->GetBufferSize(),
 				},
 				.PS =
 				{
-					.pShaderBytecode = resource.m_pixel_shader->GetBufferPointer(),
-					.BytecodeLength = resource.m_pixel_shader->GetBufferSize(),
+					.pShaderBytecode = resource.m_pixel_shader.m_blob->GetBufferPointer(),
+					.BytecodeLength = resource.m_pixel_shader.m_blob->GetBufferSize(),
 				},
 				.DS = nullptr,
 				.HS = nullptr,
@@ -238,19 +237,13 @@ void CreateGraphicsResources
 			cstate_object_desc.SetStateObjectType(D3D12_STATE_OBJECT_TYPE_EXECUTABLE);
 
 			CD3DX12_DXIL_LIBRARY_SUBOBJECT* vs_subobj = cstate_object_desc.CreateSubobject<CD3DX12_DXIL_LIBRARY_SUBOBJECT>();
-			D3D12_SHADER_BYTECODE vs_byte_code
-			{
-				.pShaderBytecode = resource.m_vertex_shader->GetBufferPointer(),
-				.BytecodeLength = resource.m_vertex_shader->GetBufferSize(),
-			};
+			D3D12_SHADER_BYTECODE vs_byte_code = BlobToByteCode(resource.m_vertex_shader.m_blob);
+
 			vs_subobj->SetDXILLibrary(&vs_byte_code);
 			vs_subobj->DefineExport(vertexshader_entrypoint.c_str(), common_entrypoint.c_str());
 			CD3DX12_DXIL_LIBRARY_SUBOBJECT* ps_subobj = cstate_object_desc.CreateSubobject<CD3DX12_DXIL_LIBRARY_SUBOBJECT>();
-			D3D12_SHADER_BYTECODE ps_byte_code
-			{
-				.pShaderBytecode = resource.m_pixel_shader->GetBufferPointer(),
-				.BytecodeLength = resource.m_pixel_shader->GetBufferSize(),
-			};
+			D3D12_SHADER_BYTECODE ps_byte_code = BlobToByteCode(resource.m_pixel_shader.m_blob);
+			
 			ps_subobj->SetDXILLibrary(&ps_byte_code);
 			ps_subobj->DefineExport(pixelshader_entrypoint.c_str(), common_entrypoint.c_str());
 			CD3DX12_PRIMITIVE_TOPOLOGY_SUBOBJECT* topology_subobj = cstate_object_desc.CreateSubobject<CD3DX12_PRIMITIVE_TOPOLOGY_SUBOBJECT>();
@@ -267,7 +260,7 @@ void CreateGraphicsResources
 			generic_subobj->AddSubobject(*rt_subobj);
 			// Seem like the SO still need RS, even when its embedded in the shader, in contrast to PSO
 			CD3DX12_GLOBAL_ROOT_SIGNATURE_SUBOBJECT* global_rootsignature_subobj = cstate_object_desc.CreateSubobject<CD3DX12_GLOBAL_ROOT_SIGNATURE_SUBOBJECT>();
-			global_rootsignature_subobj->SetRootSignature(resource.m_gfx_root_signature.Get());
+			global_rootsignature_subobj->SetRootSignature(resource.m_gfx_root_signature.m_signature.Get());
 			// TODO: CD3DX12 cause PIX to fail on CreateSO
 			dx_context.GetDevice()->CreateStateObject(cstate_object_desc, IID_PPV_ARGS(&resource.m_gfx_so)) >> CHK;
 			NAME_DX_OBJECT(resource.m_gfx_so, "Graphics State Object");
@@ -315,7 +308,7 @@ void GraphicsWork
 		D3D12_SHADER_RESOURCE_VIEW_DESC desc = GetStructuredBufferSRVDesc(resource.m_vertex_buffer.m_count, resource.m_vertex_buffer.m_stride);
 		SRV srv = dx_context.CreateSRV(resource.m_vertex_buffer, desc);
 
-		dx_context.GetCommandListGraphics()->SetGraphicsRootSignature(resource.m_gfx_root_signature.Get());
+		dx_context.GetCommandListGraphics()->SetGraphicsRootSignature(resource.m_gfx_root_signature.m_signature.Get());
 		if (use_old_pso)
 		{
 			dx_context.GetCommandListGraphics()->SetPipelineState(resource.m_gfx_pso.Get());
@@ -423,12 +416,11 @@ void RunWindowLoop(DXContext& dx_context, DXCompiler& dx_compiler, GPUCapture* g
 			CreateComputeResources(dx_context, dx_compiler, compute_resource);
 
 			// Indirect buffers
-			Microsoft::WRL::ComPtr<IDxcBlob> indirect_shader{};
-			dx_compiler.Compile(dx_context.GetDevice(), &indirect_shader, "IndirectShader.hlsl", ShaderType::COMPUTE_SHADER);
+			Shader indirect_shader = dx_compiler.Compile(dx_context.GetDevice(), { ShaderType::COMPUTE_SHADER, "IndirectShader.hlsl", "main" });
 
 			Microsoft::WRL::ComPtr<ID3D12RootSignature> indirect_root_signature{};
 			// Root signature embed in the shader
-			dx_context.GetDevice()->CreateRootSignature(0, indirect_shader->GetBufferPointer(), indirect_shader->GetBufferSize(), IID_PPV_ARGS(&indirect_root_signature)) >> CHK;
+			dx_context.GetDevice()->CreateRootSignature(0, indirect_shader.m_blob->GetBufferPointer(), indirect_shader.m_blob->GetBufferSize(), IID_PPV_ARGS(&indirect_root_signature)) >> CHK;
 			NAME_DX_OBJECT(indirect_root_signature, "Indirect RootSignature");
 
 			std::string indirect_name{ "Indirect" };
@@ -438,11 +430,8 @@ void RunWindowLoop(DXContext& dx_context, DXCompiler& dx_compiler, GPUCapture* g
 			cstate_object_desc.SetStateObjectType(D3D12_STATE_OBJECT_TYPE_EXECUTABLE);
 
 			CD3DX12_DXIL_LIBRARY_SUBOBJECT* cs_subobj = cstate_object_desc.CreateSubobject<CD3DX12_DXIL_LIBRARY_SUBOBJECT>();
-			D3D12_SHADER_BYTECODE cs_byte_code
-			{
-				.pShaderBytecode = indirect_shader->GetBufferPointer(),
-				.BytecodeLength = indirect_shader->GetBufferSize(),
-			};
+			D3D12_SHADER_BYTECODE cs_byte_code = BlobToByteCode(indirect_shader.m_blob);
+			
 			cs_subobj->SetDXILLibrary(&cs_byte_code);
 			CD3DX12_GENERIC_PROGRAM_SUBOBJECT* generic_subobj = cstate_object_desc.CreateSubobject<CD3DX12_GENERIC_PROGRAM_SUBOBJECT>();
 			generic_subobj->SetProgramName(indirect_wname.c_str());
@@ -458,12 +447,11 @@ void RunWindowLoop(DXContext& dx_context, DXCompiler& dx_compiler, GPUCapture* g
 			
 			//////////////////////////////////////////////////////////////////////////
 			// Indirect Vertex buffers
-			Microsoft::WRL::ComPtr<IDxcBlob> vertex_indirect_shader{};
-			dx_compiler.Compile(dx_context.GetDevice(), &vertex_indirect_shader, "FillVertexBufferShader.hlsl", ShaderType::COMPUTE_SHADER);
+			Shader vertex_indirect_shader = dx_compiler.Compile(dx_context.GetDevice(), { ShaderType::COMPUTE_SHADER, "FillVertexBufferShader.hlsl", "main"});
 
 			Microsoft::WRL::ComPtr<ID3D12RootSignature> vertex_indirect_root_signature{};
 			// Root signature embed in the shader
-			dx_context.GetDevice()->CreateRootSignature(0, vertex_indirect_shader->GetBufferPointer(), vertex_indirect_shader->GetBufferSize(), IID_PPV_ARGS(&vertex_indirect_root_signature)) >> CHK;
+			dx_context.GetDevice()->CreateRootSignature(0, vertex_indirect_shader.m_blob->GetBufferPointer(), vertex_indirect_shader.m_blob->GetBufferSize(), IID_PPV_ARGS(&vertex_indirect_root_signature)) >> CHK;
 			NAME_DX_OBJECT(indirect_root_signature, "Indirect RootSignature");
 
 			std::string vertex_indirect_name{ "Vertex Indirect" };
@@ -473,11 +461,8 @@ void RunWindowLoop(DXContext& dx_context, DXCompiler& dx_compiler, GPUCapture* g
 			vertex_cstate_object_desc.SetStateObjectType(D3D12_STATE_OBJECT_TYPE_EXECUTABLE);
 
 			CD3DX12_DXIL_LIBRARY_SUBOBJECT* vertex_cs_subobj = vertex_cstate_object_desc.CreateSubobject<CD3DX12_DXIL_LIBRARY_SUBOBJECT>();
-			D3D12_SHADER_BYTECODE vertex_cs_byte_code
-			{
-				.pShaderBytecode = vertex_indirect_shader->GetBufferPointer(),
-				.BytecodeLength = vertex_indirect_shader->GetBufferSize(),
-			};
+			D3D12_SHADER_BYTECODE vertex_cs_byte_code = BlobToByteCode(vertex_indirect_shader.m_blob);
+			
 			vertex_cs_subobj->SetDXILLibrary(&vertex_cs_byte_code);
 			CD3DX12_GENERIC_PROGRAM_SUBOBJECT* vertex_generic_subobj = vertex_cstate_object_desc.CreateSubobject<CD3DX12_GENERIC_PROGRAM_SUBOBJECT>();
 			vertex_generic_subobj->SetProgramName(vertex_indirect_wname.c_str());
@@ -701,7 +686,7 @@ void RunWindowLoop(DXContext& dx_context, DXCompiler& dx_compiler, GPUCapture* g
 							D3D12_SHADER_RESOURCE_VIEW_DESC desc = GetStructuredBufferSRVDesc(vertex_buffer_indirect.m_count, vertex_buffer_indirect.m_stride);
 							SRV srv = dx_context.CreateSRV(vertex_buffer_indirect, desc);
 
-							dx_context.GetCommandListGraphics()->SetGraphicsRootSignature(gfx_resource.m_gfx_root_signature.Get());
+							dx_context.GetCommandListGraphics()->SetGraphicsRootSignature(gfx_resource.m_gfx_root_signature.m_signature.Get());
 							
 							if (uses_pix)
 							{
@@ -776,11 +761,10 @@ void RunWindowLoop(DXContext& dx_context, DXCompiler& dx_compiler, GPUCapture* g
 #pragma region COMPUTE
 void CreateComputeResources(DXContext& dx_context, const DXCompiler& dx_compiler, ComputeResources& resource)
 {
-	dx_compiler.Compile(dx_context.GetDevice(), &resource.m_compute_shader, "ComputeShader.hlsl", ShaderType::COMPUTE_SHADER);
+	resource.m_compute_shader = dx_compiler.Compile(dx_context.GetDevice(), { ShaderType::COMPUTE_SHADER, "ComputeShader.hlsl", "main" });
 
 	// Root signature embed in the shader
-	dx_context.GetDevice()->CreateRootSignature(0, resource.m_compute_shader->GetBufferPointer(), resource.m_compute_shader->GetBufferSize(), IID_PPV_ARGS(&resource.m_compute_root_signature)) >> CHK;
-	NAME_DX_OBJECT(resource.m_compute_root_signature, "Compute RootSignature");
+	resource.m_compute_root_signature = dx_context.CreateRS(resource.m_compute_shader);
 
 	std::string compute_name{ "Compute" };
 	std::wstring compute_wname = std::to_wstring(compute_name);
@@ -789,11 +773,8 @@ void CreateComputeResources(DXContext& dx_context, const DXCompiler& dx_compiler
 	cstate_object_desc.SetStateObjectType(D3D12_STATE_OBJECT_TYPE_EXECUTABLE);
 
 	CD3DX12_DXIL_LIBRARY_SUBOBJECT* cs_subobj = cstate_object_desc.CreateSubobject<CD3DX12_DXIL_LIBRARY_SUBOBJECT>();
-	D3D12_SHADER_BYTECODE cs_byte_code
-	{
-		.pShaderBytecode = resource.m_compute_shader->GetBufferPointer(), 
-		.BytecodeLength = resource.m_compute_shader->GetBufferSize(), 
-	};
+	D3D12_SHADER_BYTECODE cs_byte_code = BlobToByteCode(resource.m_compute_shader.m_blob);
+	
 	cs_subobj->SetDXILLibrary(&cs_byte_code);
 	CD3DX12_GENERIC_PROGRAM_SUBOBJECT* generic_subobj = cstate_object_desc.CreateSubobject<CD3DX12_GENERIC_PROGRAM_SUBOBJECT>();
 	generic_subobj->SetProgramName(compute_wname.c_str());
@@ -855,7 +836,7 @@ void ComputeWork
 		.bindless_index = uav.m_bindless_index
 	};
 	
-	dx_context.GetCommandListGraphics()->SetComputeRootSignature(compute_resource.m_compute_root_signature.Get());
+	dx_context.GetCommandListGraphics()->SetComputeRootSignature(compute_resource.m_compute_root_signature.m_signature.Get());
 	
 	dx_context.GetCommandListGraphics()->SetComputeRoot32BitConstants(0, sizeof(MyCBuffer) / 4, &cbuffer, 0);
 	uint32 dispatch_x = DivideRoundUp(gpu_resource.m_width, 8);
@@ -901,9 +882,9 @@ struct WorkGraphResources
 
 	D3D12_PROGRAM_IDENTIFIER m_program_id;
 
-	Microsoft::WRL::ComPtr<IDxcBlob> m_workgraph_shader;
+	Shader m_workgraph_shader;
 	Microsoft::WRL::ComPtr<ID3D12StateObject> m_workgraph_so;
-	Microsoft::WRL::ComPtr<ID3D12RootSignature> m_workgraph_root_signature;
+	RootSignature m_workgraph_root_signature;
 };
 
 void CreateWorkGraphResource
@@ -913,16 +894,11 @@ void CreateWorkGraphResource
 	 bool is_pix_running
  )
 {
-	dx_compiler.Compile(dx_context.GetDevice(), &resource.m_workgraph_shader, "WorkGraphShader.hlsl", ShaderType::LIB_SHADER);
+	resource.m_workgraph_shader = dx_compiler.Compile(dx_context.GetDevice(), { ShaderType::LIB_SHADER, "WorkGraphShader.hlsl", "main" });
 
-	D3D12_SHADER_BYTECODE byte_code
-	{
-		.pShaderBytecode = resource.m_workgraph_shader->GetBufferPointer(),
-		.BytecodeLength = resource.m_workgraph_shader->GetBufferSize()
-	};
+	D3D12_SHADER_BYTECODE byte_code = BlobToByteCode(resource.m_workgraph_shader.m_blob);
 
-	dx_context.GetDevice()->CreateRootSignature(0, byte_code.pShaderBytecode, byte_code.BytecodeLength, IID_PPV_ARGS(&resource.m_workgraph_root_signature)) >> CHK;
-	NAME_DX_OBJECT(resource.m_workgraph_root_signature, "Global RootSignature");
+	resource.m_workgraph_root_signature = dx_context.CreateRS(resource.m_workgraph_shader);
 
 	CD3DX12_STATE_OBJECT_DESC cstate_object_desc;
 	cstate_object_desc.SetStateObjectType(D3D12_STATE_OBJECT_TYPE_EXECUTABLE);
@@ -936,7 +912,7 @@ void CreateWorkGraphResource
 	workgraph_subobj->IncludeAllAvailableNodes();
 	// Apparently meeds linking SO with RS, though RS is embedded in shader already but seem to be needed for graphics SO
 	CD3DX12_GLOBAL_ROOT_SIGNATURE_SUBOBJECT* rootsignature_subobj = cstate_object_desc.CreateSubobject<CD3DX12_GLOBAL_ROOT_SIGNATURE_SUBOBJECT>();
-	rootsignature_subobj->SetRootSignature(resource.m_workgraph_root_signature.Get());
+	rootsignature_subobj->SetRootSignature(resource.m_workgraph_root_signature.m_signature.Get());
 	dx_context.GetDevice()->CreateStateObject(cstate_object_desc, IID_PPV_ARGS(&resource.m_workgraph_so)) >> CHK;
 	NAME_DX_OBJECT(resource.m_workgraph_so, "Workgraph State Object");
 
@@ -1076,7 +1052,7 @@ void RunWorkGraph(DXContext& dx_context, DXCompiler& dx_compiler, bool is_pix_ru
 	};
 
 	dx_context.InitCommandLists();
-	dx_context.GetCommandListGraphics()->SetComputeRootSignature(resource.m_workgraph_root_signature.Get());
+	dx_context.GetCommandListGraphics()->SetComputeRootSignature(resource.m_workgraph_root_signature.m_signature.Get());
 	dx_context.GetCommandListGraphics()->SetComputeRootUnorderedAccessView(0, resource.m_gpu_buffer.m_resource->GetGPUVirtualAddress());
 	dx_context.GetCommandListGraphics()->SetProgram(&program_desc);
 	dx_context.GetCommandListGraphics()->DispatchGraph(&workgraph_desc);
@@ -1100,42 +1076,8 @@ void RunWorkGraph(DXContext& dx_context, DXCompiler& dx_compiler, bool is_pix_ru
 }
 #pragma endregion
 
-#pragma region WINDOW
-class Application
-{
-public:
-	void Init();
-	void Close();
-	void Run();
-private:
-};
-
-LRESULT testCallback(HWND handle, UINT msg, WPARAM wParam, LPARAM lParam)
-{
-	return DefWindowProc(handle, msg, wParam, lParam);
-}
-void RunTest()
-{
-	WindowDesc window_desc
-	{
-		.m_callback = testCallback,
-		.m_window_name = "TEST",
-		.m_width = 500,
-		.m_height = 500,
-		.m_origin_x = 200,
-		.m_origin_y = 200,
-	};
-	CreateWindowNew(window_desc);
-	while (true)
-	{
-		;
-	}
-}
-#pragma endregion
 int main()
 {
-	start_time = std::chrono::high_resolution_clock::now();
-
 	MemoryTrack();
 
 	DXReportContext dx_report_context{};

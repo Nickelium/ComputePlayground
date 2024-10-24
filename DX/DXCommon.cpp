@@ -37,3 +37,12 @@ m_source_location(loc)
 {
 
 }
+
+D3D12_SHADER_BYTECODE BlobToByteCode(Microsoft::WRL::ComPtr<IDxcBlob> blob)
+{
+	return
+	{
+		.pShaderBytecode = blob->GetBufferPointer(),
+		.BytecodeLength = blob->GetBufferSize()
+	};
+}

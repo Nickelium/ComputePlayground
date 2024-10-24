@@ -2,6 +2,8 @@
 #include "../core/Common.h"
 #include "DXCommon.h"
 #include "DXResource.h"
+#include "RootSignature.h"
+#include "Shader.h"
 
 struct IDXGIFactory6;
 struct IDXGIAdapter1;
@@ -239,6 +241,7 @@ public:
 	void Signal(const CommandQueue& command_queue, Fence& fence, uint32 index);
 	void Wait(const Fence& fence, uint32 index);
 
+	RootSignature CreateRS(const Shader& shader) const;
 
 private:
 	void Init();

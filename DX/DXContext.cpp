@@ -3,6 +3,7 @@
 #include "DXCommon.h"
 #include "DXQuery.h"
 #include "DXResource.h"
+#include "RootSignature.h"
 
 #if defined(_DEBUG)
 #include <dxgidebug.h>
@@ -329,17 +330,6 @@ void DXContext::Init()
 		m_factory->EnumAdapterByGpuPreference(0, DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE, IID_PPV_ARGS(&m_adapter)) >> CHK;
 	}
 
-	// TODO all warps??
-	IDXGIAdapter* ad = nullptr;
-	for (UINT i = 0;
-		m_factory->EnumAdapters(i, &ad) != DXGI_ERROR_NOT_FOUND;
-		++i)
-	{
-		DXGI_ADAPTER_DESC adapter_desc;
-		ad->GetDesc(&adapter_desc) >> CHK;
-		LogTrace(std::to_string(adapter_desc.Description));
-	}
-
 	DXGI_ADAPTER_DESC2 adapter_desc;
 	m_adapter->GetDesc2(&adapter_desc) >> CHK;
 	LogTrace(std::to_string(adapter_desc.Description));
@@ -350,6 +340,8 @@ void DXContext::Init()
 	D3D12CreateDevice(m_adapter.Get(), max_feature_level, IID_PPV_ARGS(&m_device)) >> CHK;
 
 #if defined(_DEBUG)
+	m_device->SetStablePowerState(true);
+
 	{
 		Microsoft::WRL::ComPtr<ID3D12InfoQueue1> info_queue{};
 		HRESULT result = m_device.As(&info_queue);
@@ -562,6 +554,14 @@ void DXContext::Flush(uint32 flush_count)
 	{
 		SignalAndWait(i);
 	}
+}
+
+RootSignature DXContext::CreateRS(const Shader& shader) const
+{
+	RootSignature root_signature{};
+	m_device->CreateRootSignature(0, shader.m_blob->GetBufferPointer(), shader.m_blob->GetBufferSize(), IID_PPV_ARGS(&root_signature.m_signature)) >> CHK;
+	NAME_DX_OBJECT(root_signature.m_signature, shader.m_shader_desc.m_file_name);
+	return root_signature;
 }
 
 void DXContext::Transition(D3D12_RESOURCE_STATES new_resource_state, DXResource& resource) const
