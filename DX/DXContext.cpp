@@ -288,6 +288,8 @@ void OnDeviceRemoved(PVOID context, BOOLEAN)
 
 void DXContext::Init()
 {
+	bool enable_debug_layer = true;
+	bool enable_dred = true;
 #if defined(_DEBUG)
 	{
 		Microsoft::WRL::ComPtr<IDXGIDebug1> dxgi_debug{};
@@ -296,15 +298,18 @@ void DXContext::Init()
 		dxgi_debug->EnableLeakTrackingForThread();
 	}
 
+	if(enable_debug_layer)
 	{
 		Microsoft::WRL::ComPtr<ID3D12Debug5> d3d12_debug{};
 		D3D12GetDebugInterface(IID_PPV_ARGS(&d3d12_debug)) >> CHK;
 		d3d12_debug->EnableDebugLayer();
 		d3d12_debug->SetEnableGPUBasedValidation(true);
+		// We name our resource explicitly already
 		//d3d12_debug->SetEnableAutoName(true);
 		d3d12_debug->SetEnableSynchronizedCommandQueueValidation(true);
 	}
 
+	if(enable_dred)
 	{
 		// DRED: Auto WriteBufferImmediate (aka auto bread crumbs) & force GPU page fault instead of reading zeros
 		Microsoft::WRL::ComPtr<ID3D12DeviceRemovedExtendedDataSettings> pDredSettings{};
@@ -334,14 +339,14 @@ void DXContext::Init()
 	m_adapter->GetDesc2(&adapter_desc) >> CHK;
 	LogTrace(std::to_string(adapter_desc.Description));
 
-	LogTrace("VRAM usage: {0} MB", ToMB(GetVRAMUsage(m_adapter)));
+	auto[bytes_used, bytes_budget] = GetVRAM(m_adapter);
+	LogTrace("VRAM usage: {0} MB / {1} MB", ToMB(bytes_used), ToMB(bytes_budget));
 
 	D3D_FEATURE_LEVEL max_feature_level = GetMaxFeatureLevel(m_adapter);
 	D3D12CreateDevice(m_adapter.Get(), max_feature_level, IID_PPV_ARGS(&m_device)) >> CHK;
 
 #if defined(_DEBUG)
 	m_device->SetStablePowerState(true);
-
 	{
 		Microsoft::WRL::ComPtr<ID3D12InfoQueue1> info_queue{};
 		HRESULT result = m_device.As(&info_queue);
@@ -396,12 +401,12 @@ void DXContext::Init()
 	m_command_allocator_graphics.resize(g_backbuffer_count);
 	// CommandAllocator has to wait that all commands in the command list has been executed by the GPU before reuse
 	// CommandList can be reused right away
-	// TODO name command allocator
 	for (uint32 i = 0; i < m_command_allocator_graphics.size(); ++i)
+	{
 		CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, m_command_allocator_graphics[i]);
-	NAME_DX_OBJECT(m_command_allocator_graphics[0].m_allocator, "Command Allocator GFX 0");
-	NAME_DX_OBJECT(m_command_allocator_graphics[1].m_allocator, "Command Allocator GFX 1");
-	NAME_DX_OBJECT(m_command_allocator_graphics[2].m_allocator, "Command Allocator GFX 2");
+		NAME_DX_OBJECT(m_command_allocator_graphics[i].m_allocator, std::string("Command Allocator GFX {0}", i));
+	}
+	
 	CreateCommandList(D3D12_COMMAND_LIST_TYPE_DIRECT, m_command_allocator_graphics[0], m_command_list_graphics);
 	NAME_DX_OBJECT(m_command_list_graphics.m_list, "CommandList GFX");
 
@@ -424,7 +429,8 @@ void DXContext::Init()
 	// Callback on event triggered
 	// None blocking operation from this thread
 	HANDLE wait_handle{};
-	bool result = RegisterWaitForSingleObject(
+	bool result = RegisterWaitForSingleObject
+	(
 		&wait_handle,
 		m_device_removed_fence.m_event,
 		OnDeviceRemoved,
@@ -564,8 +570,32 @@ RootSignature DXContext::CreateRS(const Shader& shader) const
 	return root_signature;
 }
 
+void ValidateResourceTransition(const CommandQueue& command_queue, const CommandList& command_list, const DXResource& resource)
+{
+#if defined(_DEBUG)
+	 //if debug layer enabled
+	Microsoft::WRL::ComPtr<ID3D12DebugCommandList> debug_command_list{};
+	command_list.m_list.As(&debug_command_list);
+	if (debug_command_list)
+	{
+		ASSERT(debug_command_list->AssertResourceState(resource.m_resource.Get(), D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES, resource.m_resource_state));
+	}
+
+	Microsoft::WRL::ComPtr<ID3D12DebugCommandQueue> debug_command_queue{};
+	command_queue.m_queue.As(&debug_command_queue);
+	if (debug_command_queue)
+	{
+		// Reports invalid state
+		// Whats the difference between assert on command list and queue?
+		//ASSERT(debug_command_queue->AssertResourceState(resource.m_resource.Get(), D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES, resource.m_resource_state));
+	}
+#endif
+}
+
+// TODO batch transitions from multiple resources
 void DXContext::Transition(D3D12_RESOURCE_STATES new_resource_state, DXResource& resource) const
 {
+	ValidateResourceTransition(m_queue_graphics, m_command_list_graphics, resource);
 	if (new_resource_state != resource.m_resource_state)
 	{
 		D3D12_RESOURCE_BARRIER barrier[1]{};
@@ -584,6 +614,7 @@ void DXContext::Transition(D3D12_RESOURCE_STATES new_resource_state, DXResource&
 		GetCommandListGraphics()->ResourceBarrier(COUNT(barrier), barrier);
 		resource.m_resource_state = new_resource_state;
 	}
+	ValidateResourceTransition(m_queue_graphics, m_command_list_graphics, resource);
 }
 
 Microsoft::WRL::ComPtr<ID3D12Device14> DXContext::GetDevice() const
@@ -747,8 +778,9 @@ void DXReportContext::SetDevice(Microsoft::WRL::ComPtr<ID3D12Device> device, Mic
 void DXReportContext::ReportLDO()
 {
 #if defined(_DEBUG)
-
-	LogTrace("VRAM usage: {0} MB", ToMB(GetVRAMUsage(m_adapter)));
+	auto[bytes_used, bytes_budget] = GetVRAM(m_adapter);
+	LogTrace("VRAM usage: {0} MB / {1} MB", ToMB(bytes_used), ToMB(bytes_budget));
+	
 	m_adapter.Reset();
 
 	if (m_debug_device)
@@ -911,10 +943,12 @@ SRV DXContext::CreateSRV(const DXResource& resource, const D3D12_SHADER_RESOURCE
 
 CBV DXContext::CreateCBV(const DXResource& resource)
 {
+	// Less than 4GB
+	ASSERT(resource.m_size_in_bytes < UINT32_MAX);
 	D3D12_CONSTANT_BUFFER_VIEW_DESC desc
 	{
 		.BufferLocation = resource.m_resource->GetGPUVirtualAddress(),
-		.SizeInBytes = resource.m_size_in_bytes,
+		.SizeInBytes = (uint32)resource.m_size_in_bytes,
 	};
 
 	// Constantbuffer requires 256 bytes align and not more than 65536 bytes by spec

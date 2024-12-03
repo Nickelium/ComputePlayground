@@ -11,7 +11,7 @@ struct PSOutput
 	float4 color : SV_TARGET;
 };
 
-[RootSignature("RootFlags(CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED), RootConstants(num32BitConstants=1, b0)")]
+[RootSignature(ROOTFLAGS_DEFAULT ", RootConstants(num32BitConstants=1, b0)")]
 PSOutput main(in const PSInput input) 
 {
 	PSOutput output = (PSOutput)0;

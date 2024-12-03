@@ -40,4 +40,9 @@ inline int64 ToKB(int64 bytes) { return bytes >> 10; }
 inline int64 ToMB(int64 bytes) { return bytes >> 20; }
 inline int64 ToGB(int64 bytes) { return bytes >> 30; }
 
+inline int64 FromKB(int64 KB) { return KB << 10; }
+inline int64 FromMB(int64 MB) { return MB << 20; }
+inline int64 FromGB(int64 GB) { return GB << 30; }
+
+
 D3D12_SHADER_BYTECODE BlobToByteCode(Microsoft::WRL::ComPtr<IDxcBlob> blob);

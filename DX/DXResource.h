@@ -26,7 +26,7 @@ using CBV = DXDescriptor;
 class DXResource
 {
 public:
-	uint32 m_size_in_bytes;
+	uint64 m_size_in_bytes;
 
 	D3D12_RESOURCE_STATES m_resource_state = D3D12_RESOURCE_STATE_COMMON;
 	Microsoft::WRL::ComPtr<ID3D12Resource> m_resource;
@@ -35,8 +35,12 @@ public:
 	// Some have heap, some not
 	D3D12_HEAP_PROPERTIES m_heap_properties;
 
-	virtual void SetResourceInfo(D3D12_HEAP_TYPE heap_type, D3D12_RESOURCE_FLAGS resource_flags, uint32 size);
+	virtual void SetResourceInfo(D3D12_HEAP_TYPE heap_type, D3D12_RESOURCE_FLAGS resource_flags, uint64 bytes);
 	virtual void CreateResource(DXContext& dx_context, const std::string& name_resource);
+	
+	// TODO reserved resources
+//	virtual void AllocateVirtual(DXContext& dx_context);
+//	virtual void AllocatePhysical(DXContext& dx_context);
 };
 
 class DXVertexBufferResource : public DXResource

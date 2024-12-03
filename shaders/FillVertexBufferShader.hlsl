@@ -15,7 +15,7 @@ struct MyCBuffer
 
 ConstantBuffer<MyCBuffer> m_cbuffer : register(b0);
 
-[RootSignature("RootFlags(CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED), RootConstants(num32BitConstants=1, b0)")]
+[RootSignature(ROOTFLAGS_DEFAULT ", RootConstants(num32BitConstants=1, b0)")]
 [numthreads(1, 1, 1)]
 void main()
 {

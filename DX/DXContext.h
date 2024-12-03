@@ -16,7 +16,6 @@ struct ID3D12Fence;
 
 struct ID3D12InfoQueue1;
 struct ID3D12DebugDevice2;
-struct ID3D12DebugCommandList1;
 struct ID3D12DebugCommandQueue;
 
 struct ID3D12DescriptorHeap;
@@ -80,6 +79,7 @@ struct CommandQueue
 	D3D12_COMMAND_LIST_TYPE m_type;
 };
 
+// Esssentially the backing memory of all the commands in the commandlist
 struct CommandAllocator
 {
 	Microsoft::WRL::ComPtr<ID3D12CommandAllocator> m_allocator;
@@ -255,8 +255,13 @@ public:
 	CommandQueue m_queue_graphics;
 private:
 	// Compute + Copy
+	// Put work on async in parallel for work that are not bottlenecked by the same limiting factor
 	CommandQueue m_queue_compute;
+	
 	// Copy
+	// This is the fastest engine for transfer over PCIe bus
+	// Meaning CPU <-> GPU memory transfer
+	// For GPU <-> GPU copy, prefer the other engines
 	CommandQueue m_queue_copy;
 public:
 	CommandList m_command_list_graphics;

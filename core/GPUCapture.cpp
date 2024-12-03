@@ -35,30 +35,65 @@ std::string GetNewestCaptureName(const std::string& capture_relative_path, const
 #include <pix3.h>
 #include "renderdoc/inc/renderdoc_app.h"
 
+static const std::string g_pix_dll_name = "WinPixGpuCapturer.dll";
+static const std::wstring g_pix_dll_wname = std::to_wstring(g_pix_dll_name);
+
+static std::pair<std::string, std::string> GetWinPixGpuCapturerPath(const std::string& required_version = "")
+{
+	const std::wstring required_wversion = std::to_wstring(required_version);
+
+	LPWSTR program_files_path = nullptr;
+	SHGetKnownFolderPath(FOLDERID_ProgramFiles, KF_FLAG_DEFAULT, NULL, &program_files_path);
+
+	std::filesystem::path pix_installation_path = program_files_path;
+	pix_installation_path /= L"Microsoft PIX";
+
+	std::wstring newest_version{};
+	for (auto const& directory_entry : std::filesystem::directory_iterator(pix_installation_path))
+	{
+		if (directory_entry.is_directory())
+		{
+			const std::filesystem::path directory_file_path = directory_entry.path().filename();
+			const std::wstring directory_wname = directory_file_path.c_str();
+			if (newest_version.empty() || newest_version < directory_wname)
+			{
+				newest_version = directory_wname;
+			}
+			if (required_wversion == newest_version)
+			{
+				break;
+			}
+		}
+	}
+
+	if (newest_version.empty())
+	{
+		ASSERT(false && "PIX is not installed");
+	}
+	std::filesystem::path pix_file_path = pix_installation_path / newest_version / g_pix_dll_wname;
+	return { std::to_string(pix_file_path.c_str()), std::to_string(newest_version) };
+}
+
 bool LoadPIX(HMODULE* pix_module_out)
 {
 	// Note: WinPixEventRuntime != WinPixGpuCapturer
 	// To GPU capture we need both
-	// To actually open the capture, the user need to install PIX themselves
 
-	HMODULE pix_module = 0;
-
-	TCHAR current_directory[MAX_PATH + 1] = { 0 };
-	const DWORD number_characters_written = ::GetCurrentDirectory(MAX_PATH, current_directory);
-	ASSERT(number_characters_written != 0 && "Failed current directory, call GetLastError");
-	std::string current_directory_string = std::to_string(current_directory);
-	const std::string pix_dll_name = "WinPixGpuCapturer.dll";
-	const std::string pix_dll_relative_path = "\\dependencies\\pix\\bin\\";
-	std::string pix_dll_absolute_path = current_directory_string;
-	pix_dll_absolute_path += pix_dll_relative_path;
-	pix_dll_absolute_path += pix_dll_name;
-
-	std::wstring pix_dll_absolute_path_wstring = std::to_wstring(pix_dll_absolute_path);
-	pix_module = LoadLibraryExW(pix_dll_absolute_path_wstring.c_str(), NULL, LOAD_LIBRARY_SEARCH_DEFAULT_DIRS);
-	ASSERT(pix_module && "Missing PIX dependencies");
+	HMODULE pix_module = GetModuleHandle(g_pix_dll_wname.c_str());
+	// Dont load PIX if its already loaded, this can happen through PIX UI
+	if (pix_module == 0)
+	{
+		auto[pix_path, pix_version] = GetWinPixGpuCapturerPath("2405.15.002-OneBranch_release");
+		pix_module = LoadLibrary(std::to_wstring(pix_path).c_str());
+		LogTrace(pix_version);
+	}
+	else
+	{
+		LogTrace("PIX is already loaded");
+	}
 	*pix_module_out = pix_module;
 
-	return true;
+	return pix_module != 0;
 }
 
 PIXCapture::PIXCapture()

@@ -19,7 +19,7 @@ struct MyCBuffer
 
 ConstantBuffer<MyCBuffer> m_cbuffer : register(b0);
 
-[RootSignature("RootFlags(CBV_SRV_UAV_HEAP_DIRECTLY_INDEXED), RootConstants(num32BitConstants=1, b0)")]
+[RootSignature(ROOTFLAGS_DEFAULT ", RootConstants(num32BitConstants=1, b0)")]
 VSOutput main(uint vertex_id : SV_VERTEXID, uint instance_id : SV_InstanceID) 
 {
 	StructuredBuffer<VSInput> vertex_buffer = ResourceDescriptorHeap[m_cbuffer.bindless_index];

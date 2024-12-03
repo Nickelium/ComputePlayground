@@ -459,15 +459,19 @@ bool GetGPUUploadSupport(Microsoft::WRL::ComPtr<ID3D12Device> device)
 	return options.GPUUploadHeapSupported;
 }
 
-uint64 GetVRAMUsage(Microsoft::WRL::ComPtr<IDXGIAdapter4> adapter)
+//uint64 bytes_used, uint64 bytes_budget
+std::pair<uint64, uint64> GetVRAM(Microsoft::WRL::ComPtr<IDXGIAdapter4> adapter)
 {
+	// Note that the budget can change by OS, eg. other instances and applications simultaneous running
+	// video_memory_info.Budget > video_memory_info.CurrentUsage 
+	// Respect budget such that memory is not demoted to system memory by the OS
 	// node_index 0 because single GPU
 	const uint32 node_index{0};
 	// Local means non-system main memory, non CPU RAM, aka VRAM
 	const DXGI_MEMORY_SEGMENT_GROUP memory_segment_group{ DXGI_MEMORY_SEGMENT_GROUP_LOCAL};
 	DXGI_QUERY_VIDEO_MEMORY_INFO video_memory_info{};
 	adapter->QueryVideoMemoryInfo(node_index, memory_segment_group, &video_memory_info) >> CHK;
-	return video_memory_info.CurrentUsage;
+	return { video_memory_info.CurrentUsage, video_memory_info.Budget };
 }
 
 std::string DumpDX12Capabilities(Microsoft::WRL::ComPtr<ID3D12Device> device)

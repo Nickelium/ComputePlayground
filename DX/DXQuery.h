@@ -25,6 +25,6 @@ D3D12_SAMPLER_FEEDBACK_TIER GetSamplerFeedbackTier(Microsoft::WRL::ComPtr<ID3D12
 bool GetEnhancedBarrierSupport(Microsoft::WRL::ComPtr<ID3D12Device> device);
 bool GetBindlessSupport(Microsoft::WRL::ComPtr<ID3D12Device> device);
 bool GetGPUUploadSupport(Microsoft::WRL::ComPtr<ID3D12Device> device);
-uint64 GetVRAMUsage(Microsoft::WRL::ComPtr<IDXGIAdapter4> adapter);
+std::pair<uint64, uint64> GetVRAM(Microsoft::WRL::ComPtr<IDXGIAdapter4> adapter);
 
 std::string DumpDX12Capabilities(Microsoft::WRL::ComPtr<ID3D12Device> device);

@@ -81,6 +81,9 @@
     <ClCompile Include="DX\Shader.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="DX\PSO.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="shaders\ComputeShader.hlsl" />
@@ -159,6 +162,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="DX\Shader.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="DX\PSO.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
