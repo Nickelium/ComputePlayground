@@ -84,3 +84,39 @@ public:
 	// Create Persistent Resource
 	std::vector<DXResource> m_resources[g_backbuffer_count];
 };
+
+
+struct ResourceDescription
+{
+	D3D12_RESOURCE_DESC m_resource_desc;
+	D3D12_HEAP_PROPERTIES m_heap_properties;
+};
+
+inline bool operator==(const ResourceDescription& rd1, const ResourceDescription& rd2)
+{
+	return memcmp(&rd1, &rd2, sizeof(ResourceDescription)) == 0;
+}
+
+class ResourceAllocator
+{
+public:
+	bool HasCachedResource(const ResourceDescription& resource_description)
+	{
+		// TODO hashing
+		for (uint32 i = 0; i < m_free_resource_list.size(); ++i)
+		{
+			auto [current_resource_description, current_resource] = m_free_resource_list[i];
+			if (current_resource_description == resource_description)
+			{
+				return true;
+			}
+		}
+		return false;
+	}
+	// A resource is uniquely identified by the below
+	// Stored freed resources, dont actually free
+	// If request matches free, return something from the resource list
+	// Otherwise CreateCommitedResource
+	// Add when freed
+	std::vector<std::pair<ResourceDescription, Microsoft::WRL::ComPtr<ID3D12Resource>>> m_free_resource_list;
+};

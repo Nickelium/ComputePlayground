@@ -2,19 +2,46 @@
 #include "DXContext.h"
 #include "DXQuery.h"
 
+// We dont support custom heap
+// Same as ID3D12Device::GetCustomHeapProperties
+D3D12_HEAP_PROPERTIES g_heapPropertiesNUMA[D3D12_HEAP_TYPE_CUSTOM - 1]
+{
+	//D3D12_HEAP_TYPE_DEFAULT
+	{
+		.Type = D3D12_HEAP_TYPE_DEFAULT,
+		.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_NOT_AVAILABLE,
+		// GPU local memory
+		.MemoryPoolPreference = D3D12_MEMORY_POOL_L1,
+		.CreationNodeMask = 0,
+		.VisibleNodeMask = 0,
+	},
+	//D3D12_HEAP_TYPE_UPLOAD
+	{
+		.Type = D3D12_HEAP_TYPE_UPLOAD,
+		.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_WRITE_COMBINE,
+		// System memory
+		.MemoryPoolPreference = D3D12_MEMORY_POOL_L0,
+		.CreationNodeMask = 0,
+		.VisibleNodeMask = 0,
+	},
+	//D3D12_HEAP_TYPE_READBACK
+	{
+		.Type = D3D12_HEAP_TYPE_READBACK,
+		.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_WRITE_BACK,
+		// System memory
+		.MemoryPoolPreference = D3D12_MEMORY_POOL_L0,
+		.CreationNodeMask = 0,
+		.VisibleNodeMask = 0,
+	},
+};
+
 // Note that D3D12_HEAP_TYPE_GPU_UPLOAD doesnt work on warp
 void DXResource::SetResourceInfo(D3D12_HEAP_TYPE heap_type, D3D12_RESOURCE_FLAGS resource_flags, uint64 bytes)
 {
 	m_size_in_bytes = bytes;
 
-	m_heap_properties =
-	{
-		.Type = heap_type,
-		.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN,
-		.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN,
-		.CreationNodeMask = 0,
-		.VisibleNodeMask = 0,
-	};
+	ASSERT(heap_type != D3D12_HEAP_TYPE_CUSTOM);
+	m_heap_properties = g_heapPropertiesNUMA[heap_type];
 
 	m_resource_desc =
 	{

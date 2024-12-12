@@ -288,31 +288,42 @@ void OnDeviceRemoved(PVOID context, BOOLEAN)
 
 void DXContext::Init()
 {
-	bool enable_debug_layer = true;
+	// API side checks
+	bool enable_debug_layer_cpu = true;
+	// Validate on GPU timeline and shaders
+	bool enable_debug_layer_gpu = enable_debug_layer_cpu && true;
 	bool enable_dred = true;
 #if defined(_DEBUG)
 	{
-		Microsoft::WRL::ComPtr<IDXGIDebug1> dxgi_debug{};
+		Microsoft::WRL::ComPtr < IDXGIDebug1 > dxgi_debug{};
 		// Requires windows "Graphics Tool" optional feature
 		DXGIGetDebugInterface1(0, IID_PPV_ARGS(&dxgi_debug)) >> CHK;
 		dxgi_debug->EnableLeakTrackingForThread();
 	}
 
-	if(enable_debug_layer)
+	if (enable_debug_layer_cpu)
 	{
-		Microsoft::WRL::ComPtr<ID3D12Debug5> d3d12_debug{};
+		Microsoft::WRL::ComPtr < ID3D12Debug5 > d3d12_debug{};
 		D3D12GetDebugInterface(IID_PPV_ARGS(&d3d12_debug)) >> CHK;
 		d3d12_debug->EnableDebugLayer();
-		d3d12_debug->SetEnableGPUBasedValidation(true);
+
+		// When running with GPU based validation, it assigns a unique ID to a resource. 
+		// Therefore even freeing and reallocating a resource will consume memory
+		// Its best to try to reuse resources instead of recreating them
+		// Fill a pool then reuse the pool, with commited resource it has to be exact same specs as before
+		if (enable_debug_layer_gpu)
+		{
+			d3d12_debug->SetEnableGPUBasedValidation(true);
+		}
 		// We name our resource explicitly already
 		//d3d12_debug->SetEnableAutoName(true);
 		d3d12_debug->SetEnableSynchronizedCommandQueueValidation(true);
 	}
 
-	if(enable_dred)
+	if (enable_dred)
 	{
 		// DRED: Auto WriteBufferImmediate (aka auto bread crumbs) & force GPU page fault instead of reading zeros
-		Microsoft::WRL::ComPtr<ID3D12DeviceRemovedExtendedDataSettings> pDredSettings{};
+		Microsoft::WRL::ComPtr < ID3D12DeviceRemovedExtendedDataSettings > pDredSettings{};
 		D3D12GetDebugInterface(IID_PPV_ARGS(&pDredSettings)) >> CHK;
 		// Turn on AutoBreadcrumbs and Page Fault reporting
 		pDredSettings->SetAutoBreadcrumbsEnablement(D3D12_DRED_ENABLEMENT_FORCED_ON);
@@ -320,7 +331,7 @@ void DXContext::Init()
 	}
 #endif
 
-	uint32 dxgi_factory_flag{ 0 };
+	uint32 dxgi_factory_flag { 0 };
 #if defined(_DEBUG)
 	dxgi_factory_flag |= DXGI_CREATE_FACTORY_DEBUG;
 #endif
@@ -335,12 +346,18 @@ void DXContext::Init()
 		m_factory->EnumAdapterByGpuPreference(0, DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE, IID_PPV_ARGS(&m_adapter)) >> CHK;
 	}
 
-	DXGI_ADAPTER_DESC2 adapter_desc;
-	m_adapter->GetDesc2(&adapter_desc) >> CHK;
+	DXGI_ADAPTER_DESC adapter_desc = GetAdapterDesc(m_adapter);
 	LogTrace(std::to_string(adapter_desc.Description));
 
-	auto[bytes_used, bytes_budget] = GetVRAM(m_adapter);
-	LogTrace("VRAM usage: {0} MB / {1} MB", ToMB(bytes_used), ToMB(bytes_budget));
+	LogTrace("Total VRAM {0}, Total SRAM {1}",
+	         ToMB(adapter_desc.DedicatedVideoMemory),
+	         ToMB(adapter_desc.SharedSystemMemory));
+
+	auto[vram_bytes_used, vram_bytes_budget] = GetVRAM(m_adapter);
+	LogTrace("VRAM usage: {0} MB / {1} MB", ToMB(vram_bytes_used), ToMB(vram_bytes_budget));
+
+	auto[system_ram_bytes_used, system_ram_bytes_budget] = GetSystemRAM(m_adapter);
+	LogTrace("System RAM usage: {0} MB / {1} MB", ToMB(system_ram_bytes_used), ToMB(system_ram_bytes_budget));
 
 	D3D_FEATURE_LEVEL max_feature_level = GetMaxFeatureLevel(m_adapter);
 	D3D12CreateDevice(m_adapter.Get(), max_feature_level, IID_PPV_ARGS(&m_device)) >> CHK;
@@ -482,7 +499,6 @@ void DXContext::InitCommandLists()
 	m_start_index = m_last_indices[g_current_buffer_index];
 	// Free old transient resources
 	m_resource_handler.FreeResources();
-
 	CommandAllocator& command_allocator = m_command_allocator_graphics[g_current_buffer_index];
 	
 	if (!m_command_list_graphics.m_is_open)
@@ -778,8 +794,11 @@ void DXReportContext::SetDevice(Microsoft::WRL::ComPtr<ID3D12Device> device, Mic
 void DXReportContext::ReportLDO()
 {
 #if defined(_DEBUG)
-	auto[bytes_used, bytes_budget] = GetVRAM(m_adapter);
-	LogTrace("VRAM usage: {0} MB / {1} MB", ToMB(bytes_used), ToMB(bytes_budget));
+	auto[vram_bytes_used, vram_bytes_budget] = GetVRAM(m_adapter);
+	LogTrace("VRAM usage: {0} MB / {1} MB", ToMB(vram_bytes_used), ToMB(vram_bytes_budget));
+
+	auto[system_ram_bytes_used, system_ram_bytes_budget] = GetSystemRAM(m_adapter);
+	LogTrace("System RAM usage: {0} MB / {1} MB", ToMB(system_ram_bytes_used), ToMB(system_ram_bytes_budget));
 	
 	m_adapter.Reset();
 
@@ -953,7 +972,7 @@ CBV DXContext::CreateCBV(const DXResource& resource)
 
 	// Constantbuffer requires 256 bytes align and not more than 65536 bytes by spec
 	ASSERT(desc.SizeInBytes == Align(desc.SizeInBytes, D3D12_CONSTANT_BUFFER_DATA_PLACEMENT_ALIGNMENT));
-	static uint32 s_max_constant_buffer_size = 65536;
+	static uint32 s_max_constant_buffer_size = (uint32)FromKB(64);
 	ASSERT(desc.SizeInBytes <= s_max_constant_buffer_size);
 
 	D3D12_CPU_DESCRIPTOR_HANDLE cpu_descriptor{};

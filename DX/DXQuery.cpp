@@ -459,6 +459,13 @@ bool GetGPUUploadSupport(Microsoft::WRL::ComPtr<ID3D12Device> device)
 	return options.GPUUploadHeapSupported;
 }
 
+bool GetIsNUMA(Microsoft::WRL::ComPtr<ID3D12Device> device)
+{
+	D3D12_FEATURE_DATA_ARCHITECTURE1 options{};
+	device->CheckFeatureSupport(D3D12_FEATURE_ARCHITECTURE1, &options, sizeof(options)) >> CHK;
+	return options.UMA == false;
+}
+
 //uint64 bytes_used, uint64 bytes_budget
 std::pair<uint64, uint64> GetVRAM(Microsoft::WRL::ComPtr<IDXGIAdapter4> adapter)
 {
@@ -472,6 +479,28 @@ std::pair<uint64, uint64> GetVRAM(Microsoft::WRL::ComPtr<IDXGIAdapter4> adapter)
 	DXGI_QUERY_VIDEO_MEMORY_INFO video_memory_info{};
 	adapter->QueryVideoMemoryInfo(node_index, memory_segment_group, &video_memory_info) >> CHK;
 	return { video_memory_info.CurrentUsage, video_memory_info.Budget };
+}
+
+//uint64 bytes_used, uint64 bytes_budget
+std::pair<uint64, uint64> GetSystemRAM(Microsoft::WRL::ComPtr<IDXGIAdapter4> adapter)
+{
+	// Note that the budget can change by OS, eg. other instances and applications simultaneous running
+	// video_memory_info.Budget > video_memory_info.CurrentUsage 
+	// Respect budget such that memory is not demoted to system memory by the OS
+	// node_index 0 because single GPU
+	const uint32 node_index{0};
+	// Local means non-system main memory, non CPU RAM, aka VRAM
+	const DXGI_MEMORY_SEGMENT_GROUP memory_segment_group{ DXGI_MEMORY_SEGMENT_GROUP_NON_LOCAL};
+	DXGI_QUERY_VIDEO_MEMORY_INFO system_memory_info{};
+	adapter->QueryVideoMemoryInfo(node_index, memory_segment_group, &system_memory_info) >> CHK;
+	return { system_memory_info.CurrentUsage, system_memory_info.Budget };
+}
+
+DXGI_ADAPTER_DESC GetAdapterDesc(Microsoft::WRL::ComPtr<IDXGIAdapter> adapter)
+{
+	DXGI_ADAPTER_DESC adapter_desc{};
+	adapter->GetDesc(&adapter_desc) >> CHK;
+	return adapter_desc;
 }
 
 std::string DumpDX12Capabilities(Microsoft::WRL::ComPtr<ID3D12Device> device)
@@ -493,6 +522,7 @@ std::string DumpDX12Capabilities(Microsoft::WRL::ComPtr<ID3D12Device> device)
 	pair_data.push_back({ "WorkGraph", std::format("{0}", GetWorkGraphSupport(device)) });
 	pair_data.push_back({ "Bindless", std::format("{0}", GetBindlessSupport(device)) });
 	pair_data.push_back({ "GPU Upload", std::format("{0}", GetGPUUploadSupport(device)) });
+	pair_data.push_back({ "NUMA", std::format("{0}", GetIsNUMA(device)) });
 
 	std::string ret{};
 	for (auto& P : pair_data)

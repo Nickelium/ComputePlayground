@@ -223,17 +223,94 @@ void FillCommandList
 	ComputeResources& compute_resource
 )
 {
-	// Fill CommandList
-	dx_window.BeginFrame(dx_context);
-
 	// Set descriptor heap before root signature, order required by spec
 	dx_context.GetCommandListGraphics()->SetDescriptorHeaps(1, dx_context.m_resources_descriptor_heap.m_heap.GetAddressOf());
 	{
 		ComputeWork(dx_context, compute_resource, dx_window, dx_window.m_buffers[g_current_buffer_index]);
 		//GraphicsWork(dx_context, dx_window, gfx_resource, dx_window.m_buffers[g_current_buffer_index]);
 	}
-	dx_window.EndFrame(dx_context);
 }
+
+#include <chrono>
+#include <thread>
+
+class UI
+{
+public:
+	~UI()
+	{
+		ImGui_ImplDX12_Shutdown();
+		ImGui_ImplWin32_Shutdown();
+		ImGui::DestroyContext();
+	}
+	void Init(DXContext& dx_context, DXTextureResource& output, HWND window_handle)
+	{
+		// Setup Dear ImGui context
+		IMGUI_CHECKVERSION();
+		ImGui::CreateContext();
+		ImGuiIO& io = ImGui::GetIO();
+		io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
+		io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
+		//io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;         // IF using Docking Branch
+
+		// Setup ImGui DX resources
+		dx_context.CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 1, "ImGui descriptor heap", m_imgui_descriptor_heap);
+		// No bindless
+		DXDescriptor descriptor{};
+		descriptor.m_cpu_descriptor_handle = dx_context.GetCPUDescriptorHandle(m_imgui_descriptor_heap, 0);
+		descriptor.m_gpu_descriptor_handle = dx_context.GetGPUDescriptorHandle(m_imgui_descriptor_heap, 0);
+
+		ImGui_ImplWin32_Init(window_handle);
+		ImGui_ImplDX12_Init
+		(
+			dx_context.GetDevice().Get(), g_backbuffer_count, output.m_format,
+		    m_imgui_descriptor_heap.m_heap.Get(),
+		    descriptor.m_cpu_descriptor_handle,
+		    descriptor.m_gpu_descriptor_handle
+		);
+	}
+
+	void ImGUI(DXContext& dx_context)
+	{
+		ImGui::ShowDemoWindow(); // Show demo window! :)
+		auto [bytes_used, bytes_budget] = GetVRAM(dx_context.m_adapter);
+		ImGui::Text("VRAM usage: %d MB / %d MB", ToMB(bytes_used), ToMB(bytes_budget));
+		auto [system_bytes_used, system_bytes_budget] = GetSystemRAM(dx_context.m_adapter);
+		ImGui::Text("System RAM usage: %d MB / %d MB", ToMB(system_bytes_used), ToMB(system_bytes_budget));
+	}
+
+	void FillcommandlistImGui(DXContext& dx_context, DXTextureResource& output)
+	{
+		dx_context.Transition(D3D12_RESOURCE_STATE_RENDER_TARGET, output);
+		D3D12_RENDER_TARGET_VIEW_DESC rtv_desc
+		{
+			.Format = output.m_format,
+			.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D,
+			.Texture2D =
+			{
+				.MipSlice = 0,
+				.PlaneSlice = 0,
+			},
+		};
+		ID3D12Resource* d3d12_ouput_resource = output.m_resource.Get();
+		dx_context.OMSetRenderTargets(1, &d3d12_ouput_resource, &rtv_desc, nullptr, nullptr);
+		dx_context.GetCommandListGraphics()->SetDescriptorHeaps(1, m_imgui_descriptor_heap.m_heap.GetAddressOf());
+		// Actual GPU draw commands
+		ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), dx_context.GetCommandListGraphics().Get());
+	}
+
+	void Render(DXContext& dx_context, DXTextureResource& output)
+	{
+		ImGui_ImplDX12_NewFrame();
+		ImGui_ImplWin32_NewFrame();
+		ImGui::NewFrame();
+		ImGUI(dx_context);
+		ImGui::Render();
+		FillcommandlistImGui(dx_context, output);
+
+	}
+	DescriptorHeap m_imgui_descriptor_heap;
+};
 
 void RunWindowLoop(DXContext& dx_context, DXCompiler& dx_compiler, GPUCapture* gpu_capture)
 {
@@ -250,38 +327,17 @@ void RunWindowLoop(DXContext& dx_context, DXCompiler& dx_compiler, GPUCapture* g
 			.m_origin_y = (1080 >> 1) - (height >> 1),
 		};
 		DXWindow dx_window(dx_context, window_manager, window_desc);
-
-		DescriptorHeap imgui_descriptor_heap{};
-		dx_context.CreateDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 1, "ImGui descriptor heap", imgui_descriptor_heap);
-		D3D12_CPU_DESCRIPTOR_HANDLE cpu_descriptor = dx_context.GetCPUDescriptorHandle(imgui_descriptor_heap, 0);
-		D3D12_GPU_DESCRIPTOR_HANDLE gpu_descriptor = dx_context.GetGPUDescriptorHandle(imgui_descriptor_heap, 0);
-
-		{
-			// Setup Dear ImGui context
-			IMGUI_CHECKVERSION();
-			ImGui::CreateContext();
-			ImGuiIO& io = ImGui::GetIO();
-			io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
-			io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
-			//io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;         // IF using Docking Branch
-
-			// Setup Platform/Renderer backends
-			ImGui_ImplWin32_Init(dx_window.m_handle);
-			ImGui_ImplDX12_Init(dx_context.GetDevice().Get(), g_backbuffer_count, DXGI_FORMAT_R8G8B8A8_UNORM,
-			imgui_descriptor_heap.m_heap.Get(),
-			// You'll need to designate a descriptor from your descriptor heap for Dear ImGui to use internally for its font texture's SRV
-			cpu_descriptor,
-			gpu_descriptor);
-		}
-
+		UI ui;
+		ui.Init(dx_context, dx_window.m_buffers[g_current_buffer_index], dx_window.m_handle);
 		{
 			GraphicsResources gfx_resource{};
 			//CreateGraphicsResources(dx_context, dx_compiler, dx_window, gfx_resource);
 			ComputeResources compute_resource{};
 			CreateComputeResources(dx_context, dx_compiler, compute_resource);
-
 			while (!dx_window.ShouldClose())
 			{
+				std::chrono::milliseconds ms(8);
+				std::this_thread::sleep_for(ms);
 				// Process window message
 				dx_window.Update();
 
@@ -334,46 +390,16 @@ void RunWindowLoop(DXContext& dx_context, DXCompiler& dx_compiler, GPUCapture* g
 						dx_context.InitCommandLists();
 						{
 							PIXScopedEvent(dx_context.GetCommandListGraphics().Get(), 0, "Frame");
-
+							dx_window.BeginFrame(dx_context);
 							{
 								PIXScopedEvent(dx_context.GetCommandListGraphics().Get(), 0, "FillCommandList");
 								FillCommandList(dx_context, dx_window, gfx_resource, compute_resource);
 							}
-
 							{
 								PIXScopedEvent(dx_context.GetCommandListGraphics().Get(), 0, "ImGui");
-								// Rendering
-								// (Your code clears your framebuffer, renders your other stuff etc.)
-								dx_context.Transition(D3D12_RESOURCE_STATE_RENDER_TARGET, dx_window.m_buffers[g_current_buffer_index]);
-								D3D12_RENDER_TARGET_VIEW_DESC rtv_desc
-								{
-									.Format = dx_window.m_buffers[g_current_buffer_index].m_format,
-									.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D,
-									.Texture2D =
-									{
-										.MipSlice = 0,
-										.PlaneSlice = 0,
-									},
-								};
-								ID3D12Resource* d3d12_ouput_resource = dx_window.m_buffers[g_current_buffer_index].m_resource.Get();
-								dx_context.OMSetRenderTargets(1, &d3d12_ouput_resource, &rtv_desc, nullptr, nullptr);
-								{
-									// (Your code process and dispatch Win32 messages)
-									// Start the Dear ImGui frame
-									ImGui_ImplDX12_NewFrame();
-									ImGui_ImplWin32_NewFrame();
-									ImGui::NewFrame();
-									ImGui::ShowDemoWindow(); // Show demo window! :)
-									auto [bytes_used, bytes_budget] = GetVRAM(dx_context.m_adapter);
-									ImGui::Text("VRAM usage: %d MB / %d MB", ToMB(bytes_used), ToMB(bytes_budget));
-								}
-								ImGui::Render();
-								dx_context.GetCommandListGraphics()->SetDescriptorHeaps(1, imgui_descriptor_heap.m_heap.GetAddressOf());
-								ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), dx_context.GetCommandListGraphics().Get());
-								// (Your code calls ExecuteCommandLists, swapchain's Present(), etc.)
-								dx_context.Transition(D3D12_RESOURCE_STATE_PRESENT, dx_window.m_buffers[g_current_buffer_index]);
+								ui.Render(dx_context, dx_window.m_buffers[g_current_buffer_index]);
 							}
-
+							dx_window.EndFrame(dx_context);
 						}
 						dx_context.ExecuteCommandListGraphics();
 						dx_window.Present(dx_context);
@@ -389,11 +415,7 @@ void RunWindowLoop(DXContext& dx_context, DXCompiler& dx_compiler, GPUCapture* g
 			dx_context.Flush(dx_window.GetBackBufferCount());
 		}
 
-		{
-			ImGui_ImplDX12_Shutdown();
-			ImGui_ImplWin32_Shutdown();
-			ImGui::DestroyContext();
-		}
+
 	}
 }
 #pragma endregion
@@ -432,12 +454,14 @@ void ComputeWork
 	DXTextureResource gpu_resource;
 	gpu_resource.SetResourceInfo(D3D12_HEAP_TYPE_DEFAULT, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, dx_window.GetWidth(), dx_window.GetHeight(), output_resource.m_resource_desc.Format);
 	gpu_resource.CreateResource(dx_context, "GPU resource");
+	
 	dx_context.m_resource_handler.RegisterResource(gpu_resource);
 
 	struct MyCBuffer
 	{
 		uint2 resolution;
 		float32 iTime;
+		uint32 iFrame;
 		uint32 bindless_index;
 	}; 
 
@@ -461,14 +485,16 @@ void ComputeWork
 	auto current_time = std::chrono::high_resolution_clock::now();
 	auto diff_seconds = (float32)std::chrono::duration_cast<std::chrono::milliseconds>(current_time - start_time).count();
 	diff_seconds /= 1000;
+	static uint32 iFrame = 0;
 
 	MyCBuffer cbuffer
 	{
 		.resolution = {(uint32)gpu_resource.m_resource_desc.Width, (uint32)gpu_resource.m_resource_desc.Height},
 		.iTime = diff_seconds,
+		.iFrame = iFrame,
 		.bindless_index = uav.m_bindless_index
 	};
-	
+	++iFrame;
 	dx_context.GetCommandListGraphics()->SetComputeRootSignature(compute_resource.m_compute_root_signature.m_signature.Get());
 	
 	dx_context.GetCommandListGraphics()->SetComputeRoot32BitConstants(0, sizeof(MyCBuffer) / 4, &cbuffer, 0);
@@ -704,39 +730,25 @@ void RunWorkGraph(DXContext& dx_context, DXCompiler& dx_compiler, bool is_pix_ru
 }
 #pragma endregion
 
+std::shared_ptr<GPUCapture> CreateGPUCapture()
+{
+	//return nullptr;
+	return std::make_shared<PIXCapture>();
+	// RenderDoc doesnt support WorkGraph and newer interfaces
+	//return std::make_shared<RenderDocCapture>();
+}
+
 int main()
 {
 	MemoryTrack();
-	//static volatile bool t = true;
-	//while (t);
 	DXReportContext dx_report_context{};
 	{
-		// TODO PIX / renderdoc markers
-		//GPUCapture * gpu_capture = nullptr;
-		GPUCapture* gpu_capture = new PIXCapture();
-		// RenderDoc doesnt support WorkGraph and newer interfaces
-		//GPUCapture* gpu_capture = new RenderDocCapture();
-
+		std::shared_ptr<GPUCapture> gpu_capture = CreateGPUCapture();
 		DXContext dx_context{};
-		
 		dx_report_context.SetDevice(dx_context.GetDevice(), dx_context.m_adapter);
 		DXCompiler dx_compiler("shaders");
-		//gpu_capture->StartCapture();
-		do
-		{
-			//RunWorkGraph(dx_context, dx_compiler, dynamic_cast<PIXCapture*>(gpu_capture) != nullptr);
-		}while (false);
-		//gpu_capture->EndCapture();
-		//gpu_capture->OpenCapture();
-
-		RunWindowLoop(dx_context, dx_compiler, gpu_capture);
-		//gpu_capture->StartCapture();
-		//RunComputeWork(dx_context);
-		//gpu_capture->EndCapture();
-		//gpu_capture->OpenCapture();
-		//RunTest();
-
-		delete gpu_capture;
+		//RunWorkGraph(dx_context, dx_compiler, dynamic_cast<PIXCapture*>(gpu_capture) != nullptr);
+		RunWindowLoop(dx_context, dx_compiler, gpu_capture.get());
 	}
 	
 	return 0;
