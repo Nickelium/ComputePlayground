@@ -83,7 +83,7 @@ bool LoadPIX(HMODULE* pix_module_out)
 	// Dont load PIX if its already loaded, this can happen through PIX UI
 	if (pix_module == 0)
 	{
-		auto[pix_path, pix_version] = GetWinPixGpuCapturerPath("2405.15.002-OneBranch_release");
+		auto[pix_path, pix_version] = GetWinPixGpuCapturerPath();
 		pix_module = LoadLibrary(std::to_wstring(pix_path).c_str());
 		LogTrace(pix_version);
 	}

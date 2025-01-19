@@ -161,7 +161,7 @@ void main
 	c.im = sin(m_cbuffer.iTime * 0.15);
 //	c.re = 0.285;
 //	c.im = 0;
-	int N = 50;
+	int N = 150;
 	float j = julia(z0, c, N);
 	out_color = 0.5f + 0.5 * cos( 3.0 + j *0.15 + float3(0.0,0.6,1.0));
 

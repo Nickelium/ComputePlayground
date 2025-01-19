@@ -1,5 +1,7 @@
 #pragma once
 
+using uint8 = unsigned char;
+using int8 = char;
 using int32 = int; 
 using uint32 = unsigned int;
 static_assert(sizeof(int32) == 4);
@@ -12,6 +14,33 @@ using float32 = float;
 using float64 = double;
 static_assert(sizeof(float32) == 4);
 static_assert(sizeof(float64) == 8);
+
+template<typename T>
+T MaxType();
+
+template<typename T>
+T MinType();
+
+// Full specialization becomes a regular function, thus can have issue of multiple definitions across translation units
+template<>
+inline uint8 MaxType() { return (1 << 8) - 1; }
+
+template<>
+inline uint8 MinType() { return 0; }
+
+template<>
+inline int8 MaxType()
+{
+	int8 max_abs_value = static_cast<int8>(1 << 7);
+	return +(max_abs_value - 1);
+}
+
+template<>
+inline int8 MinType()
+{
+	int8 max_abs_value = static_cast < int8>(1 << 7);
+	return -max_abs_value;
+}
 
 using int2 = int32[2];
 using int3 = int32[3]; 

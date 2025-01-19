@@ -98,7 +98,7 @@ namespace
 
 		std::wstring str = std::to_wstring(description);
 		OutputDebugStringW(str.c_str());
-		ASSERT(false);
+		//ASSERT(false);
 	}
 }
 
@@ -329,6 +329,10 @@ void DXContext::Init()
 		pDredSettings->SetAutoBreadcrumbsEnablement(D3D12_DRED_ENABLEMENT_FORCED_ON);
 		pDredSettings->SetPageFaultEnablement(D3D12_DRED_ENABLEMENT_FORCED_ON);
 	}
+#else
+	UNUSED(enable_debug_layer_cpu);
+	UNUSED(enable_debug_layer_gpu);
+	UNUSED(enable_dred);
 #endif
 
 	uint32 dxgi_factory_flag { 0 };
@@ -605,6 +609,10 @@ void ValidateResourceTransition(const CommandQueue& command_queue, const Command
 		// Whats the difference between assert on command list and queue?
 		//ASSERT(debug_command_queue->AssertResourceState(resource.m_resource.Get(), D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES, resource.m_resource_state));
 	}
+#else
+	UNUSED(command_queue);
+	UNUSED(command_list);
+	UNUSED(resource);
 #endif
 }
 
@@ -1062,7 +1070,8 @@ void RTVDescriptorHandler::ClearDepthStencilView
 {
 	D3D12_CPU_DESCRIPTOR_HANDLE descriptor_handle = m_dsv_descriptor;
 	dx_context.GetDevice()->CreateDepthStencilView(dsv_resource, dsv_desc, descriptor_handle);
-	dx_context.GetCommandListGraphics()->ClearDepthStencilView(descriptor_handle, clear_flags, depth, stencil, num_rects, rects);
+	ASSERT(stencil <= MaxType<uint8>());
+	dx_context.GetCommandListGraphics()->ClearDepthStencilView(descriptor_handle, clear_flags, depth, (uint8)stencil, num_rects, rects);
 }
 
 

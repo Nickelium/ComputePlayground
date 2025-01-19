@@ -72,19 +72,12 @@ class ResourceHandler
 {
 public:
 	// Create Transient Resource
-	void RegisterResource(DXResource& resource)
-	{
-		m_resources[g_current_buffer_index].push_back(resource);
-	}
-
-	void FreeResources()
-	{
-		m_resources[g_current_buffer_index].clear();
-	}
+	void RegisterResource(DXResource& resource);
+	void ReRegisterResource(DXResource& resource);
+	void FreeResources();
 	// Create Persistent Resource
 	std::vector<DXResource> m_resources[g_backbuffer_count];
 };
-
 
 struct ResourceDescription
 {
@@ -94,29 +87,30 @@ struct ResourceDescription
 
 inline bool operator==(const ResourceDescription& rd1, const ResourceDescription& rd2)
 {
-	return memcmp(&rd1, &rd2, sizeof(ResourceDescription)) == 0;
+	return 
+		rd1.m_resource_desc	== rd2.m_resource_desc &&
+		rd1.m_heap_properties == rd2.m_heap_properties;
 }
 
 class ResourceAllocator
 {
 public:
-	bool HasCachedResource(const ResourceDescription& resource_description)
-	{
-		// TODO hashing
-		for (uint32 i = 0; i < m_free_resource_list.size(); ++i)
-		{
-			auto [current_resource_description, current_resource] = m_free_resource_list[i];
-			if (current_resource_description == resource_description)
-			{
-				return true;
-			}
-		}
-		return false;
-	}
+	Microsoft::WRL::ComPtr<ID3D12Resource> CreateResource
+	(
+		DXContext& dx_context, 
+		D3D12_HEAP_PROPERTIES heap_properties,
+	    D3D12_RESOURCE_DESC resource_desc,
+		D3D12_RESOURCE_STATES resource_state
+	);
+	void AddCachedResource(const ResourceDescription& resource_description, Microsoft::WRL::ComPtr<ID3D12Resource> resource, D3D12_RESOURCE_STATES resource_state);
+private:
+	bool HasCachedResource(const ResourceDescription& resource_description) const;
+	std::pair<Microsoft::WRL::ComPtr<ID3D12Resource>, D3D12_RESOURCE_STATES> GetCachedResource(const ResourceDescription& resource_description);
 	// A resource is uniquely identified by the below
 	// Stored freed resources, dont actually free
 	// If request matches free, return something from the resource list
 	// Otherwise CreateCommitedResource
 	// Add when freed
-	std::vector<std::pair<ResourceDescription, Microsoft::WRL::ComPtr<ID3D12Resource>>> m_free_resource_list;
+	std::vector<std::pair<ResourceDescription, std::pair<Microsoft::WRL::ComPtr<ID3D12Resource>, D3D12_RESOURCE_STATES>>> m_free_resource_list;
 };
+

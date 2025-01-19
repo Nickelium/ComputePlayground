@@ -8,7 +8,7 @@ D3D12_HEAP_PROPERTIES g_heapPropertiesNUMA[D3D12_HEAP_TYPE_CUSTOM - 1]
 {
 	//D3D12_HEAP_TYPE_DEFAULT
 	{
-		.Type = D3D12_HEAP_TYPE_DEFAULT,
+		.Type = D3D12_HEAP_TYPE_CUSTOM,
 		.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_NOT_AVAILABLE,
 		// GPU local memory
 		.MemoryPoolPreference = D3D12_MEMORY_POOL_L1,
@@ -17,7 +17,7 @@ D3D12_HEAP_PROPERTIES g_heapPropertiesNUMA[D3D12_HEAP_TYPE_CUSTOM - 1]
 	},
 	//D3D12_HEAP_TYPE_UPLOAD
 	{
-		.Type = D3D12_HEAP_TYPE_UPLOAD,
+		.Type = D3D12_HEAP_TYPE_CUSTOM,
 		.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_WRITE_COMBINE,
 		// System memory
 		.MemoryPoolPreference = D3D12_MEMORY_POOL_L0,
@@ -26,7 +26,7 @@ D3D12_HEAP_PROPERTIES g_heapPropertiesNUMA[D3D12_HEAP_TYPE_CUSTOM - 1]
 	},
 	//D3D12_HEAP_TYPE_READBACK
 	{
-		.Type = D3D12_HEAP_TYPE_READBACK,
+		.Type = D3D12_HEAP_TYPE_CUSTOM,
 		.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_WRITE_BACK,
 		// System memory
 		.MemoryPoolPreference = D3D12_MEMORY_POOL_L0,
@@ -67,10 +67,19 @@ void DXResource::SetResourceInfo(D3D12_HEAP_TYPE heap_type, D3D12_RESOURCE_FLAGS
 	m_resource_state = D3D12_RESOURCE_STATE_COMMON;
 }
 
+ResourceAllocator g_resource_allocator;
+
 void DXResource::CreateResource(DXContext& dx_context, const std::string& name_resource)
 {
-	dx_context.GetDevice()->CreateCommittedResource(&m_heap_properties, D3D12_HEAP_FLAG_NONE, &m_resource_desc, m_resource_state, nullptr, IID_PPV_ARGS(&m_resource)) >> CHK;
+	m_resource = g_resource_allocator.CreateResource
+	(
+		dx_context, m_heap_properties, m_resource_desc, m_resource_state
+	);
+	//dx_context.GetDevice()->CreateCommittedResource(&m_heap_properties, D3D12_HEAP_FLAG_NONE, &m_resource_desc, m_resource_state, nullptr, IID_PPV_ARGS(&m_resource)) >> CHK;
 	NAME_DX_OBJECT(m_resource, name_resource);
+#if !defined(_DEBUG)
+	UNUSED(name_resource);
+#endif
 }
 
 void DXVertexBufferResource::SetResourceInfo(D3D12_HEAP_TYPE heap_type, D3D12_RESOURCE_FLAGS resource_flags, uint32 size, uint32 stride)
@@ -135,4 +144,120 @@ void DXTextureResource::SetResourceInfo(D3D12_HEAP_TYPE heap_type, D3D12_RESOURC
 void DXTextureResource::CreateResource(DXContext& dx_context, const std::string& name_resource)
 {
 	DXResource::CreateResource(dx_context, name_resource);
+}
+
+Microsoft::WRL::ComPtr<ID3D12Resource> ResourceAllocator::CreateResource
+(
+	DXContext& dx_context, 
+	D3D12_HEAP_PROPERTIES heap_properties,
+	D3D12_RESOURCE_DESC resource_desc,
+	D3D12_RESOURCE_STATES resource_state
+) 
+{
+	Microsoft::WRL::ComPtr<ID3D12Resource> final_resource{};
+	if (HasCachedResource( { resource_desc, heap_properties }))
+	{
+		auto [resource, old_resource_state] = GetCachedResource( { resource_desc, heap_properties });
+		final_resource = resource;
+		// Barrier
+		// if different state transition
+		if (old_resource_state != resource_state)
+		{
+			//ValidateResourceTransition(m_queue_graphics, m_command_list_graphics, resource);
+			D3D12_RESOURCE_BARRIER barrier[1]{};
+			barrier[0] =
+			{
+				.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION,
+				.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE,
+				.Transition =
+				{
+					.pResource = resource.Get(),
+					.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
+					.StateBefore = old_resource_state,
+					.StateAfter = resource_state,
+				}
+			};
+			dx_context.GetCommandListGraphics()->ResourceBarrier(COUNT(barrier), barrier);
+			//ValidateResourceTransition(m_queue_graphics, m_command_list_graphics, resource);
+		}
+
+	}
+	else
+	{
+		dx_context.GetDevice()->CreateCommittedResource(&heap_properties, D3D12_HEAP_FLAG_NONE, &resource_desc, resource_state, nullptr, IID_PPV_ARGS(&final_resource)) >> CHK;
+	}
+	return final_resource;
+}
+
+bool ResourceAllocator::HasCachedResource(const ResourceDescription& resource_description) const
+{
+	// TODO hashing
+	for (uint32 i = 0; i < m_free_resource_list.size(); ++i)
+	{
+		auto [current_resource_description, current_resource] = m_free_resource_list[i];
+		if (current_resource_description == resource_description)
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+std::pair<Microsoft::WRL::ComPtr<ID3D12Resource>, D3D12_RESOURCE_STATES> ResourceAllocator::GetCachedResource(const ResourceDescription& resource_description)
+{
+	for (auto it = m_free_resource_list.begin(); it != m_free_resource_list.end(); ++it)
+	{
+		auto [current_resource_description, current_resource] = *it;
+		if (current_resource_description == resource_description)
+		{
+			m_free_resource_list.erase(it);
+			return current_resource;
+		}
+	}
+	ASSERT(false);
+	return {};
+}
+
+void ResourceAllocator::AddCachedResource(const ResourceDescription& resource_description, Microsoft::WRL::ComPtr<ID3D12Resource> resource, D3D12_RESOURCE_STATES resource_state)
+{
+	std::pair<ResourceDescription, Microsoft::WRL::ComPtr < ID3D12Resource> > new_element { resource_description, resource };
+	if (std::find_if
+	(
+		m_free_resource_list.begin(), m_free_resource_list.end(), 
+		[resource_description, resource](std::pair<ResourceDescription, std::pair<Microsoft::WRL::ComPtr<ID3D12Resource>, D3D12_RESOURCE_STATES>> element)
+		{
+			return element.first == resource_description && element.second.first == resource;
+		}
+	) == m_free_resource_list.end())
+	m_free_resource_list.push_back( { resource_description, { resource, resource_state } });
+}
+
+void ResourceHandler::RegisterResource(DXResource& resource)
+{
+	m_resources[g_current_buffer_index].push_back(resource);
+}
+
+void ResourceHandler::ReRegisterResource(DXResource& resource)
+{
+	auto it = std::find_if(m_resources[g_current_buffer_index].begin(), m_resources[g_current_buffer_index].end(), 
+	[resource](DXResource element)
+	{
+		return element.m_resource == resource.m_resource;
+	});
+	if (it != m_resources[g_current_buffer_index].end())
+	{
+		// Patch up
+		(*it).m_resource_state = resource.m_resource_state;
+	}
+	//m_resources[g_current_buffer_index].push_back(resource);
+}
+
+void ResourceHandler::FreeResources()
+{
+	for (uint32 i = 0; i < m_resources[g_current_buffer_index].size(); ++i)
+	{
+		const DXResource& resource = m_resources[g_current_buffer_index][i];
+		g_resource_allocator.AddCachedResource( { resource.m_resource_desc, resource.m_heap_properties }, resource.m_resource, resource.m_resource_state);
+	}
+	m_resources[g_current_buffer_index].clear();
 }

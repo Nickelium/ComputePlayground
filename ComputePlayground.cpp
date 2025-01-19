@@ -82,8 +82,7 @@ void CreateGraphicsResources
 
 		DXResource vertex_upload_buffer{};
 		vertex_upload_buffer.SetResourceInfo(D3D12_HEAP_TYPE_UPLOAD, D3D12_RESOURCE_FLAG_NONE, sizeof(vertex_data));
-		vertex_upload_buffer.m_resource_state = D3D12_RESOURCE_STATE_GENERIC_READ;
-		// Memory resident in upload needs to be in generic read
+		// Needs to start in COMMON for buffers
 		vertex_upload_buffer.CreateResource(dx_context, "VertexUploadBuffer");
 
 		Vertex* data = nullptr;
@@ -91,7 +90,6 @@ void CreateGraphicsResources
 		memcpy(data, vertex_data, sizeof(vertex_data));
 		vertex_upload_buffer.m_resource->Unmap(0, nullptr);
 		dx_context.InitCommandLists();
-		// Technically, dont need to transition to copy source because generic is copy source and more or'd together
 		dx_context.Transition(D3D12_RESOURCE_STATE_COPY_SOURCE, vertex_upload_buffer);
 		dx_context.Transition(D3D12_RESOURCE_STATE_COPY_DEST, resource.m_vertex_buffer);
 		dx_context.GetCommandListGraphics()->CopyResource(resource.m_vertex_buffer.m_resource.Get(), vertex_upload_buffer.m_resource.Get());
@@ -227,7 +225,7 @@ void FillCommandList
 	dx_context.GetCommandListGraphics()->SetDescriptorHeaps(1, dx_context.m_resources_descriptor_heap.m_heap.GetAddressOf());
 	{
 		ComputeWork(dx_context, compute_resource, dx_window, dx_window.m_buffers[g_current_buffer_index]);
-		//GraphicsWork(dx_context, dx_window, gfx_resource, dx_window.m_buffers[g_current_buffer_index]);
+		GraphicsWork(dx_context, dx_window, gfx_resource, dx_window.m_buffers[g_current_buffer_index]);
 	}
 }
 
@@ -331,7 +329,7 @@ void RunWindowLoop(DXContext& dx_context, DXCompiler& dx_compiler, GPUCapture* g
 		ui.Init(dx_context, dx_window.m_buffers[g_current_buffer_index], dx_window.m_handle);
 		{
 			GraphicsResources gfx_resource{};
-			//CreateGraphicsResources(dx_context, dx_compiler, dx_window, gfx_resource);
+			CreateGraphicsResources(dx_context, dx_compiler, dx_window, gfx_resource);
 			ComputeResources compute_resource{};
 			CreateComputeResources(dx_context, dx_compiler, compute_resource);
 			while (!dx_window.ShouldClose())
@@ -505,6 +503,8 @@ void ComputeWork
 	dx_context.Transition(D3D12_RESOURCE_STATE_COPY_DEST, output_resource);
 	dx_context.Transition(D3D12_RESOURCE_STATE_COPY_SOURCE, gpu_resource);
 	dx_context.GetCommandListGraphics()->CopyResource(output_resource.m_resource.Get(), gpu_resource.m_resource.Get());
+
+	dx_context.m_resource_handler.ReRegisterResource(gpu_resource);
 }
 
 void RunComputeWork(DXContext& dx_context)
@@ -541,7 +541,6 @@ struct WorkGraphResources
 
 	Shader m_workgraph_shader;
 	RootSignature m_workgraph_root_signature;
-	//Microsoft::WRL::ComPtr<ID3D12StateObject> m_workgraph_so;
 	PSO m_pso;
 };
 
@@ -730,20 +729,47 @@ void RunWorkGraph(DXContext& dx_context, DXCompiler& dx_compiler, bool is_pix_ru
 }
 #pragma endregion
 
-std::shared_ptr<GPUCapture> CreateGPUCapture()
+enum class GPUCaptureType
 {
-	//return nullptr;
-	return std::make_shared<PIXCapture>();
+	NONE,
+	PIX,
+	RENDERDOC,
+};
+
+std::shared_ptr<GPUCapture> CreateGPUCapture(GPUCaptureType type)
+{
+	if(type == GPUCaptureType::NONE) return nullptr;
+	else if(type == GPUCaptureType::PIX) return std::make_shared<PIXCapture>();
 	// RenderDoc doesnt support WorkGraph and newer interfaces
-	//return std::make_shared<RenderDocCapture>();
+	else if(type == GPUCaptureType::RENDERDOC) return std::make_shared<RenderDocCapture>();
+	else { ASSERT(false); return nullptr; }
+	//return 
+}
+
+// Use this to attach debugger when running from PIX or Nsight Graphics to detect the crash
+void StallWaitDebugger(bool enable_wait)
+{
+#if defined(_DEBUG)
+	if (enable_wait == false) return;
+	bool is_debugger_present = IsDebuggerPresent();
+	while (is_debugger_present == false)
+	{
+		is_debugger_present = IsDebuggerPresent();
+		std::chrono::milliseconds ms(8);
+		std::this_thread::sleep_for(ms);
+	}
+#else
+	UNUSED(enable_wait);
+#endif
 }
 
 int main()
 {
+	StallWaitDebugger(false);
 	MemoryTrack();
 	DXReportContext dx_report_context{};
 	{
-		std::shared_ptr<GPUCapture> gpu_capture = CreateGPUCapture();
+		std::shared_ptr<GPUCapture> gpu_capture = CreateGPUCapture(GPUCaptureType::PIX);
 		DXContext dx_context{};
 		dx_report_context.SetDevice(dx_context.GetDevice(), dx_context.m_adapter);
 		DXCompiler dx_compiler("shaders");
