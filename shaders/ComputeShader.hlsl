@@ -9,7 +9,6 @@
 
 struct MyCBuffer
 {
-	int2 resolution;
 	float iTime;
 	int iFrame;
 	int bindless_index;
@@ -134,7 +133,7 @@ float3 GetWhiteNoise(uint2 position, uint width, uint frame, float scale)
 }
 
 
-[RootSignature(ROOTFLAGS_DEFAULT ", RootConstants(num32BitConstants=5, b0)")]
+[RootSignature(ROOTFLAGS_DEFAULT ", RootConstants(num32BitConstants=4, b0)")]
 [numthreads(8, 8, 1)]
 void main
 (
@@ -144,8 +143,11 @@ void main
 	const uint inGroupIndex : SV_GroupIndex
 )
 {
-	float2 uv = (inDispatchThreadID.xy + 0.5f) / float2(m_cbuffer.resolution.x, m_cbuffer.resolution.y);
 	RWTexture2D<float4> m_uav = ResourceDescriptorHeap[m_cbuffer.bindless_index];
+	uint width;
+	uint height;
+	m_uav.GetDimensions(width, height);
+	float2 uv = (inDispatchThreadID.xy + 0.5f) / float2(width, height);
 	float3 out_color;
 #if defined(CHEAP_STAR)
 	out_color = animate_star(uv, m_cbuffer.iTime);
@@ -166,7 +168,7 @@ void main
 	out_color = 0.5f + 0.5 * cos( 3.0 + j *0.15 + float3(0.0,0.6,1.0));
 
 	float noiseScale = 1.0f / 256.0f;
-	float3 noise = GetWhiteNoise(uint2(inDispatchThreadID.xy + 0.5f), m_cbuffer.resolution.x, m_cbuffer.iFrame, noiseScale);
+	float3 noise = GetWhiteNoise(uint2(inDispatchThreadID.xy + 0.5f), width, m_cbuffer.iFrame, noiseScale);
 	out_color += noise;
 	//out_color = sRGBToLinear(out_color);
 #else

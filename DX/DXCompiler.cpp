@@ -40,22 +40,23 @@ void DXCompiler::Init(const std::string& directory)
 Shader DXCompiler::Compile(Microsoft::WRL::ComPtr<ID3D12Device> device, const ShaderDesc& shader_desc) const
 {
 	Microsoft::WRL::ComPtr<IDxcBlob> shader_blob;
-	std::string shaderFile = shader_desc.m_file_name;
-	ShaderType shaderType = shader_desc.m_type;
+	std::string shader_file = shader_desc.m_file_name;
+	ShaderType shader_type = shader_desc.m_type;
 	std::string entry_point = shader_desc.m_entry_point_name;
 	
-	Microsoft::WRL::ComPtr<IDxcBlobEncoding> shaderSource{};
-	const std::string shaderFullPath = m_directory + "\\" + shaderFile;
-	m_utils->LoadFile(std::to_wstring(shaderFullPath).c_str(), nullptr, &shaderSource) >> CHK;
-	DxcBuffer sourceBuffer{};
-	sourceBuffer.Ptr = shaderSource->GetBufferPointer();
-	sourceBuffer.Size = shaderSource->GetBufferSize();
+	Microsoft::WRL::ComPtr<IDxcBlobEncoding> shader_source{};
+	const std::string shader_full_path = m_directory + "\\" + shader_file;
+	m_utils->LoadFile(std::to_wstring(shader_full_path).c_str(), nullptr, &shader_source) >> CHK;
+	DxcBuffer source_buffer{};
+	source_buffer.Ptr = shader_source->GetBufferPointer();
+	source_buffer.Size = shader_source->GetBufferSize();
 
 	std::vector<std::string> compile_arguments{};
+	compile_arguments.push_back(shader_file); // Entry point name
 	compile_arguments.push_back("-E "); // Entry point name
 	compile_arguments.push_back(entry_point);
 	compile_arguments.push_back("-T"); // Target profile 
-	std::string shader_type_model_string = GetShaderTypeString(shaderType);
+	std::string shader_type_model_string = GetShaderTypeString(shader_type);
 
 	// Technically this needs to be supported by the DXC and not the device
 	const D3D_SHADER_MODEL shader_model = GetMaxShaderModel(device);
@@ -91,13 +92,13 @@ Shader DXCompiler::Compile(Microsoft::WRL::ComPtr<ID3D12Device> device, const Sh
 	}
 
 	Microsoft::WRL::ComPtr<IDxcResult> compileResult{};
-	m_compiler->Compile(&sourceBuffer, compile_arguments_lpcwstr.data(), (uint32)compile_arguments_lpcwstr.size(), m_include_handler.Get(), IID_PPV_ARGS(&compileResult)) >> CHK;
+	m_compiler->Compile(&source_buffer, compile_arguments_lpcwstr.data(), (uint32)compile_arguments_lpcwstr.size(), m_include_handler.Get(), IID_PPV_ARGS(&compileResult)) >> CHK;
 
-	Microsoft::WRL::ComPtr<IDxcBlobUtf8> pErrors{};
-	compileResult->GetOutput(DXC_OUT_ERRORS, IID_PPV_ARGS(&pErrors), nullptr) >> CHK;
-	if (pErrors && pErrors->GetStringLength() > 0)
+	Microsoft::WRL::ComPtr<IDxcBlobUtf8> errors{};
+	compileResult->GetOutput(DXC_OUT_ERRORS, IID_PPV_ARGS(&errors), nullptr) >> CHK;
+	if (errors && errors->GetStringLength() > 0)
 	{
-		LogError("{0}", (char*)pErrors->GetBufferPointer());
+		LogError("{0}", (char*)errors->GetBufferPointer());
 	}
 	HRESULT HR{};
 	compileResult->GetStatus(&HR) >> CHK;

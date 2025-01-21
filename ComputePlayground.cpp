@@ -457,7 +457,6 @@ void ComputeWork
 
 	struct MyCBuffer
 	{
-		uint2 resolution;
 		float32 iTime;
 		uint32 iFrame;
 		uint32 bindless_index;
@@ -487,7 +486,6 @@ void ComputeWork
 
 	MyCBuffer cbuffer
 	{
-		.resolution = {(uint32)gpu_resource.m_resource_desc.Width, (uint32)gpu_resource.m_resource_desc.Height},
 		.iTime = diff_seconds,
 		.iFrame = iFrame,
 		.bindless_index = uav.m_bindless_index
