@@ -492,7 +492,6 @@ void ComputeWork
 	};
 	++iFrame;
 	dx_context.GetCommandListGraphics()->SetComputeRootSignature(compute_resource.m_compute_root_signature.m_signature.Get());
-	
 	dx_context.GetCommandListGraphics()->SetComputeRoot32BitConstants(0, sizeof(MyCBuffer) / 4, &cbuffer, 0);
 	uint32 dispatch_x = DivideRoundUp(gpu_resource.m_width, 8);
 	uint32 dispatch_y = DivideRoundUp(gpu_resource.m_height, 8);
@@ -578,7 +577,7 @@ void CreateWorkGraphResource
 	uint32 workgraph_index = workgraph_properties->GetWorkGraphIndex(work_graph_wname.c_str());
 	D3D12_WORK_GRAPH_MEMORY_REQUIREMENTS mem_requirements{};
 	workgraph_properties->GetWorkGraphMemoryRequirements(workgraph_index, &mem_requirements);
-
+	
 	if (mem_requirements.MaxSizeInBytes > 0)
 	{
 		// For some reason running with PIX requires UAV

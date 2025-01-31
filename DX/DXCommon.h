@@ -9,7 +9,7 @@
 #include <dxcapi.h> // DXC compiler
 
 // Agility SDK needs to be included in main.cpp
-#define AGILITY_SDK_DECLARE() extern "C" { __declspec(dllexport) extern const UINT D3D12SDKVersion = 614; } \
+#define AGILITY_SDK_DECLARE() extern "C" { __declspec(dllexport) extern const UINT D3D12SDKVersion = 615; } \
 extern "C" { __declspec(dllexport) extern const char* D3D12SDKPath = ".\\D3D12\\"; }
 
 static const uint32 g_backbuffer_count = 3u;

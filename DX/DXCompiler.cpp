@@ -93,7 +93,7 @@ Shader DXCompiler::Compile(Microsoft::WRL::ComPtr<ID3D12Device> device, const Sh
 
 	Microsoft::WRL::ComPtr<IDxcResult> compileResult{};
 	m_compiler->Compile(&source_buffer, compile_arguments_lpcwstr.data(), (uint32)compile_arguments_lpcwstr.size(), m_include_handler.Get(), IID_PPV_ARGS(&compileResult)) >> CHK;
-
+	
 	Microsoft::WRL::ComPtr<IDxcBlobUtf8> errors{};
 	compileResult->GetOutput(DXC_OUT_ERRORS, IID_PPV_ARGS(&errors), nullptr) >> CHK;
 	if (errors && errors->GetStringLength() > 0)
