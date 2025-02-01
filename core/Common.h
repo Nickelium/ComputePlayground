@@ -10,8 +10,8 @@
 // ComPtr
 #define NOMINMAX
 #include <wrl/client.h>
-// Avoid long namespace for Microsoft::WRL::ComPtr<T>
-// using namespace Microsoft::WRL;
+// Avoid long namespace for ComPtr<T>
+using namespace Microsoft::WRL;
 
 #define DISABLE_OPTIMISATIONS() __pragma( optimize( "", off ) )
 #define ENABLE_OPTIMISATIONS() __pragma( optimize( "", on ) )

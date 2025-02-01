@@ -9,7 +9,7 @@
 #include <dxcapi.h> // DXC compiler
 
 // Agility SDK needs to be included in main.cpp
-#define AGILITY_SDK_DECLARE() extern "C" { __declspec(dllexport) extern const UINT D3D12SDKVersion = 615; } \
+#define AGILITY_SDK_DECLARE() extern "C" { __declspec(dllexport) extern const UINT D3D12SDKVersion = 716; } \
 extern "C" { __declspec(dllexport) extern const char* D3D12SDKPath = ".\\D3D12\\"; }
 
 static const uint32 g_backbuffer_count = 3u;
@@ -45,4 +45,4 @@ inline int64 FromMB(int64 MB) { return MB << 20; }
 inline int64 FromGB(int64 GB) { return GB << 30; }
 
 
-D3D12_SHADER_BYTECODE BlobToByteCode(Microsoft::WRL::ComPtr<IDxcBlob> blob);
+D3D12_SHADER_BYTECODE BlobToByteCode(ComPtr<IDxcBlob> blob);

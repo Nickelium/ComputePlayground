@@ -147,7 +147,7 @@ private:
 	WindowMode m_window_mode;
 	WindowMode m_window_mode_request;
 
-	Microsoft::WRL::ComPtr<IDXGISwapChain4> m_swap_chain;
+	ComPtr<IDXGISwapChain4> m_swap_chain;
 public:
 	std::vector<DXTextureResource> m_buffers;
 private:

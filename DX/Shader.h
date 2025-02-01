@@ -22,6 +22,6 @@ struct ShaderDesc
 
 struct Shader
 {
-	Microsoft::WRL::ComPtr<IDxcBlob> m_blob;
+	ComPtr<IDxcBlob> m_blob;
 	ShaderDesc m_shader_desc;
 };

@@ -38,7 +38,7 @@ m_source_location(loc)
 
 }
 
-D3D12_SHADER_BYTECODE BlobToByteCode(Microsoft::WRL::ComPtr<IDxcBlob> blob)
+D3D12_SHADER_BYTECODE BlobToByteCode(ComPtr<IDxcBlob> blob)
 {
 	return
 	{

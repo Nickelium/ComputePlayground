@@ -4,7 +4,7 @@
 
 struct PSO
 {
-	Microsoft::WRL::ComPtr<ID3D12StateObject> m_so;
+	ComPtr<ID3D12StateObject> m_so;
 	D3D12_PROGRAM_IDENTIFIER m_program_id;
 };
 

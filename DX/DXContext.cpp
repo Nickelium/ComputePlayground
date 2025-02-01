@@ -11,21 +11,10 @@
 
 #include <map>
 
-DXContext::DXContext() :
-	m_use_warp(false)
-#if defined(_DEBUG)
-	,
-	m_callback_handle(0)
-#endif
-{
-	Init();
-	m_rtv_descriptor_handler.Init(*this);
-}
-
 DXContext::~DXContext()
 {
 #if defined(_DEBUG)
-	Microsoft::WRL::ComPtr<ID3D12InfoQueue1> info_queue{};
+	ComPtr<ID3D12InfoQueue1> info_queue{};
 	HRESULT result = m_device.As(&info_queue);
 	// Query fails if debug layer disabled
 	if (result == S_OK)
@@ -264,14 +253,14 @@ void OnDeviceRemoved(PVOID context, BOOLEAN)
 {
 	// Data to pass is limited so we dont pass ComPtr
 	ID3D12Device* removed_device = static_cast<ID3D12Device*>(context);
-	Microsoft::WRL::ComPtr<ID3D12Device> device = removed_device;
+	ComPtr<ID3D12Device> device = removed_device;
 	HRESULT removed_reason = device->GetDeviceRemovedReason();
 	std::string removed_reason_string = RemapHResult(removed_reason);
 	
 	if (removed_reason != S_OK)
 	{
 		// DRED
-		Microsoft::WRL::ComPtr<ID3D12DeviceRemovedExtendedData> dred{};
+		ComPtr<ID3D12DeviceRemovedExtendedData> dred{};
 		device->QueryInterface(IID_PPV_ARGS(&dred));
 		D3D12_DRED_AUTO_BREADCRUMBS_OUTPUT dred_autobreadcrumbs_output{};
 		D3D12_DRED_PAGE_FAULT_OUTPUT dred_page_fault_output{};
@@ -286,27 +275,33 @@ void OnDeviceRemoved(PVOID context, BOOLEAN)
 	LogTrace(removed_reason_string);
 }
 
-void DXContext::Init()
+DXContext::DXContext
+(
+	 bool enable_debug_layer_cpu, 
+	 bool enable_debug_layer_gpu, 
+	 bool enable_dred, 
+	 bool use_warp
+)
+#if defined(_DEBUG)
+	: m_callback_handle(0)
+#endif
 {
-	// API side checks
-	bool enable_debug_layer_cpu = true;
-	// Validate on GPU timeline and shaders
-	bool enable_debug_layer_gpu = enable_debug_layer_cpu && true;
-	bool enable_dred = true;
 #if defined(_DEBUG)
 	{
-		Microsoft::WRL::ComPtr < IDXGIDebug1 > dxgi_debug{};
+		ComPtr < IDXGIDebug1 > dxgi_debug{};
 		// Requires windows "Graphics Tool" optional feature
 		DXGIGetDebugInterface1(0, IID_PPV_ARGS(&dxgi_debug)) >> CHK;
 		dxgi_debug->EnableLeakTrackingForThread();
 	}
 
+	// API side checks
 	if (enable_debug_layer_cpu)
 	{
-		Microsoft::WRL::ComPtr < ID3D12Debug5 > d3d12_debug{};
+		ComPtr < ID3D12Debug5 > d3d12_debug{};
 		D3D12GetDebugInterface(IID_PPV_ARGS(&d3d12_debug)) >> CHK;
 		d3d12_debug->EnableDebugLayer();
 
+		// Validate on GPU timeline and shaders
 		// When running with GPU based validation, it assigns a unique ID to a resource. 
 		// Therefore even freeing and reallocating a resource will consume memory
 		// Its best to try to reuse resources instead of recreating them
@@ -323,7 +318,7 @@ void DXContext::Init()
 	if (enable_dred)
 	{
 		// DRED: Auto WriteBufferImmediate (aka auto bread crumbs) & force GPU page fault instead of reading zeros
-		Microsoft::WRL::ComPtr < ID3D12DeviceRemovedExtendedDataSettings > pDredSettings{};
+		ComPtr < ID3D12DeviceRemovedExtendedDataSettings > pDredSettings{};
 		D3D12GetDebugInterface(IID_PPV_ARGS(&pDredSettings)) >> CHK;
 		// Turn on AutoBreadcrumbs and Page Fault reporting
 		pDredSettings->SetAutoBreadcrumbsEnablement(D3D12_DRED_ENABLEMENT_FORCED_ON);
@@ -333,6 +328,7 @@ void DXContext::Init()
 	UNUSED(enable_debug_layer_cpu);
 	UNUSED(enable_debug_layer_gpu);
 	UNUSED(enable_dred);
+	UNUSED(use_warp);
 #endif
 
 	uint32 dxgi_factory_flag { 0 };
@@ -341,7 +337,7 @@ void DXContext::Init()
 #endif
 	CreateDXGIFactory2(dxgi_factory_flag, IID_PPV_ARGS(&m_factory)) >> CHK;
 
-	if (m_use_warp)
+	if (use_warp)
 	{
 		m_factory->EnumWarpAdapter(IID_PPV_ARGS(&m_adapter)) >> CHK;
 	}
@@ -369,7 +365,7 @@ void DXContext::Init()
 #if defined(_DEBUG)
 	m_device->SetStablePowerState(true);
 	{
-		Microsoft::WRL::ComPtr<ID3D12InfoQueue1> info_queue{};
+		ComPtr<ID3D12InfoQueue1> info_queue{};
 		HRESULT result = m_device.As(&info_queue);
 		// Query fails if debug layer disabled
 		if (result == S_OK)
@@ -491,6 +487,8 @@ void DXContext::Init()
 #if defined(_DEBUG)
 	LogTrace(DumpDX12Capabilities(m_device));
 #endif
+
+	m_rtv_descriptor_handler.Init(*this);
 }
 
 // Declaration
@@ -594,14 +592,14 @@ void ValidateResourceTransition(const CommandQueue& command_queue, const Command
 {
 #if defined(_DEBUG)
 	 //if debug layer enabled
-	Microsoft::WRL::ComPtr<ID3D12DebugCommandList> debug_command_list{};
+	ComPtr<ID3D12DebugCommandList> debug_command_list{};
 	command_list.m_list.As(&debug_command_list);
 	if (debug_command_list)
 	{
 		ASSERT(debug_command_list->AssertResourceState(resource.m_resource.Get(), D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES, resource.m_resource_state));
 	}
 
-	Microsoft::WRL::ComPtr<ID3D12DebugCommandQueue> debug_command_queue{};
+	ComPtr<ID3D12DebugCommandQueue> debug_command_queue{};
 	command_queue.m_queue.As(&debug_command_queue);
 	if (debug_command_queue)
 	{
@@ -641,27 +639,27 @@ void DXContext::Transition(D3D12_RESOURCE_STATES new_resource_state, DXResource&
 	ValidateResourceTransition(m_queue_graphics, m_command_list_graphics, resource);
 }
 
-Microsoft::WRL::ComPtr<ID3D12Device14> DXContext::GetDevice() const
+ComPtr<ID3D12Device14> DXContext::GetDevice() const
 {
 	return m_device;
 }
 
-Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList10> DXContext::GetCommandListGraphics() const
+ComPtr<ID3D12GraphicsCommandList10> DXContext::GetCommandListGraphics() const
 {
 	return m_command_list_graphics.m_list;
 }
 
-Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> DXContext::GetCommandListCompute() const
+ComPtr<ID3D12GraphicsCommandList> DXContext::GetCommandListCompute() const
 {
 	return m_command_list_compute.m_list;
 }
 
-Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> DXContext::GetCommandListCopy() const
+ComPtr<ID3D12GraphicsCommandList> DXContext::GetCommandListCopy() const
 {
 	return m_command_list_copy.m_list;
 }
 
-Microsoft::WRL::ComPtr<IDXGIFactory> DXContext::GetFactory() const
+ComPtr<IDXGIFactory> DXContext::GetFactory() const
 {
 	return m_factory;
 }
@@ -791,7 +789,7 @@ DXReportContext::~DXReportContext()
 	ReportLDO();
 }
 
-void DXReportContext::SetDevice(Microsoft::WRL::ComPtr<ID3D12Device> device, Microsoft::WRL::ComPtr<IDXGIAdapter> adapter)
+void DXReportContext::SetDevice(ComPtr<ID3D12Device> device, ComPtr<IDXGIAdapter> adapter)
 {
 	// Query fails if debug layer disabled
 	HRESULT result = device.As(&m_debug_device);
@@ -817,7 +815,7 @@ void DXReportContext::ReportLDO()
 	}
 
 	{
-		Microsoft::WRL::ComPtr<IDXGIDebug1> dxgi_debug{};
+		ComPtr<IDXGIDebug1> dxgi_debug{};
 		// Requires windows "Graphics Tool" optional feature
 		DXGIGetDebugInterface1(0, IID_PPV_ARGS(&dxgi_debug)) >> CHK;
 		OutputDebugStringW(std::to_wstring("Report Live DXGI Objects:\n").c_str());
@@ -844,7 +842,7 @@ std::string GetCommandTypeToString(const D3D12_COMMAND_LIST_TYPE& command_type)
 	return "";
 }
 
-DXCommand::DXCommand(Microsoft::WRL::ComPtr<ID3D12Device> device, const D3D12_COMMAND_LIST_TYPE& command_type)
+DXCommand::DXCommand(ComPtr<ID3D12Device> device, const D3D12_COMMAND_LIST_TYPE& command_type)
 	: m_command_type(command_type)
 {
 	const D3D12_COMMAND_QUEUE_DESC queue_desc =
@@ -876,7 +874,7 @@ DXCommand::~DXCommand()
 
 void DXCommand::BeginFrame()
 {
-	Microsoft::WRL::ComPtr<ID3D12CommandAllocator> command_allocator = m_command_allocators[m_frame_index];
+	ComPtr<ID3D12CommandAllocator> command_allocator = m_command_allocators[m_frame_index];
 	// Wait GPU using command allocator
 	// Free command allocator
 	command_allocator->Reset() >> CHK;

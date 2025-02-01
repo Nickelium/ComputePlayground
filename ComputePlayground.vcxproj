@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="packages\Microsoft.Direct3D.D3D12.1.716.0-preview\build\native\Microsoft.Direct3D.D3D12.props" Condition="Exists('packages\Microsoft.Direct3D.D3D12.1.716.0-preview\build\native\Microsoft.Direct3D.D3D12.props')" />
   <Import Project="packages\Microsoft.Direct3D.DXC.1.8.2407.12\build\native\Microsoft.Direct3D.DXC.props" Condition="Exists('packages\Microsoft.Direct3D.DXC.1.8.2407.12\build\native\Microsoft.Direct3D.DXC.props')" />
   <Import Project="packages\Microsoft.Direct3D.D3D12.1.615.0\build\native\Microsoft.Direct3D.D3D12.props" Condition="Exists('packages\Microsoft.Direct3D.D3D12.1.615.0\build\native\Microsoft.Direct3D.D3D12.props')" />
   <ItemGroup Label="ProjectConfigurations">
@@ -207,6 +208,7 @@ xcopy /y /d $(ProjectDir)dependencies\warp\d3d10warp.dll $(OutDir)</Command>
     <Import Project="packages\Microsoft.Direct3D.D3D12.1.615.0\build\native\Microsoft.Direct3D.D3D12.targets" Condition="Exists('packages\Microsoft.Direct3D.D3D12.1.615.0\build\native\Microsoft.Direct3D.D3D12.targets')" />
     <Import Project="packages\Microsoft.Direct3D.DXC.1.8.2407.12\build\native\Microsoft.Direct3D.DXC.targets" Condition="Exists('packages\Microsoft.Direct3D.DXC.1.8.2407.12\build\native\Microsoft.Direct3D.DXC.targets')" />
     <Import Project="packages\WinPixEventRuntime.1.0.240308001\build\WinPixEventRuntime.targets" Condition="Exists('packages\WinPixEventRuntime.1.0.240308001\build\WinPixEventRuntime.targets')" />
+    <Import Project="packages\Microsoft.Direct3D.D3D12.1.716.0-preview\build\native\Microsoft.Direct3D.D3D12.targets" Condition="Exists('packages\Microsoft.Direct3D.D3D12.1.716.0-preview\build\native\Microsoft.Direct3D.D3D12.targets')" />
   </ImportGroup>
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
     <PropertyGroup>
@@ -217,5 +219,7 @@ xcopy /y /d $(ProjectDir)dependencies\warp\d3d10warp.dll $(OutDir)</Command>
     <Error Condition="!Exists('packages\Microsoft.Direct3D.DXC.1.8.2407.12\build\native\Microsoft.Direct3D.DXC.props')" Text="$([System.String]::Format('$(ErrorText)', 'packages\Microsoft.Direct3D.DXC.1.8.2407.12\build\native\Microsoft.Direct3D.DXC.props'))" />
     <Error Condition="!Exists('packages\Microsoft.Direct3D.DXC.1.8.2407.12\build\native\Microsoft.Direct3D.DXC.targets')" Text="$([System.String]::Format('$(ErrorText)', 'packages\Microsoft.Direct3D.DXC.1.8.2407.12\build\native\Microsoft.Direct3D.DXC.targets'))" />
     <Error Condition="!Exists('packages\WinPixEventRuntime.1.0.240308001\build\WinPixEventRuntime.targets')" Text="$([System.String]::Format('$(ErrorText)', 'packages\WinPixEventRuntime.1.0.240308001\build\WinPixEventRuntime.targets'))" />
+    <Error Condition="!Exists('packages\Microsoft.Direct3D.D3D12.1.716.0-preview\build\native\Microsoft.Direct3D.D3D12.props')" Text="$([System.String]::Format('$(ErrorText)', 'packages\Microsoft.Direct3D.D3D12.1.716.0-preview\build\native\Microsoft.Direct3D.D3D12.props'))" />
+    <Error Condition="!Exists('packages\Microsoft.Direct3D.D3D12.1.716.0-preview\build\native\Microsoft.Direct3D.D3D12.targets')" Text="$([System.String]::Format('$(ErrorText)', 'packages\Microsoft.Direct3D.D3D12.1.716.0-preview\build\native\Microsoft.Direct3D.D3D12.targets'))" />
   </Target>
 </Project>

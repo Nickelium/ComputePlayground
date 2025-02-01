@@ -29,19 +29,19 @@ public:
 	~DXReportContext();
 
 	// Keeps device alive to report then free
-	void SetDevice(Microsoft::WRL::ComPtr<ID3D12Device> device, Microsoft::WRL::ComPtr<IDXGIAdapter> adapter);
+	void SetDevice(ComPtr<ID3D12Device> device, ComPtr<IDXGIAdapter> adapter);
 private:
 	// ReportLiveDeviceObjects, ref count 1 is normal since debug_device is the last one
 	void ReportLDO();
-	Microsoft::WRL::ComPtr<ID3D12DebugDevice2> m_debug_device;
-	Microsoft::WRL::ComPtr<IDXGIAdapter4> m_adapter;
+	ComPtr<ID3D12DebugDevice2> m_debug_device;
+	ComPtr<IDXGIAdapter4> m_adapter;
 };
 
 // Structure for a single thread to submit
 class DXCommand
 {
 public:
-	DXCommand(Microsoft::WRL::ComPtr<ID3D12Device> device, const D3D12_COMMAND_LIST_TYPE& command_type);
+	DXCommand(ComPtr<ID3D12Device> device, const D3D12_COMMAND_LIST_TYPE& command_type);
 	~DXCommand();
 
 	void BeginFrame();
@@ -50,11 +50,11 @@ private:
 	// Command type
 	D3D12_COMMAND_LIST_TYPE m_command_type;
 
-	Microsoft::WRL::ComPtr<ID3D12CommandQueue> m_command_queue;
+	ComPtr<ID3D12CommandQueue> m_command_queue;
 	// Number of command list == number of threads, can reuse commandlist after submission
-	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList6> m_command_list;
+	ComPtr<ID3D12GraphicsCommandList6> m_command_list;
 	// Number of command allocator == number of threads x backbuffer count
-	Microsoft::WRL::ComPtr<ID3D12CommandAllocator> m_command_allocators[g_backbuffer_count];
+	ComPtr<ID3D12CommandAllocator> m_command_allocators[g_backbuffer_count];
 
 	uint32 m_frame_index{ 0 };
 };
@@ -67,7 +67,7 @@ using CBV = DXDescriptor;
 // Store CPU / GPU descriptor handle from start
 struct DescriptorHeap
 {
-	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> m_heap;
+	ComPtr<ID3D12DescriptorHeap> m_heap;
 	D3D12_DESCRIPTOR_HEAP_TYPE m_heap_type;
 	uint32 m_number_descriptors;
 	uint32 m_increment_size;
@@ -75,27 +75,27 @@ struct DescriptorHeap
 
 struct CommandQueue
 {
-	Microsoft::WRL::ComPtr<ID3D12CommandQueue> m_queue;
+	ComPtr<ID3D12CommandQueue> m_queue;
 	D3D12_COMMAND_LIST_TYPE m_type;
 };
 
 // Esssentially the backing memory of all the commands in the commandlist
 struct CommandAllocator
 {
-	Microsoft::WRL::ComPtr<ID3D12CommandAllocator> m_allocator;
+	ComPtr<ID3D12CommandAllocator> m_allocator;
 	D3D12_COMMAND_LIST_TYPE m_type;
 };
 
 struct CommandList
 {
-	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList10> m_list;
+	ComPtr<ID3D12GraphicsCommandList10> m_list;
 	D3D12_COMMAND_LIST_TYPE m_type;
 	bool m_is_open = false;
 };
 
 struct Fence
 {
-	Microsoft::WRL::ComPtr<ID3D12Fence> m_gpu;
+	ComPtr<ID3D12Fence> m_gpu;
 	uint64 m_cpus[g_backbuffer_count];
 	uint64 m_value;
 	HANDLE m_event;
@@ -149,7 +149,13 @@ private:
 class DXContext
 {
 public:
-	DXContext();
+	DXContext
+	(
+		bool enable_debug_layer_cpu, 
+		bool enable_debug_layer_gpu, 
+		bool enable_dred, 
+		bool use_warp
+	);
 	~DXContext();
 
 	void OMSetRenderTargets
@@ -191,11 +197,11 @@ public:
 	void Transition(D3D12_RESOURCE_STATES new_resource_state, DXResource& resource) const;
 
 	// Note we use the full namespace Microsoft::WRL to help 10xEditor autocompletion
-	Microsoft::WRL::ComPtr<ID3D12Device14> GetDevice() const;
-	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList10> GetCommandListGraphics() const;
-	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList>GetCommandListCompute() const;
-	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> GetCommandListCopy() const;
-	Microsoft::WRL::ComPtr<IDXGIFactory> GetFactory() const;
+	ComPtr<ID3D12Device14> GetDevice() const;
+	ComPtr<ID3D12GraphicsCommandList10> GetCommandListGraphics() const;
+	ComPtr<ID3D12GraphicsCommandList>GetCommandListCompute() const;
+	ComPtr<ID3D12GraphicsCommandList> GetCommandListCopy() const;
+	ComPtr<IDXGIFactory> GetFactory() const;
 	CommandQueue GetCommandQueue() const;
 
 	void CreateDescriptorHeap
@@ -243,13 +249,10 @@ public:
 
 	RootSignature CreateRS(const Shader& shader) const;
 
-private:
-	void Init();
 public:
-	Microsoft::WRL::ComPtr<IDXGIFactory7> m_factory;
-	Microsoft::WRL::ComPtr<IDXGIAdapter4> m_adapter; // GPU
-	Microsoft::WRL::ComPtr<ID3D12Device14> m_device;
-	bool m_use_warp;
+	ComPtr<IDXGIFactory7> m_factory;
+	ComPtr<IDXGIAdapter4> m_adapter; // GPU
+	ComPtr<ID3D12Device14> m_device;
 public:
 	// Graphics + Compute + Copy
 	CommandQueue m_queue_graphics;

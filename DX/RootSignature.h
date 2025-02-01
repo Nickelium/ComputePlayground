@@ -2,5 +2,5 @@
 
 struct RootSignature
 {
-	Microsoft::WRL::ComPtr<ID3D12RootSignature> m_signature;
+	ComPtr<ID3D12RootSignature> m_signature;
 };

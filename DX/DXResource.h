@@ -29,12 +29,21 @@ public:
 	uint64 m_size_in_bytes;
 
 	D3D12_RESOURCE_STATES m_resource_state = D3D12_RESOURCE_STATE_COMMON;
-	Microsoft::WRL::ComPtr<ID3D12Resource> m_resource;
+	ComPtr<ID3D12Resource> m_resource;
 
 	D3D12_RESOURCE_DESC m_resource_desc;
 	// Some have heap, some not
 	D3D12_HEAP_PROPERTIES m_heap_properties;
+	ComPtr<ID3D12Heap> m_heap;
 
+	D3D12_HEAP_FLAGS m_heap_flags;
+
+	// 3 Types of main heap types for Heap Tier 1
+	//	D3D12_HEAP_FLAG_ALLOW_ONLY_RT_DS_TEXTURES 
+	//	D3D12_HEAP_FLAG_ALLOW_ONLY_NON_RT_DS_TEXTURES 
+	//	D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS
+
+	DXResource() : m_heap_flags(D3D12_HEAP_FLAG_ALLOW_ONLY_BUFFERS) {};
 	virtual void SetResourceInfo(D3D12_HEAP_TYPE heap_type, D3D12_RESOURCE_FLAGS resource_flags, uint64 bytes);
 	virtual void CreateResource(DXContext& dx_context, const std::string& name_resource);
 	
@@ -62,7 +71,7 @@ public:
 	uint32 m_height;
 	DXGI_FORMAT m_format;
 
-	virtual void SetResourceInfo(D3D12_HEAP_TYPE heap_type, D3D12_RESOURCE_FLAGS resource_flags, uint32 width, uint32 height, DXGI_FORMAT format);
+	virtual void SetResourceInfo(D3D12_HEAP_TYPE heap_type, D3D12_HEAP_FLAGS heap_flags, D3D12_RESOURCE_FLAGS resource_flags, uint32 width, uint32 height, DXGI_FORMAT format);
 	virtual void CreateResource(DXContext& dx_context, const std::string& name_resource);
 };
 
@@ -95,22 +104,35 @@ inline bool operator==(const ResourceDescription& rd1, const ResourceDescription
 class ResourceAllocator
 {
 public:
-	Microsoft::WRL::ComPtr<ID3D12Resource> CreateResource
+	std::pair
+	<
+	ComPtr<ID3D12Resource>, 
+	ComPtr<ID3D12Heap>
+	>
+	CreateResourceAndHeap
+	(
+		DXContext& dx_context, 
+		D3D12_HEAP_PROPERTIES heap_properties,
+		D3D12_HEAP_FLAGS heap_flags,
+		D3D12_RESOURCE_DESC resource_desc,
+		D3D12_RESOURCE_STATES resource_state
+	);
+	ComPtr<ID3D12Resource> CreateResource
 	(
 		DXContext& dx_context, 
 		D3D12_HEAP_PROPERTIES heap_properties,
 	    D3D12_RESOURCE_DESC resource_desc,
 		D3D12_RESOURCE_STATES resource_state
 	);
-	void AddCachedResource(const ResourceDescription& resource_description, Microsoft::WRL::ComPtr<ID3D12Resource> resource, D3D12_RESOURCE_STATES resource_state);
+	void AddCachedResource(const ResourceDescription& resource_description, ComPtr<ID3D12Resource> resource, D3D12_RESOURCE_STATES resource_state);
 private:
 	bool HasCachedResource(const ResourceDescription& resource_description) const;
-	std::pair<Microsoft::WRL::ComPtr<ID3D12Resource>, D3D12_RESOURCE_STATES> GetCachedResource(const ResourceDescription& resource_description);
+	std::pair<ComPtr<ID3D12Resource>, D3D12_RESOURCE_STATES> GetCachedResource(const ResourceDescription& resource_description);
 	// A resource is uniquely identified by the below
 	// Stored freed resources, dont actually free
 	// If request matches free, return something from the resource list
 	// Otherwise CreateCommitedResource
 	// Add when freed
-	std::vector<std::pair<ResourceDescription, std::pair<Microsoft::WRL::ComPtr<ID3D12Resource>, D3D12_RESOURCE_STATES>>> m_free_resource_list;
+	std::vector<std::pair<ResourceDescription, std::pair<ComPtr<ID3D12Resource>, D3D12_RESOURCE_STATES>>> m_free_resource_list;
 };
 

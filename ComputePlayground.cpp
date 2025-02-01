@@ -449,8 +449,8 @@ void ComputeWork
 	DXResource& output_resource
 )
 {
-	DXTextureResource gpu_resource;
-	gpu_resource.SetResourceInfo(D3D12_HEAP_TYPE_DEFAULT, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, dx_window.GetWidth(), dx_window.GetHeight(), output_resource.m_resource_desc.Format);
+	DXTextureResource gpu_resource{};
+	gpu_resource.SetResourceInfo(D3D12_HEAP_TYPE_DEFAULT, D3D12_HEAP_FLAG_ALLOW_ONLY_NON_RT_DS_TEXTURES, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS, dx_window.GetWidth(), dx_window.GetHeight(), output_resource.m_resource_desc.Format);
 	gpu_resource.CreateResource(dx_context, "GPU resource");
 	
 	dx_context.m_resource_handler.RegisterResource(gpu_resource);
@@ -572,7 +572,7 @@ void CreateWorkGraphResource
 
 	// These are not subtypes but you can QueryInterface as how ComPtr works apparently
 	// To figure out from which to what you can QueryInterface, look up the docs they said ..
-	Microsoft::WRL::ComPtr<ID3D12WorkGraphProperties> workgraph_properties;
+	ComPtr<ID3D12WorkGraphProperties> workgraph_properties;
 	resource.m_pso.m_so.As(&workgraph_properties) >> CHK;
 	uint32 workgraph_index = workgraph_properties->GetWorkGraphIndex(work_graph_wname.c_str());
 	D3D12_WORK_GRAPH_MEMORY_REQUIREMENTS mem_requirements{};
@@ -767,7 +767,11 @@ int main()
 	DXReportContext dx_report_context{};
 	{
 		std::shared_ptr<GPUCapture> gpu_capture = CreateGPUCapture(GPUCaptureType::PIX);
-		DXContext dx_context{};
+		bool enable_debug_layer_cpu = true;
+		bool enable_debug_layer_gpu = true;
+		bool enable_dred = true;
+		bool use_warp = false;
+		DXContext dx_context{enable_debug_layer_cpu, enable_debug_layer_gpu, enable_dred, use_warp};
 		dx_report_context.SetDevice(dx_context.GetDevice(), dx_context.m_adapter);
 		DXCompiler dx_compiler("shaders");
 		//RunWorkGraph(dx_context, dx_compiler, dynamic_cast<PIXCapture*>(gpu_capture) != nullptr);

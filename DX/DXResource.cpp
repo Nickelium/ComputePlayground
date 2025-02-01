@@ -71,11 +71,16 @@ ResourceAllocator g_resource_allocator;
 
 void DXResource::CreateResource(DXContext& dx_context, const std::string& name_resource)
 {
-	m_resource = g_resource_allocator.CreateResource
+//	ComPtr<ID3D12Resource> resource = g_resource_allocator.CreateResource
+//	(
+//		dx_context, m_heap_properties, m_resource_desc, m_resource_state
+//	);
+	auto[resource, heap] = g_resource_allocator.CreateResourceAndHeap
 	(
-		dx_context, m_heap_properties, m_resource_desc, m_resource_state
+		dx_context, m_heap_properties, m_heap_flags, m_resource_desc, m_resource_state
 	);
-	//dx_context.GetDevice()->CreateCommittedResource(&m_heap_properties, D3D12_HEAP_FLAG_NONE, &m_resource_desc, m_resource_state, nullptr, IID_PPV_ARGS(&m_resource)) >> CHK;
+	m_heap = heap;
+	m_resource = resource;
 	NAME_DX_OBJECT(m_resource, name_resource);
 #if !defined(_DEBUG)
 	UNUSED(name_resource);
@@ -104,8 +109,10 @@ void DXVertexBufferResource::CreateResource(DXContext& dx_context, const std::st
 	};
 }
 
-void DXTextureResource::SetResourceInfo(D3D12_HEAP_TYPE heap_type, D3D12_RESOURCE_FLAGS resource_flags, uint32 width, uint32 height, DXGI_FORMAT format)
+void DXTextureResource::SetResourceInfo(D3D12_HEAP_TYPE heap_type, D3D12_HEAP_FLAGS heap_flags, D3D12_RESOURCE_FLAGS resource_flags, uint32 width, uint32 height, DXGI_FORMAT format)
 {
+	m_heap_flags = heap_flags;
+
 	m_width = width;
 	m_height = height;
 	m_size_in_bytes = m_width * m_height;
@@ -146,7 +153,81 @@ void DXTextureResource::CreateResource(DXContext& dx_context, const std::string&
 	DXResource::CreateResource(dx_context, name_resource);
 }
 
-Microsoft::WRL::ComPtr<ID3D12Resource> ResourceAllocator::CreateResource
+ComPtr<ID3D12Heap> CreateHeap
+ (
+	 DXContext& dx_context, 
+	 const D3D12_HEAP_PROPERTIES& heap_properties, 
+	 uint64 bytes,
+	 D3D12_HEAP_FLAGS heap_flags
+ )
+{
+	ComPtr<ID3D12Heap> heap{};
+	D3D12_HEAP_DESC heap_desc
+	{
+		.SizeInBytes = bytes,
+		.Properties = heap_properties,
+		// We dont support D3D12_RESOURCE_FLAG_USE_TIGHT_ALIGNMENT
+		.Alignment = D3D12_DEFAULT_RESOURCE_PLACEMENT_ALIGNMENT,
+		// Unfortunately 1080 TI only support Resource Heap Tier 1, which means heap types cant be mixed together
+		.Flags = heap_flags,
+	};
+	dx_context.GetDevice()->CreateHeap(&heap_desc, IID_PPV_ARGS(&heap)) >> CHK;
+	return heap;
+}
+ComPtr<ID3D12Resource> CreateResourceFromHeap
+(
+	DXContext& dx_context,
+	::ComPtr<ID3D12Heap> heap,
+	uint64 heap_offset,
+	D3D12_RESOURCE_DESC resource_desc,
+	D3D12_RESOURCE_STATES resource_state
+)
+{
+	ComPtr<ID3D12Resource> resource{};
+	dx_context.GetDevice()->CreatePlacedResource(heap.Get(), heap_offset, &resource_desc, resource_state, nullptr, IID_PPV_ARGS(&resource)) >> CHK;
+	return resource;
+}
+
+std::pair
+<
+	ComPtr<ID3D12Resource>, 
+	ComPtr<ID3D12Heap>
+>
+CreateResourceAndHeap
+(	
+	DXContext& dx_context, 
+    D3D12_HEAP_PROPERTIES heap_properties,
+	D3D12_HEAP_FLAGS heap_flags,
+    D3D12_RESOURCE_DESC resource_desc,
+    D3D12_RESOURCE_STATES resource_state
+)
+{
+	D3D12_RESOURCE_ALLOCATION_INFO resource_allocation_info = dx_context.GetDevice()->GetResourceAllocationInfo(0, 1, &resource_desc);
+	uint64 heap_size = resource_allocation_info.SizeInBytes + resource_allocation_info.Alignment;
+	ComPtr<ID3D12Heap> heap = CreateHeap(dx_context, heap_properties, heap_size, heap_flags);
+	uint64 heap_offset = resource_allocation_info.Alignment;
+	ComPtr<ID3D12Resource> resource = CreateResourceFromHeap(dx_context, heap, heap_offset, resource_desc, resource_state);
+	return { resource, heap };
+}
+
+std::pair
+<
+	ComPtr<ID3D12Resource>, 
+	ComPtr<ID3D12Heap>
+>
+ResourceAllocator::CreateResourceAndHeap
+(	
+	DXContext& dx_context, 
+	D3D12_HEAP_PROPERTIES heap_properties,
+	D3D12_HEAP_FLAGS heap_flags,
+	D3D12_RESOURCE_DESC resource_desc,
+	D3D12_RESOURCE_STATES resource_state
+)
+{
+	return ::CreateResourceAndHeap(dx_context, heap_properties, heap_flags, resource_desc, resource_state);
+}
+
+ComPtr<ID3D12Resource> ResourceAllocator::CreateResource
 (
 	DXContext& dx_context, 
 	D3D12_HEAP_PROPERTIES heap_properties,
@@ -154,8 +235,9 @@ Microsoft::WRL::ComPtr<ID3D12Resource> ResourceAllocator::CreateResource
 	D3D12_RESOURCE_STATES resource_state
 ) 
 {
-	Microsoft::WRL::ComPtr<ID3D12Resource> final_resource{};
-	if (HasCachedResource( { resource_desc, heap_properties }))
+	ComPtr<ID3D12Resource> final_resource{};
+	if (false)
+	//if (HasCachedResource( { resource_desc, heap_properties }))
 	{
 		auto [resource, old_resource_state] = GetCachedResource( { resource_desc, heap_properties });
 		final_resource = resource;
@@ -203,7 +285,7 @@ bool ResourceAllocator::HasCachedResource(const ResourceDescription& resource_de
 	return false;
 }
 
-std::pair<Microsoft::WRL::ComPtr<ID3D12Resource>, D3D12_RESOURCE_STATES> ResourceAllocator::GetCachedResource(const ResourceDescription& resource_description)
+std::pair<ComPtr<ID3D12Resource>, D3D12_RESOURCE_STATES> ResourceAllocator::GetCachedResource(const ResourceDescription& resource_description)
 {
 	for (auto it = m_free_resource_list.begin(); it != m_free_resource_list.end(); ++it)
 	{
@@ -218,13 +300,13 @@ std::pair<Microsoft::WRL::ComPtr<ID3D12Resource>, D3D12_RESOURCE_STATES> Resourc
 	return {};
 }
 
-void ResourceAllocator::AddCachedResource(const ResourceDescription& resource_description, Microsoft::WRL::ComPtr<ID3D12Resource> resource, D3D12_RESOURCE_STATES resource_state)
+void ResourceAllocator::AddCachedResource(const ResourceDescription& resource_description, ComPtr<ID3D12Resource> resource, D3D12_RESOURCE_STATES resource_state)
 {
-	std::pair<ResourceDescription, Microsoft::WRL::ComPtr < ID3D12Resource> > new_element { resource_description, resource };
+	std::pair<ResourceDescription, ComPtr < ID3D12Resource> > new_element { resource_description, resource };
 	if (std::find_if
 	(
 		m_free_resource_list.begin(), m_free_resource_list.end(), 
-		[resource_description, resource](std::pair<ResourceDescription, std::pair<Microsoft::WRL::ComPtr<ID3D12Resource>, D3D12_RESOURCE_STATES>> element)
+		[resource_description, resource](std::pair<ResourceDescription, std::pair<ComPtr<ID3D12Resource>, D3D12_RESOURCE_STATES>> element)
 		{
 			return element.first == resource_description && element.second.first == resource;
 		}
@@ -254,10 +336,10 @@ void ResourceHandler::ReRegisterResource(DXResource& resource)
 
 void ResourceHandler::FreeResources()
 {
-	for (uint32 i = 0; i < m_resources[g_current_buffer_index].size(); ++i)
-	{
-		const DXResource& resource = m_resources[g_current_buffer_index][i];
-		g_resource_allocator.AddCachedResource( { resource.m_resource_desc, resource.m_heap_properties }, resource.m_resource, resource.m_resource_state);
-	}
+//	for (uint32 i = 0; i < m_resources[g_current_buffer_index].size(); ++i)
+//	{
+//		const DXResource& resource = m_resources[g_current_buffer_index][i];
+//		g_resource_allocator.AddCachedResource( { resource.m_resource_desc, resource.m_heap_properties }, resource.m_resource, resource.m_resource_state);
+//	}
 	m_resources[g_current_buffer_index].clear();
 }

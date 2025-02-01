@@ -37,14 +37,14 @@ void DXCompiler::Init(const std::string& directory)
 	m_utils->CreateDefaultIncludeHandler(&m_include_handler);
 }
 
-Shader DXCompiler::Compile(Microsoft::WRL::ComPtr<ID3D12Device> device, const ShaderDesc& shader_desc) const
+Shader DXCompiler::Compile(ComPtr<ID3D12Device> device, const ShaderDesc& shader_desc) const
 {
-	Microsoft::WRL::ComPtr<IDxcBlob> shader_blob;
+	ComPtr<IDxcBlob> shader_blob;
 	std::string shader_file = shader_desc.m_file_name;
 	ShaderType shader_type = shader_desc.m_type;
 	std::string entry_point = shader_desc.m_entry_point_name;
 	
-	Microsoft::WRL::ComPtr<IDxcBlobEncoding> shader_source{};
+	ComPtr<IDxcBlobEncoding> shader_source{};
 	const std::string shader_full_path = m_directory + "\\" + shader_file;
 	m_utils->LoadFile(std::to_wstring(shader_full_path).c_str(), nullptr, &shader_source) >> CHK;
 	DxcBuffer source_buffer{};
@@ -91,10 +91,10 @@ Shader DXCompiler::Compile(Microsoft::WRL::ComPtr<ID3D12Device> device, const Sh
 		compile_arguments_lpcwstr.push_back(argument.c_str());
 	}
 
-	Microsoft::WRL::ComPtr<IDxcResult> compileResult{};
+	ComPtr<IDxcResult> compileResult{};
 	m_compiler->Compile(&source_buffer, compile_arguments_lpcwstr.data(), (uint32)compile_arguments_lpcwstr.size(), m_include_handler.Get(), IID_PPV_ARGS(&compileResult)) >> CHK;
 	
-	Microsoft::WRL::ComPtr<IDxcBlobUtf8> errors{};
+	ComPtr<IDxcBlobUtf8> errors{};
 	compileResult->GetOutput(DXC_OUT_ERRORS, IID_PPV_ARGS(&errors), nullptr) >> CHK;
 	if (errors && errors->GetStringLength() > 0)
 	{

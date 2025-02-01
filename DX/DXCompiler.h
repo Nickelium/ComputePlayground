@@ -14,14 +14,14 @@ class DXCompiler
 {
 public:
 	DXCompiler(const std::string& directory);
-	Shader Compile(Microsoft::WRL::ComPtr<ID3D12Device> device, const ShaderDesc& shader_desc) const;
+	Shader Compile(ComPtr<ID3D12Device> device, const ShaderDesc& shader_desc) const;
 private:
 	void Init(const std::string& directory);
 	
 	bool m_debug;
 	std::string m_directory;
 
-	Microsoft::WRL::ComPtr<IDxcUtils> m_utils;
-	Microsoft::WRL::ComPtr<IDxcCompiler3> m_compiler;
-	Microsoft::WRL::ComPtr<IDxcIncludeHandler> m_include_handler;
+	ComPtr<IDxcUtils> m_utils;
+	ComPtr<IDxcCompiler3> m_compiler;
+	ComPtr<IDxcIncludeHandler> m_include_handler;
 };

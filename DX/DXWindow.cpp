@@ -164,7 +164,7 @@ void DXWindow::Init
 	GetBuffers();
 	UpdateBackBufferIndex();
 
-	Microsoft::WRL::ComPtr<IDXGIFactory1> factory{};
+	ComPtr<IDXGIFactory1> factory{};
 	m_swap_chain->GetParent(IID_PPV_ARGS(&factory)) >> CHK;
 	// Requires to GetParent factory to work
 
@@ -481,8 +481,8 @@ void DXWindow::CreateSwapChain(const DXContext& dxContext)
 		.AlphaMode = DXGI_ALPHA_MODE_IGNORE,
 		.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING,
 	};
-	Microsoft::WRL::ComPtr<IDXGISwapChain1> swapChain{};
-	Microsoft::WRL::ComPtr<IDXGIFactory5> factory3{};
+	ComPtr<IDXGISwapChain1> swapChain{};
+	ComPtr<IDXGIFactory5> factory3{};
 	dxContext.GetFactory().As(&factory3) >> CHK;
 	factory3->CreateSwapChainForHwnd
 	(
