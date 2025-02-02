@@ -14,7 +14,6 @@
 #include "DX/DXQuery.h"
 #include "core/GPUCapture.h"
 #include "DX/PSO.h"
-#include "maths/LinearAlgebra.h"
 
 #include <pix3.h>
 
@@ -740,7 +739,6 @@ std::shared_ptr<GPUCapture> CreateGPUCapture(GPUCaptureType type)
 	// RenderDoc doesnt support WorkGraph and newer interfaces
 	else if(type == GPUCaptureType::RENDERDOC) return std::make_shared<RenderDocCapture>();
 	else { ASSERT(false); return nullptr; }
-	//return 
 }
 
 // Use this to attach debugger when running from PIX or Nsight Graphics to detect the crash
@@ -777,6 +775,5 @@ int main()
 		//RunWorkGraph(dx_context, dx_compiler, dynamic_cast<PIXCapture*>(gpu_capture) != nullptr);
 		RunWindowLoop(dx_context, dx_compiler, gpu_capture.get());
 	}
-	
 	return 0;
 }

@@ -9,23 +9,25 @@
 #include <dxgidebug.h>
 #endif
 
-#include <map>
-
 DXContext::~DXContext()
 {
+	UnregisterWait(m_device_removed_handle);
 #if defined(_DEBUG)
-	ComPtr<ID3D12InfoQueue1> info_queue{};
-	HRESULT result = m_device.As(&info_queue);
-	// Query fails if debug layer disabled
-	if (result == S_OK)
+	if (m_device)
 	{
-		// Reset back breaks otherwise breaks in ReportLiveDeviceObjects
-		info_queue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_CORRUPTION, false) >> CHK;
-		info_queue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_WARNING, false) >> CHK;
-		info_queue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, false) >> CHK;
-		if (m_callback_handle != 0)
+		ComPtr<ID3D12InfoQueue1> info_queue{};
+		HRESULT result = m_device.As(&info_queue);
+		// Query fails if debug layer disabled
+		if (result == S_OK)
 		{
-			info_queue->UnregisterMessageCallback(m_callback_handle) >> CHK;
+			// Reset back breaks otherwise breaks in ReportLiveDeviceObjects
+			info_queue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_CORRUPTION, false) >> CHK;
+			info_queue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_WARNING, false) >> CHK;
+			info_queue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, false) >> CHK;
+			if (m_callback_handle != 0)
+			{
+				info_queue->UnregisterMessageCallback(m_callback_handle) >> CHK;
+			}
 		}
 	}
 #endif
@@ -336,6 +338,7 @@ DXContext::DXContext
 	dxgi_factory_flag |= DXGI_CREATE_FACTORY_DEBUG;
 #endif
 	CreateDXGIFactory2(dxgi_factory_flag, IID_PPV_ARGS(&m_factory)) >> CHK;
+	NAME_DXGI_OBJECT(m_factory, "Factory");
 
 	if (use_warp)
 	{
@@ -345,6 +348,7 @@ DXContext::DXContext
 	{
 		m_factory->EnumAdapterByGpuPreference(0, DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE, IID_PPV_ARGS(&m_adapter)) >> CHK;
 	}
+	NAME_DXGI_OBJECT(m_adapter, "Adapter");
 
 	DXGI_ADAPTER_DESC adapter_desc = GetAdapterDesc(m_adapter);
 	LogTrace(std::to_string(adapter_desc.Description));
@@ -361,6 +365,7 @@ DXContext::DXContext
 
 	D3D_FEATURE_LEVEL max_feature_level = GetMaxFeatureLevel(m_adapter);
 	D3D12CreateDevice(m_adapter.Get(), max_feature_level, IID_PPV_ARGS(&m_device)) >> CHK;
+	NAME_DX_OBJECT(m_device, "Device");
 
 #if defined(_DEBUG)
 	m_device->SetStablePowerState(true);
@@ -412,8 +417,11 @@ DXContext::DXContext
 #endif
 
 	CreateCommandQueue(D3D12_COMMAND_LIST_TYPE_DIRECT, m_queue_graphics);
+	NAME_DX_OBJECT(m_queue_graphics.m_queue, "Queue graphics");
 	CreateCommandQueue(D3D12_COMMAND_LIST_TYPE_COMPUTE, m_queue_compute);
+	NAME_DX_OBJECT(m_queue_compute.m_queue, "Queue compute");
 	CreateCommandQueue(D3D12_COMMAND_LIST_TYPE_COPY, m_queue_copy);
+	NAME_DX_OBJECT(m_queue_copy.m_queue, "Queue copy");
 
 	m_command_allocator_graphics.resize(g_backbuffer_count);
 	// CommandAllocator has to wait that all commands in the command list has been executed by the GPU before reuse
@@ -423,32 +431,32 @@ DXContext::DXContext
 		CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, m_command_allocator_graphics[i]);
 		NAME_DX_OBJECT(m_command_allocator_graphics[i].m_allocator, std::string("Command Allocator GFX {0}", i));
 	}
-	
 	CreateCommandList(D3D12_COMMAND_LIST_TYPE_DIRECT, m_command_allocator_graphics[0], m_command_list_graphics);
 	NAME_DX_OBJECT(m_command_list_graphics.m_list, "CommandList GFX");
 
 	CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_COMPUTE, m_command_allocator_compute);
 	NAME_DX_OBJECT(m_command_allocator_compute.m_allocator, "Command Allocator Compute");
 	CreateCommandList(D3D12_COMMAND_LIST_TYPE_COMPUTE, m_command_allocator_compute, m_command_list_compute);
-	NAME_DX_OBJECT(m_command_list_graphics.m_list, "CommandList Compute");
+	NAME_DX_OBJECT(m_command_list_compute.m_list, "CommandList Compute");
 
 	CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_COPY, m_command_allocator_copy);
 	NAME_DX_OBJECT(m_command_allocator_copy.m_allocator, "Command Allocator Copy");
 	CreateCommandList(D3D12_COMMAND_LIST_TYPE_COPY, m_command_allocator_copy, m_command_list_copy);
-	NAME_DX_OBJECT(m_command_list_graphics.m_list, "CommandList Copy");
-	
+	NAME_DX_OBJECT(m_command_list_copy.m_list, "CommandList Copy");
+
 	CreateFence(m_fence);
+	NAME_DX_OBJECT(m_fence.m_gpu, "Fence");
 
 	CreateFence(m_device_removed_fence);
+	NAME_DX_OBJECT(m_device_removed_fence.m_gpu, "Device removed fence");
 	// On device removal all fences will be set to uint64_max
 	m_device_removed_fence.m_gpu->SetEventOnCompletion(UINT64_MAX, m_device_removed_fence.m_event);
 
 	// Callback on event triggered
 	// None blocking operation from this thread
-	HANDLE wait_handle{};
 	bool result = RegisterWaitForSingleObject
 	(
-		&wait_handle,
+		&m_device_removed_handle,
 		m_device_removed_fence.m_event,
 		OnDeviceRemoved,
 		m_device.Get(), // Pass the device as our context
@@ -457,25 +465,12 @@ DXContext::DXContext
 	);
 	ASSERT(result);
 
-	NAME_DXGI_OBJECT(m_factory, "Factory");
-	NAME_DXGI_OBJECT(m_adapter, "Adapter");
 
-	NAME_DX_OBJECT(m_device, "Device");
-	NAME_DX_OBJECT(m_queue_graphics.m_queue, "Queue graphics");
 	for (uint32 i = 0; i < m_command_allocator_graphics.size(); ++i)
 	{
 		std::string str = "Command allocator graphics " + std::to_string(i);
 		NAME_DX_OBJECT(m_command_allocator_graphics[i].m_allocator, "Command allocator graphics");
 	}
-	NAME_DX_OBJECT(m_command_list_graphics.m_list, "Command list graphics");
-	NAME_DX_OBJECT(m_queue_compute.m_queue, "Queue compute");
-	NAME_DX_OBJECT(m_command_allocator_compute.m_allocator, "Command allocator compute");
-	NAME_DX_OBJECT(m_command_list_compute.m_list, "Command list compute");
-	NAME_DX_OBJECT(m_queue_copy.m_queue, "Command allocator copy");
-	NAME_DX_OBJECT(m_command_allocator_copy.m_allocator, "Command allocator copy");
-	NAME_DX_OBJECT(m_command_list_copy.m_list, "Command list copy");
-	NAME_DX_OBJECT(m_fence.m_gpu, "Fence");
-	NAME_DX_OBJECT(m_device_removed_fence.m_gpu, "Device removed fence");
 
 	CacheDescriptorSizes();
 	//const uint32 max_allowed_cbv_srv_uav_descriptors = 1000000;
@@ -800,13 +795,16 @@ void DXReportContext::SetDevice(ComPtr<ID3D12Device> device, ComPtr<IDXGIAdapter
 void DXReportContext::ReportLDO()
 {
 #if defined(_DEBUG)
-	auto[vram_bytes_used, vram_bytes_budget] = GetVRAM(m_adapter);
-	LogTrace("VRAM usage: {0} MB / {1} MB", ToMB(vram_bytes_used), ToMB(vram_bytes_budget));
+	if (m_adapter)
+	{
+		auto[vram_bytes_used, vram_bytes_budget] = GetVRAM(m_adapter);
+		LogTrace("VRAM usage: {0} MB / {1} MB", ToMB(vram_bytes_used), ToMB(vram_bytes_budget));
 
-	auto[system_ram_bytes_used, system_ram_bytes_budget] = GetSystemRAM(m_adapter);
-	LogTrace("System RAM usage: {0} MB / {1} MB", ToMB(system_ram_bytes_used), ToMB(system_ram_bytes_budget));
-	
-	m_adapter.Reset();
+		auto[system_ram_bytes_used, system_ram_bytes_budget] = GetSystemRAM(m_adapter);
+		LogTrace("System RAM usage: {0} MB / {1} MB", ToMB(system_ram_bytes_used), ToMB(system_ram_bytes_budget));
+
+		if (m_adapter) m_adapter.Reset();
+	}
 
 	if (m_debug_device)
 	{

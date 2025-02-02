@@ -10,7 +10,7 @@
 
 // Agility SDK needs to be included in main.cpp
 #define AGILITY_SDK_DECLARE() extern "C" { __declspec(dllexport) extern const UINT D3D12SDKVersion = 716; } \
-extern "C" { __declspec(dllexport) extern const char* D3D12SDKPath = ".\\D3D12\\"; }
+extern "C" { __declspec(dllexport) extern const char* D3D12SDKPath = ".\\AgilitySDK\\"; }
 
 static const uint32 g_backbuffer_count = 3u;
 

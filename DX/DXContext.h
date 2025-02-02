@@ -280,6 +280,7 @@ public:
 	Fence m_fence;
 private:
 	Fence m_device_removed_fence;
+	HANDLE m_device_removed_handle{};
 
 	void CacheDescriptorSizes();
 #if defined(_DEBUG)

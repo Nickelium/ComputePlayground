@@ -39,9 +39,6 @@
     <ClCompile Include="DX\DXResource.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="maths\LinearAlgebra.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="DX\DXQuery.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -114,9 +111,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="DX\DXResource.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="maths\LinearAlgebra.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="core\Types.h">

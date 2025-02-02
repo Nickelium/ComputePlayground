@@ -9,7 +9,7 @@
 // Added _SILENCE_STDEXT_ARR_ITERS_DEPRECATION_WARNING globally to silence spdlog fmt issue with latest MSVC
 #define SPDLOG_ACTIVE_LEVEL SPDLOG_LEVEL_TRACE
 // Release version 1.13
-#include "spdlog/spdlog.h"
+#include <spdlog/spdlog.h>
 #endif
 
 #if defined(LOG_ENABLE)

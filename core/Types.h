@@ -41,15 +41,3 @@ inline int8 MinType()
 	int8 max_abs_value = static_cast < int8>(1 << 7);
 	return -max_abs_value;
 }
-
-using int2 = int32[2];
-using int3 = int32[3]; 
-using int4 = int32[4];
-
-using uint2 = uint32[2];
-using uint3 = uint32[3]; 
-using uint4 = uint32[4];
-
-using float2 = float32[2];
-using float3 = float32[3]; 
-using float4 = float32[4];
